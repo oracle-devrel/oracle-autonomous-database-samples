@@ -11,8 +11,14 @@ The steps below show how to create an Autonomous Database using the Azure CLI.
 * [Subscribe to Oracle Database@Azure](https://www.youtube.com/watch?v=MEB8kB_TI2I) 
 * Ensure you have the appropriate user groups and privileges. See [details for onboarding Autonomous Database](https://learn.microsoft.com/en-us/azure/oracle/oracle-db/onboard-oracle-database)
 
-## Deploy your Autonomous Database
-Use the following scripts to deploy your infrastructure and Autonomous Database. You can run the scripts independently or run `create-all-resources.sh`. Simply update the [`config`](#configuration-file) prior to running the scripts:
+## Deploy your Autonomous Database and your infrastructure
+Use the following scripts to deploy your infrastructure and Autonomous Database:
+
+![deployment](../images/azure-deployment.png)
+
+**Note:** Azure OpenAI is used by the samples - but the scripts do not deploy the resource.
+f
+You can run the scripts independently or run `create-all-resources.sh`. Simply update the [`config`](#configuration-file) prior to running the scripts:
 
 |Script|Description|
 |----|---|

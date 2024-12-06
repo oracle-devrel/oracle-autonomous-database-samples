@@ -15,7 +15,11 @@ The steps below show how to create an Autonomous Database using the OCI CLI.
     * [Use OCI Object Storage](https://docs.oracle.com/en-us/iaas/Content/Security/Reference/objectstorage_security.htm#iam-policies)
 
 ## Deploy your Autonomous Database
-Use the following scripts to deploy your Autonomous Database and sample data. You can run the scripts independently or run `create-all-resources.sh`. Simply update the [`config`](#configuration-file) prior to running the scripts:
+Use the following scripts to deploy your Autonomous Database and sample data on OCI. Because the sample script deploys ADB on a public endpoint, the architecture is very simple: 
+
+![ADB on OCI](../images/oci-adb-github-samples.drawio.png)
+
+You can run the scripts independently or run `create-all-resources.sh`. Simply update the [`config`](#configuration-file) prior to running the scripts:
 
 |Script|Description|
 |----|---|
@@ -66,9 +70,10 @@ JDBC is a common way to connect to Autonomous Database. For example, you can use
 
 Notice the `jdbc:oracle:thin:@` prefix followed by a connection string. You can find the connection string in different ways. 
 
-1. Go to your Autonomous Database blade in the Azure Portal and go to **Settings -> Connections**:
-    ![Azure Portal connections](../images/connections-portal.png)
-2. Use the Azure cli script [`show-adb-info.sh`](./show-adb-info.sh). That script will return information about your Autonomous Database, including connection details.
+1. Go to your Autonomous Database instance in the OCI Console and click **Database Connections**:
+![connection dialog](../images/connection-console-oci.png)
+
+2. Use the OCI cli script [`show-adb-info.sh`](./show-adb-info.sh). That script will return information about your Autonomous Database, including connection details.
 
 <hr>
 Copyright (c) 2024 Oracle and/or its affiliates.<br>
