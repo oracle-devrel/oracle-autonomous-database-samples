@@ -62,11 +62,9 @@ Since Autonomous AI Database has APEX built in, after creating your APEX
 workspace, simply import the Ask Oracle application using the APEX App
 Builder. This quick video will guide through the steps.
 
-* [Install Ask Oracle Chatbot]([https://github.com/oracle-devrel/oracle-autonomous-database-samples](https://github.com/oracle-devrel/oracle-autonomous-database-samples/blob/main/apex/images/Ask%20Oracle%20App%20Installation%20video.mp4))
+* [Install Ask Oracle Chatbot](https://youtu.be/Q1iafqiVqgs)
 
-VIDEO LINK
-
-* [You can download the Ask Oracle APEX app here:]([https://github.com/oracle-devrel/oracle-autonomous-database-samples/blob/main/apex/apex/Ask-Oracle/ADB-AskOracle-Chatbot-2025-10-07.sql?raw=true](https://github.com/oracle-devrel/oracle-autonomous-database-samples/blob/main/apex/Ask-Oracle/ADB-AskOracle-Chatbot-2025-10-07.sql))
+* [You can download the Ask Oracle APEX app here](https://github.com/oracle-devrel/oracle-autonomous-database-samples/blob/main/apex/Ask-Oracle/ADB-AskOracle-Chatbot-2025-10-07.sql)
 
 # Resources
 
