@@ -1,12 +1,36 @@
 # About Select AI
 
-**Select AI** lets you use natural language to interact with your database and large language models (LLMs) directly through SQL. It’s designed to enhance user productivity and simplify the development of AI-based applications. With Select AI, you can generate, run, and explain SQL from natural language prompts, perform retrieval-augmented generation (RAG) using vector stores, generate synthetic data, or even chat with an LLM - all from a familiar SQL interface.
+**Select AI** — a feature of **Oracle Autonomous AI Database** — supports building AI-enabled applications and tools that leverage large language models (LLMs) and transformers from a wide range of AI providers or privately hosted AI models.  
 
-When you use Select AI, **Oracle Autonomous AI Database** manages the process of converting natural language into SQL. This means you can provide natural language prompts instead of writing SQL code to explore and query your data. Select AI serves as a productivity tool for experienced SQL developers and empowers non-expert users to extract insights without needing to understand database schemas or query syntax.
+Using SQL, PL/SQL, and Python APIs, Select AI allows you to query data using natural language prompts against your database data, leverage retrieval-augmented generation (RAG) for LLM responses grounded in your trusted data sources, and generate synthetic data, among other capabilities.
 
-Select AI also automates the **retrieval-augmented generation (RAG)** workflow: generating vector embeddings, performing semantic similarity searches, and retrieving relevant content from your vector store. Additional capabilities include **synthetic data generation**, **chat history support**, and other advanced AI functions - all accessible through SQL.
+For natural language-to-SQL (NL2SQL) generation, you can ask questions like:  
+*“Show me last quarter’s top-selling products.”*  
+Select AI — using your selected LLM — converts the question into SQL and runs it securely against your database. You can view the generated SQL, produce an explanation of each query step, automatically run the query, or receive a natural-language narration of the results.  
 
-The [DBMS_CLOUD_AI](https://docs.oracle.com/en/cloud/paas/autonomous-database/serverless/adbsb/dbms-cloud-ai-package.html#GUID-000CBBD4-202B-4E9B-9FC2-B9F2FF20F246) PL/SQL package provides programmatic integration with user-specified LLMs. It automatically augments prompts with schema metadata, enabling natural language-to-SQL translation, RAG with vector stores, synthetic data generation, and conversational LLM sessions. The package supports multiple AI providers and LLMs listed under [Select Your AI Provider and LLMs](https://docs.oracle.com/en/cloud/paas/autonomous-database/serverless/adbsb/select-ai-about.html#GUID-FDAEF22A-5DDF-4BAE-A465-C1D568C75812) in the Oracle documentation.
+Select AI serves as a productivity tool for experienced SQL developers and empowers non-experts to extract insights without needing to understand database schemas or SQL syntax.
+
+---
+
+## Key Features
+
+- **Retrieval-augmented generation (RAG)** using AI Vector Search for precise, context-aware answers  
+- **Synthetic data generation** for safer, scalable development and testing  
+- **Text translation and summarization** capabilities  
+- **Select AI Agents** to build, orchestrate, and run AI agents that automate end-to-end, data-driven workflows  
+
+---
+
+## Resources
+
+- [Autonomous AI Database Select AI](https://docs.oracle.com/en/cloud/paas/autonomous-database/serverless/adbsb/select-ai-about.html)  
+- [Getting Started with Select AI](https://docs.oracle.com/en/cloud/paas/autonomous-database/serverless/adbsb/select-ai-get-started.html)  
+- [DBMS_CLOUD_AI](https://docs.oracle.com/en/cloud/paas/autonomous-database/serverless/adbsb/dbms-cloud-ai-package.html)  
+- [DBMS_CLOUD_AI_AGENT](https://docs.oracle.com/en/cloud/paas/autonomous-database/serverless/adbsb/dbms-cloud-ai-agent-package.html)  
+- [Blog: Chat with Your Data in Autonomous Database Using Generative AI](https://blogs.oracle.com/ai-and-database/post/chat-with-your-data-in-autonomous-database-using-generative-ai)  
+- [LiveLabs: Develop Apps Using GenAI, Autonomous Database, and React](https://apexapps.oracle.com/pls/apex/dbpm/r/livelabs/view-workshop?wid=3863)  
+- [LiveLabs: Develop AI RAG Apps with Autonomous Database Select AI](https://apexapps.oracle.com/pls/apex/dbpm/r/livelabs/view-workshop?wid=4007)  
+- [Ask Oracle – sample Oracle APEX application](https://github.com/oracle-devrel/oracle-autonomous-database-samples/tree/main/apex/Ask-Oracle)
 
 ---
 
@@ -16,10 +40,3 @@ The [DBMS_CLOUD_AI](https://docs.oracle.com/en/cloud/paas/autonomous-database/se
 - **python/**
 - **r/**
 - **notebooks/**
-
----
-
-## Related Repository
-
-[**Ask Oracle**](https://github.com/oracle-devrel/oracle-autonomous-database-samples/tree/main/apex/Ask-Oracle) allows you to query data in Autonomous Database using natural language.  
-It uses the AI profiles stored in the current user's schema, supporting both natural language to SQL and retrieval-augmented generation (RAG).
