@@ -32,15 +32,21 @@ functionality for Select AI:
   agents for ease of selection and easily see which profile/action or
   agent used for each prompt
 
-![NL2SQL](../images/NL2SQL-chart.png)
+![NL2SQL](../images/Chatbot-for-NL2SQL_with_chart.png)
 
 ***Figure 1: Ask Oracle chatbot for NL2SQL with chart and SQL
-displayed***
 
-![settings1](../images/chatbot-settings1.png) ![settings1](../images/chatbot-settings2.png) ![settings1](../images/chatbot-settings3.png)
+![settings1](../images/chatbot-settings1.png) 
 
-***Figure 2: Ask Oracle chatbot settings for NL2SQL and RAG AI profiles
-as well as Agent Team***
+***Figure 2: Ask Oracle Chatbot for NL2SQL Profile Settings
+
+![settings1](../images/chatbot-settings2.png) 
+
+***Figure 3: Ask Oracle Chatbot RAG AI Profile Settings
+
+![settings1](../images/chatbot-settings3.png)
+
+***Figure4: Ask Oracle Chatbot Agent Team Settings
 
 ## What is Select AI? 
 
