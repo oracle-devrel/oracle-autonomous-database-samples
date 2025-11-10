@@ -1,0 +1,4057 @@
+[
+  {
+    "name" : "SelectAI4SQL - AI Agents - Sales Return Agent (6)",
+    "description" : null,
+    "tags" : null,
+    "version" : "7",
+    "layout" : "zeppelin",
+    "type" : "low",
+    "snapshot" : false,
+    "isEditable" : true,
+    "isRunnable" : true,
+    "template" : "dsrgmn3y",
+    "templateConfig" : "{\"visualization\":{\"filters\":[{\"_id\":1583324064459,\"type\":\"styling\",\"enabled\":true,\"conditions\":{\"operator\":\"and\",\"conditions\":[{\"property\":\"hiddenConnection\",\"operator\":\"*\",\"value\":\"\"}]},\"component\":\"edge\",\"target\":\"edge\",\"properties\":{\"colors\":[\"rgba(0, 0, 0, 0.1)\"],\"style\":[\"dashed\"],\"legendTitle\":[\"Hidden Connection\"]}},{\"_id\":1590499315755,\"type\":\"aggregation\",\"enabled\":true,\"conditions\":{\"operator\":\"and\",\"conditions\":[]},\"component\":\"vertex\",\"target\":\"vertex\",\"properties\":{},\"aggregation\":[{\"source\":\"\",\"type\":\"average\"}]}],\"version\":4}}",
+    "paragraphs" : [
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : null,
+        "hasTitle" : false,
+        "message" : [ ],
+        "selectedVisualization" : null,
+        "visualizationConfig" : null,
+        "hideCode" : true,
+        "hideResult" : true,
+        "hideGutter" : true,
+        "hideVizConfig" : true,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1760028496305,
+          "endTime" : 1760028496871,
+          "interpreter" : "md.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [ ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : null,
+        "hasTitle" : false,
+        "message" : [
+          "%md\r",
+          "\r",
+          "# Build agentic solutions using Select AI - Sales Return Agent\r",
+          "\r",
+          "Select AI Agent provides a simple, automated framework to build, deploy, and manage AI agents. Users access the functionality via the package DBMS_CLOUD_AI_AGENT. \r",
+          "Select AI Agent provides the *ReAct* agentic pattern as a built-in feature but accommodates multiple agentic patterns - including prompt chaining, \r",
+          "routing, orchestrator-workers, and evaluator-optimizer.\r",
+          "\r",
+          "In this notebook, you will create a simple sales return agent that interacts with the customer to process a product return request. \r",
+          "The agent asks the reason for the return and handle the return accordingly. \r",
+          "\r",
+          "#### What is an AI agent?\r",
+          "\r",
+          "An AI agent is a software program or system designed to interact with its environment, collect and use data, formulate next actions, \r",
+          "and autonomously perform tasks to achieve specific goals.\r",
+          "\r",
+          "While generative AI supports creating content (as the case with LLMs), \r",
+          "agentic AI enables performing actions and making decisions to achieve specific goals, \r",
+          "potentially with no or minimal human intervention. \r",
+          "\r",
+          "#### Select AI Agent concepts\r",
+          "\r",
+          " * Agent Team - the set of agents and tasks that form an agentic flow\r",
+          " * Agent - an actor in an agent team with a defined role that can perform one or more tasks using a specified AI profile\r",
+          " * Task - an activity performed by a actor with a set of instructions and one or more tools to carry out the activity\r",
+          " * Tool - used to affect changes or access content in support of tasks and consist of instructions (what the tool does), a tool type, and tool parameters\r",
+          "\r",
+          "#### ReAct agentic pattern\r",
+          "\r",
+          "ReAct = Reasoning + Acting - allowing your LLM to “think” before it “acts”\r",
+          "\r",
+          "Supports a wide range of agentic use cases \r",
+          "* Reasoning - chain-of-thought on needed tasks\r",
+          "* Tool use - elect and invoke tools to affect environment\r",
+          "* Evaluation/reflection - loop until outcome is satisfactory\r",
+          "\r",
+          "Enable Select AI Agent by granting the following privileges to your user. Administrator privileges required to perform these operations:\r",
+          "* `grant execute on DBMS_CLOUD_AI to <username>;`\r",
+          "* `grant execute on DBMS_CLOUD_AI_AGENT to <username>;`\r",
+          "\r",
+          "---\r",
+          "Copyright (c) 2025 Oracle Corporation  \r",
+          "###### [The Universal Permissive License (UPL), Version 1.0](https://oss.oracle.com/licenses/upl/)"
+        ],
+        "selectedVisualization" : "html",
+        "visualizationConfig" : null,
+        "hideCode" : true,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : true,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1760021255360,
+          "endTime" : 1760021255739,
+          "interpreter" : "md.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "<h1 id=\"build-agentic-solutions-using-select-ai---sales-return-agent\">Build agentic solutions using Select AI - Sales Return Agent</h1>\n<p>Select AI Agent provides a simple, automated framework to build, deploy, and manage AI agents. Users access the functionality via the package DBMS_CLOUD_AI_AGENT.\nSelect AI Agent provides the <em>ReAct</em> agentic pattern as a built-in feature but accommodates multiple agentic patterns - including prompt chaining,\nrouting, orchestrator-workers, and evaluator-optimizer.</p>\n<p>In this notebook, you will create a simple sales return agent that interacts with the customer to process a product return request.\nThe agent asks the reason for the return and handle the return accordingly.</p>\n<h4 id=\"what-is-an-ai-agent\">What is an AI agent?</h4>\n<p>An AI agent is a software program or system designed to interact with its environment, collect and use data, formulate next actions,\nand autonomously perform tasks to achieve specific goals.</p>\n<p>While generative AI supports creating content (as the case with LLMs),\nagentic AI enables performing actions and making decisions to achieve specific goals,\npotentially with no or minimal human intervention.</p>\n<h4 id=\"select-ai-agent-concepts\">Select AI Agent concepts</h4>\n<ul>\n<li>Agent Team - the set of agents and tasks that form an agentic flow</li>\n<li>Agent - an actor in an agent team with a defined role that can perform one or more tasks using a specified AI profile</li>\n<li>Task - an activity performed by a actor with a set of instructions and one or more tools to carry out the activity</li>\n<li>Tool - used to affect changes or access content in support of tasks and consist of instructions (what the tool does), a tool type, and tool parameters</li>\n</ul>\n<h4 id=\"react-agentic-pattern\">ReAct agentic pattern</h4>\n<p>ReAct = Reasoning + Acting - allowing your LLM to “think” before it “acts”</p>\n<p>Supports a wide range of agentic use cases</p>\n<ul>\n<li>Reasoning - chain-of-thought on needed tasks</li>\n<li>Tool use - elect and invoke tools to affect environment</li>\n<li>Evaluation/reflection - loop until outcome is satisfactory</li>\n</ul>\n<p>Enable Select AI Agent by granting the following privileges to your user. Administrator privileges required to perform these operations:</p>\n<ul>\n<li><code>grant execute on DBMS_CLOUD_AI to &lt;username&gt;;</code></li>\n<li><code>grant execute on DBMS_CLOUD_AI_AGENT to &lt;username&gt;;</code></li>\n</ul>\n<hr />\n<p>Copyright (c) 2025 Oracle Corporation</p>\n<h6 id=\"the-universal-permissive-license-upl-version-10\"><a href=\"https://oss.oracle.com/licenses/upl/\">The Universal Permissive License (UPL), Version 1.0</a></h6>\n",
+              "type" : "HTML"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : "For more information...",
+        "hasTitle" : true,
+        "message" : [
+          "%md",
+          "",
+          "* <a href=\"https://docs.oracle.com/en/cloud/paas/autonomous-database/serverless/adbsb/select-ai.html\" target=\"_blank\" rel=\"noopener noreferrer\">Oracle Select AI documentation</a>",
+          "* <a href=\"https://docs.oracle.com/en/cloud/paas/autonomous-database/serverless/adbsb/dbms-cloud-ai-package.html\" target=\"_blank\" rel=\"noopener noreferrer\">DBMS_CLOUD_AI Package documentation</a>"
+        ],
+        "selectedVisualization" : "html",
+        "visualizationConfig" : null,
+        "hideCode" : true,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : true,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1760021259515,
+          "endTime" : 1760021259879,
+          "interpreter" : "md.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "<ul>\n<li><a href=\"https://docs.oracle.com/en/cloud/paas/autonomous-database/serverless/adbsb/select-ai.html\" target=\"_blank\" rel=\"noopener noreferrer\">Oracle Select AI documentation</a></li>\n<li><a href=\"https://docs.oracle.com/en/cloud/paas/autonomous-database/serverless/adbsb/dbms-cloud-ai-package.html\" target=\"_blank\" rel=\"noopener noreferrer\">DBMS_CLOUD_AI Package documentation</a></li>\n</ul>\n",
+              "type" : "HTML"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 5,
+        "title" : null,
+        "hasTitle" : false,
+        "message" : [
+          "%md",
+          "",
+          "## Develop a sales return agent",
+          "",
+          "If you've ordered a product online, you likely at some point also had to return an item whether the product arrived broken or you no longer needed the item. ",
+          "This \"sales return agent\" scenario uses your database and LLM to interact with the user to handle product returns. This agent will inquire as to why the",
+          "item is being returned and perform some backend processing (update a database record) to indicate the status change. As an additional capability, the ",
+          "agent can also generate an email that could be sent to the customer. ",
+          "",
+          "You will be constructing the agentic solution as depicted here, starting with function and tool definition,",
+          "then task, agent, and agent team. Note that the agent specifies your AI profile, which identifies the LLM to use. ",
+          "",
+          "There are two phases to this solution. First, a basic definition that interacts with the customer and updates the database table.",
+          "Second, make the agent more personable and generate an email that could be sent to the customer confirming the action. "
+        ],
+        "selectedVisualization" : "html",
+        "visualizationConfig" : null,
+        "hideCode" : true,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : true,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1760021262651,
+          "endTime" : 1760021262994,
+          "interpreter" : "md.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "<h2 id=\"develop-a-sales-return-agent\">Develop a sales return agent</h2>\n<p>If you've ordered a product online, you likely at some point also had to return an item whether the product arrived broken or you no longer needed the item.\nThis &quot;sales return agent&quot; scenario uses your database and LLM to interact with the user to handle product returns. This agent will inquire as to why the\nitem is being returned and perform some backend processing (update a database record) to indicate the status change. As an additional capability, the\nagent can also generate an email that could be sent to the customer.</p>\n<p>You will be constructing the agentic solution as depicted here, starting with function and tool definition,\nthen task, agent, and agent team. Note that the agent specifies your AI profile, which identifies the LLM to use.</p>\n<p>There are two phases to this solution. First, a basic definition that interacts with the customer and updates the database table.\nSecond, make the agent more personable and generate an email that could be sent to the customer confirming the action.</p>\n",
+              "type" : "HTML"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 7,
+        "title" : null,
+        "hasTitle" : false,
+        "message" : [
+          "%md",
+          "![tiny arrow](https://adwc4pm.objectstorage.us-ashburn-1.oci.customer-oci.com/p/vXNl6D1Ixp4e5cz-YD_Q-h9yjtzrMAzgXfmR39QYSYb5EPrjju803L5sXqj40oZn/n/adwc4pm/b/select-ai-notebook-content/o/Select-AI-Agent-Sales-Return-Agent.png \"tiny arrow\")"
+        ],
+        "selectedVisualization" : "html",
+        "visualizationConfig" : null,
+        "hideCode" : true,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : true,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1760021264350,
+          "endTime" : 1760021264677,
+          "interpreter" : "md.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "<p><img src=\"https://adwc4pm.objectstorage.us-ashburn-1.oci.customer-oci.com/p/vXNl6D1Ixp4e5cz-YD_Q-h9yjtzrMAzgXfmR39QYSYb5EPrjju803L5sXqj40oZn/n/adwc4pm/b/select-ai-notebook-content/o/Select-AI-Agent-Sales-Return-Agent.png\" alt=\"tiny arrow\" title=\"tiny arrow\" /></p>\n",
+              "type" : "HTML"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : null,
+        "hasTitle" : false,
+        "message" : [
+          "%md",
+          "",
+          "# Phase 1: Create a sales return agent"
+        ],
+        "selectedVisualization" : "html",
+        "visualizationConfig" : null,
+        "hideCode" : true,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : true,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1760021267201,
+          "endTime" : 1760021267547,
+          "interpreter" : "md.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "<h1 id=\"phase-1-create-a-sales-return-agent\">Phase 1: Create a sales return agent</h1>\n",
+              "type" : "HTML"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : null,
+        "hasTitle" : false,
+        "message" : [
+          "%md",
+          "",
+          "### Create a tool for database update",
+          "",
+          "Tools are what allow agents to perform tasks in the \"real\" world. One of these tools is for updating the table with customer order status. ",
+          "",
+          "For our scenario, we'll create minimal `customers` and `customer_order_status` tables. "
+        ],
+        "selectedVisualization" : "html",
+        "visualizationConfig" : null,
+        "hideCode" : true,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : true,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1759424370499,
+          "endTime" : 1759424370818,
+          "interpreter" : "md.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "<h3 id=\"create-a-tool-for-database-update\">Create a tool for database update</h3>\n<p>Tools are what allow agents to perform tasks in the &quot;real&quot; world. One of these tools is for updating the table with customer order status.</p>\n<p>For our scenario, we'll create minimal <code>customers</code> and <code>customer_order_status</code> tables.</p>\n",
+              "type" : "HTML"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : "Define a Customer table",
+        "hasTitle" : true,
+        "message" : [
+          "%script",
+          "",
+          "BEGIN EXECUTE IMMEDIATE 'DROP TABLE customers';",
+          "EXCEPTION WHEN OTHERS THEN NULL; END;",
+          "/",
+          "CREATE TABLE customers (",
+          "    customer_id  NUMBER(10) PRIMARY KEY,",
+          "    name         VARCHAR2(100),",
+          "    email        VARCHAR2(100),",
+          "    phone        VARCHAR2(20),",
+          "    state        VARCHAR2(2),",
+          "    zip          VARCHAR2(10)",
+          ");",
+          "",
+          "INSERT INTO customers (customer_id, name, email, phone, state, zip) VALUES",
+          "(1, 'Alice Thompson', 'alice.thompson@example.com', '555-1234', 'NY', '10001'),",
+          "(2, 'Bob Martinez', 'bob.martinez@example.com', '555-2345', 'CA', '94105'),",
+          "(3, 'Carol Chen', 'carol.chen@example.com', '555-3456', 'TX', '73301'),",
+          "(4, 'David Johnson', 'david.johnson@example.com', '555-4567', 'IL', '60601'),",
+          "(5, 'Eva Green', 'eva.green@example.com', '555-5678', 'FL', '33101');"
+        ],
+        "selectedVisualization" : "raw",
+        "visualizationConfig" : null,
+        "hideCode" : false,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : false,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1760028497359,
+          "endTime" : 1760028502561,
+          "interpreter" : "script.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "\nPL/SQL procedure successfully completed.\n\n\n---------------------------\n\nTable CUSTOMERS created.\n\n\n---------------------------\n\n5 rows inserted.\n\n\n---------------------------\n",
+              "type" : "TEXT"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : "View customers table content",
+        "hasTitle" : true,
+        "message" : [
+          "%sql",
+          "",
+          "select * from customers;"
+        ],
+        "selectedVisualization" : "table",
+        "visualizationConfig" : null,
+        "hideCode" : false,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : false,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1760028519281,
+          "endTime" : 1760028519753,
+          "interpreter" : "sql.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "CUSTOMER_ID\tNAME\tEMAIL\tPHONE\tSTATE\tZIP\n1\tAlice Thompson\talice.thompson@example.com\t555-1234\tNY\t10001\n2\tBob Martinez\tbob.martinez@example.com\t555-2345\tCA\t94105\n3\tCarol Chen\tcarol.chen@example.com\t555-3456\tTX\t73301\n4\tDavid Johnson\tdavid.johnson@example.com\t555-4567\tIL\t60601\n5\tEva Green\teva.green@example.com\t555-5678\tFL\t33101\n",
+              "type" : "TABLE"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : "Define table Customer Order Return Status",
+        "hasTitle" : true,
+        "message" : [
+          "%script",
+          "",
+          "BEGIN EXECUTE IMMEDIATE 'DROP TABLE customer_order_status';",
+          "EXCEPTION WHEN OTHERS THEN NULL; END;",
+          "/",
+          "CREATE TABLE customer_order_status (",
+          "    customer_id     NUMBER(10),",
+          "    order_number    VARCHAR2(20),",
+          "    status          VARCHAR2(30),",
+          "    product_name    VARCHAR2(100)",
+          "",
+          ");",
+          "",
+          "INSERT INTO customer_order_status (customer_id, order_number, status, product_name) VALUES",
+          "(2, '7734', 'delivered', 'smartphone charging cord'),",
+          "(1, '4381', 'pending_delivery', 'smartphone protective case'),",
+          "(2, '7820', 'delivered', 'smartphone charging cord'),",
+          "(3, '1293', 'pending_return', 'smartphone stand (metal)'),",
+          "(4, '9842', 'returned', 'smartphone backup storage'),",
+          "(5, '5019', 'delivered', 'smartphone protective case'),",
+          "(2, '6674', 'pending_delivery', 'smartphone charging cord'),",
+          "(1, '3087', 'returned', 'smartphone stand (metal)'),",
+          "(3, '7635', 'pending_return', 'smartphone backup storage'),",
+          "(4, '3928', 'delivered', 'smartphone protective case'),",
+          "(5, '8421', 'pending_delivery', 'smartphone charging cord'),",
+          "(1, '2204', 'returned', 'smartphone stand (metal)'),",
+          "(2, '7031', 'pending_delivery', 'smartphone backup storage'),",
+          "(3, '1649', 'delivered', 'smartphone protective case'),",
+          "(4, '9732', 'pending_return', 'smartphone charging cord'),",
+          "(5, '4550', 'delivered', 'smartphone stand (metal)'),",
+          "(1, '6468', 'pending_delivery', 'smartphone backup storage'),",
+          "(2, '3910', 'returned', 'smartphone protective case'),",
+          "(3, '2187', 'delivered', 'smartphone charging cord'),",
+          "(4, '8023', 'pending_return', 'smartphone stand (metal)'),",
+          "(5, '5176', 'delivered', 'smartphone backup storage');"
+        ],
+        "selectedVisualization" : "raw",
+        "visualizationConfig" : null,
+        "hideCode" : false,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : false,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1760028522710,
+          "endTime" : 1760028523225,
+          "interpreter" : "script.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "\nPL/SQL procedure successfully completed.\n\n\n---------------------------\n\nTable CUSTOMER_ORDER_STATUS created.\n\n\n---------------------------\n\n21 rows inserted.\n\n\n---------------------------\n",
+              "type" : "TEXT"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : "View customer_order_status table content",
+        "hasTitle" : true,
+        "message" : [
+          "%sql",
+          "",
+          "select * from customer_order_status;"
+        ],
+        "selectedVisualization" : "table",
+        "visualizationConfig" : null,
+        "hideCode" : false,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : false,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1760028527745,
+          "endTime" : 1760028528137,
+          "interpreter" : "sql.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "CUSTOMER_ID\tORDER_NUMBER\tSTATUS\tPRODUCT_NAME\n2\t7734\tdelivered\tsmartphone charging cord\n1\t4381\tpending_delivery\tsmartphone protective case\n2\t7820\tdelivered\tsmartphone charging cord\n3\t1293\tpending_return\tsmartphone stand (metal)\n4\t9842\treturned\tsmartphone backup storage\n5\t5019\tdelivered\tsmartphone protective case\n2\t6674\tpending_delivery\tsmartphone charging cord\n1\t3087\treturned\tsmartphone stand (metal)\n3\t7635\tpending_return\tsmartphone backup storage\n4\t3928\tdelivered\tsmartphone protective case\n5\t8421\tpending_delivery\tsmartphone charging cord\n1\t2204\treturned\tsmartphone stand (metal)\n2\t7031\tpending_delivery\tsmartphone backup storage\n3\t1649\tdelivered\tsmartphone protective case\n4\t9732\tpending_return\tsmartphone charging cord\n5\t4550\tdelivered\tsmartphone stand (metal)\n1\t6468\tpending_delivery\tsmartphone backup storage\n2\t3910\treturned\tsmartphone protective case\n3\t2187\tdelivered\tsmartphone charging cord\n4\t8023\tpending_return\tsmartphone stand (metal)\n5\t5176\tdelivered\tsmartphone backup storage\n",
+              "type" : "TABLE"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : "Define a PL/SQL function called update_customer_order_status",
+        "hasTitle" : true,
+        "message" : [
+          "%script",
+          "",
+          "CREATE OR REPLACE FUNCTION update_customer_order_status (",
+          "    p_customer_name IN VARCHAR2,",
+          "    p_order_number  IN VARCHAR2,",
+          "    p_status        IN VARCHAR2",
+          ") RETURN CLOB IS",
+          "    v_customer_id  customers.customer_id%TYPE;",
+          "    v_row_count    NUMBER;",
+          "BEGIN",
+          "    -- Find customer_id from customer_name",
+          "    SELECT customer_id",
+          "    INTO v_customer_id",
+          "    FROM customers",
+          "    WHERE name = p_customer_name;",
+          "    ",
+          "    UPDATE customer_order_status",
+          "    SET status = p_status",
+          "    WHERE customer_id = v_customer_id",
+          "      AND order_number = p_order_number;",
+          "",
+          "    v_row_count := SQL%ROWCOUNT;",
+          "",
+          "    IF v_row_count = 0 THEN",
+          "        RETURN 'No matching record found to update.';",
+          "    ELSE",
+          "        RETURN 'Update successful.';",
+          "    END IF;",
+          "EXCEPTION",
+          "    WHEN OTHERS THEN",
+          "        RETURN 'Error: ' || SQLERRM;",
+          "END;"
+        ],
+        "selectedVisualization" : "raw",
+        "visualizationConfig" : null,
+        "hideCode" : false,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : false,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1760028531102,
+          "endTime" : 1760028531665,
+          "interpreter" : "script.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "\nFunction UPDATE_CUSTOMER_ORDER_STATUS compiled\n\n",
+              "type" : "TEXT"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : "Test the function update_customer_order_status",
+        "hasTitle" : true,
+        "message" : [
+          "%script",
+          "",
+          "DECLARE",
+          "  v_result CLOB;",
+          "BEGIN",
+          "  v_result := update_customer_order_status('David Johnson', '3928', 'pending_return');",
+          "",
+          "  DBMS_OUTPUT.PUT_LINE(v_result);",
+          "END;"
+        ],
+        "selectedVisualization" : "raw",
+        "visualizationConfig" : null,
+        "hideCode" : false,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : false,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1760028554244,
+          "endTime" : 1760028554808,
+          "interpreter" : "script.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "Update successful.\n\n\nPL/SQL procedure successfully completed.\n\n",
+              "type" : "TEXT"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : "View customer_order_status table",
+        "hasTitle" : true,
+        "message" : [
+          "%sql",
+          "",
+          "select * from customer_order_status",
+          "where order_number = 3928"
+        ],
+        "selectedVisualization" : "table",
+        "visualizationConfig" : null,
+        "hideCode" : false,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : false,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1760028557686,
+          "endTime" : 1760028558067,
+          "interpreter" : "sql.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "CUSTOMER_ID\tORDER_NUMBER\tSTATUS\tPRODUCT_NAME\n4\t3928\tpending_return\tsmartphone protective case\n",
+              "type" : "TABLE"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : "Define Update_Order_Status_Tool",
+        "hasTitle" : true,
+        "message" : [
+          "%script",
+          "",
+          "BEGIN DBMS_CLOUD_AI_AGENT.drop_tool('Update_Order_Status_Tool');",
+          "EXCEPTION WHEN OTHERS THEN NULL; END;",
+          "/",
+          " BEGIN",
+          "    DBMS_CLOUD_AI_AGENT.CREATE_TOOL(",
+          "        tool_name => 'Update_Order_Status_Tool',",
+          "        attributes => '{\"instruction\": \"This tool updates the database to reflect return status change. Always confirm user name and order number with user before update status\",",
+          "                        \"function\" : \"update_customer_order_status\"}',",
+          "        description => 'Tool for updating customer order status in database table.'",
+          "    );",
+          "END;"
+        ],
+        "selectedVisualization" : "raw",
+        "visualizationConfig" : null,
+        "hideCode" : false,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : false,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1760028560855,
+          "endTime" : 1760028561786,
+          "interpreter" : "script.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "\nPL/SQL procedure successfully completed.\n\n\n---------------------------\n\nPL/SQL procedure successfully completed.\n\n",
+              "type" : "TEXT"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : "View tools listing",
+        "hasTitle" : true,
+        "message" : [
+          "%sql",
+          "",
+          "select * from USER_AI_AGENT_TOOLS ",
+          "order by created desc"
+        ],
+        "selectedVisualization" : "table",
+        "visualizationConfig" : null,
+        "hideCode" : false,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : false,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1760028565654,
+          "endTime" : 1760028566229,
+          "interpreter" : "sql.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "TOOL_ID\tTOOL_NAME\tSTATUS\tDESCRIPTION\tCREATED\tLAST_MODIFIED\tORACLE_MAINTAINED\n1\tUPDATE_ORDER_STATUS_TOOL\tENABLED\tTool for updating customer order status in database table.\t2025-10-09 16:49:21.363581 UTC\t2025-10-09 16:49:21.363581 UTC\tN\n",
+              "type" : "TABLE"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : null,
+        "hasTitle" : false,
+        "message" : [
+          "%md",
+          "",
+          "### Define the task to handle the product return",
+          "",
+          "We use a task to specify the instructions for performing actions using tools. Here, we create the `Handle_Product_Return_Task` and describe the interaction with the customer and how to respond in various cases. ",
+          "",
+          "This will use the Update_Order_Status_Tool and the implicit HUMAN_TOOL."
+        ],
+        "selectedVisualization" : "html",
+        "visualizationConfig" : null,
+        "hideCode" : true,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : true,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1760028569317,
+          "endTime" : 1760028569713,
+          "interpreter" : "md.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "<h3 id=\"define-the-task-to-handle-the-product-return\">Define the task to handle the product return</h3>\n<p>We use a task to specify the instructions for performing actions using tools. Here, we create the <code>Handle_Product_Return_Task</code> and describe the interaction with the customer and how to respond in various cases.</p>\n<p>This will use the Update_Order_Status_Tool and the implicit HUMAN_TOOL.</p>\n",
+              "type" : "HTML"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : "Define the Handle_Product_Return_Task",
+        "hasTitle" : true,
+        "message" : [
+          "%script",
+          "",
+          "BEGIN DBMS_CLOUD_AI_AGENT.drop_task('Handle_Product_Return_Task');",
+          "EXCEPTION WHEN OTHERS THEN NULL; END;",
+          "/",
+          "BEGIN",
+          "  DBMS_CLOUD_AI_AGENT.create_task(",
+          "    task_name => 'Handle_Product_Return_Task',",
+          "    attributes => '{\"instruction\": \"Process a product return request from a customer:{query}' || ",
+          "                    '1. Ask customer the order reason for return (no longer needed, arrived too late, box broken, or defective)' || ",
+          "                    '2. If no longer needed:' ||",
+          "                    '   a. Inform customer to ship the product at their expense back to us.' ||",
+          "                    '   b. Update the order status to return_shipment_pending using Update_Order_Status_Tool.' ||",
+          "                     '3. If it arrived too late:' ||",
+          "                    '   a. Ask customer if they want a refund.' ||",
+          "                    '   b. If the customer wants a refund, then confirm refund processed and update the order status to refund_completed' || ",
+          "                    '4. If the product was defective or the box broken:' ||",
+          "                    '   a. Ask customer if they want a replacement or a refund' ||",
+          "                    '   b. If a replacement, inform customer replacement is on its way and they will receive a return shipping label for the defective product, then update the order status to replaced' ||",
+          "                    '   c. If a refund, inform customer to print out the return shipping label for the defective product, return the product, and update the order status to refund' ||",
+          "                    '5. After the completion of a return or refund, ask if you can help with anything else.' ||",
+          "                    '   End the task if user does not need help on anything else\",",
+          "                    \"tools\": [\"Update_Order_Status_Tool\"]}'",
+          "  );",
+          "END;"
+        ],
+        "selectedVisualization" : "raw",
+        "visualizationConfig" : null,
+        "hideCode" : false,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : false,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1760028571350,
+          "endTime" : 1760028572365,
+          "interpreter" : "script.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "\nPL/SQL procedure successfully completed.\n\n\n---------------------------\n\nPL/SQL procedure successfully completed.\n\n",
+              "type" : "TEXT"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : null,
+        "hasTitle" : false,
+        "message" : [
+          "%md",
+          "",
+          "### Define Customer Agent",
+          "",
+          "Next, we define the agent that will perform the task, describing the role of the agent. ",
+          "This characterizes the the experience of the agent and how they should interact with the customer. ",
+          "",
+          "First, you need to have a credential for your AI provider of choice. We've shown the template for OCI GenAI Service. ",
+          "",
+          "Then, define the AI profile using this credential for the desired LLM and transformer. ",
+          "The agent will use only the LLM at this point, but the transformer will be used for the RAG tool later in the notebook. "
+        ],
+        "selectedVisualization" : "html",
+        "visualizationConfig" : null,
+        "hideCode" : true,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : true,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1759424594172,
+          "endTime" : 1759424594497,
+          "interpreter" : "md.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "<h3 id=\"define-customer-agent\">Define Customer Agent</h3>\n<p>Next, we define the agent that will perform the task, describing the role of the agent.\nThis characterizes the the experience of the agent and how they should interact with the customer.</p>\n<p>First, you need to have a credential for your AI provider of choice. We've shown the template for OCI GenAI Service.</p>\n<p>Then, define the AI profile using this credential for the desired LLM and transformer.\nThe agent will use only the LLM at this point, but the transformer will be used for the RAG tool later in the notebook.</p>\n",
+              "type" : "HTML"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : "Create the credential to access OCI GenAI Service for your AI models",
+        "hasTitle" : true,
+        "message" : [
+          "%script",
+          "",
+          "begin",
+          "  DBMS_CLOUD.drop_credential(credential_name => 'OCI_CRED_TEMP');",
+          "  EXCEPTION WHEN OTHERS THEN NULL; END;",
+          "end;",
+          "/",
+          "BEGIN",
+          "  DBMS_CLOUD.create_credential(",
+          "    credential_name => 'OCI_CRED_TEMP',",
+          "    user_ocid       => 'ocid1.user......',",
+          "    tenancy_ocid    => 'ocid1.tenancy......",
+          "',",
+          "    fingerprint     => '04:f2:.....'",
+          "  );",
+          "END;"
+        ],
+        "selectedVisualization" : "raw",
+        "visualizationConfig" : null,
+        "hideCode" : false,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : false,
+        "hideInIFrame" : false,
+        "enabled" : false,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1757444482699,
+          "endTime" : 1757444483357,
+          "interpreter" : "script.low",
+          "taskStatus" : null,
+          "status" : null,
+          "results" : null,
+          "forms" : null
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : "Define our AI profile with desired LLM and transformer for use by our agent",
+        "hasTitle" : true,
+        "message" : [
+          "%script",
+          "",
+          "BEGIN",
+          "  BEGIN DBMS_CLOUD_AI.drop_profile(profile_name => 'OCI_GENAI_GROK'); ",
+          "  EXCEPTION WHEN OTHERS THEN NULL; END;",
+          "",
+          "  DBMS_CLOUD_AI.create_profile(",
+          "      profile_name => 'OCI_GENAI_GROK',",
+          "      attributes   => '{",
+          "          \"provider\": \"oci\",",
+          "          \"credential_name\": \"AI_CREDENTIAL\",",
+          "          \"model\": \"xai.grok-3\",",
+          "          \"embedding_model\": \"cohere.embed-english-v3.0\"",
+          "      }',",
+          "      description  => 'Supports the Select AI Sales Return Agent scenario.'",
+          "  ); ",
+          "END;"
+        ],
+        "selectedVisualization" : "raw",
+        "visualizationConfig" : null,
+        "hideCode" : false,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : false,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1760028592899,
+          "endTime" : 1760028609793,
+          "interpreter" : "script.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "\nPL/SQL procedure successfully completed.\n\n",
+              "type" : "TEXT"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : "Define the Customer_Return_Agent",
+        "hasTitle" : true,
+        "message" : [
+          "%script",
+          "",
+          "BEGIN DBMS_CLOUD_AI_AGENT.drop_agent('Customer_Return_Agent');",
+          "EXCEPTION WHEN OTHERS THEN NULL; END;",
+          "/",
+          "BEGIN",
+          "  DBMS_CLOUD_AI_AGENT.create_agent(",
+          "    agent_name => 'Customer_Return_Agent',",
+          "    attributes => '{\"profile_name\": \"OCI_GENAI_GROK\",",
+          "                    \"role\": \"You are an experienced customer return agent who deals with customers return requests.\"}');",
+          "END;"
+        ],
+        "selectedVisualization" : "raw",
+        "visualizationConfig" : null,
+        "hideCode" : false,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : false,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1760028626221,
+          "endTime" : 1760028627174,
+          "interpreter" : "script.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "\nPL/SQL procedure successfully completed.\n\n\n---------------------------\n\nPL/SQL procedure successfully completed.\n\n",
+              "type" : "TEXT"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : null,
+        "hasTitle" : false,
+        "message" : [
+          "%md",
+          "",
+          "### Define the Return Agency Team",
+          "",
+          "This is the final step in defining our agentic solution. We associate the agent with the tasks they will perform. Note that this is a single agent solution."
+        ],
+        "selectedVisualization" : "html",
+        "visualizationConfig" : null,
+        "hideCode" : true,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : true,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1759424607029,
+          "endTime" : 1759424607353,
+          "interpreter" : "md.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "<h3 id=\"define-the-return-agency-team\">Define the Return Agency Team</h3>\n<p>This is the final step in defining our agentic solution. We associate the agent with the tasks they will perform. Note that this is a single agent solution.</p>\n",
+              "type" : "HTML"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : "Define the Return_Agency_Team ",
+        "hasTitle" : true,
+        "message" : [
+          "%script",
+          "",
+          "BEGIN DBMS_CLOUD_AI_AGENT.drop_team('Return_Agency_Team');",
+          "EXCEPTION WHEN OTHERS THEN NULL; END;",
+          "/",
+          "BEGIN                                                                 ",
+          "  DBMS_CLOUD_AI_AGENT.create_team(  ",
+          "    team_name  => 'Return_Agency_Team',                                                            ",
+          "    attributes => '{\"agents\": [{\"name\" : \"Customer_Return_Agent\", \"task\" : \"Handle_Product_Return_Task\"}],",
+          "                    \"process\": \"sequential\"}');                                                                 ",
+          "END;"
+        ],
+        "selectedVisualization" : "raw",
+        "visualizationConfig" : null,
+        "hideCode" : false,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : false,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1760028630291,
+          "endTime" : 1760028639425,
+          "interpreter" : "script.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "\nPL/SQL procedure successfully completed.\n\n\n---------------------------\n\nPL/SQL procedure successfully completed.\n\n",
+              "type" : "TEXT"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : null,
+        "hasTitle" : false,
+        "message" : [
+          "%md",
+          "",
+          "### Interact with the Return Agency ",
+          "",
+          "First set the agent team and then interact with it on the SQL command line using 'select ai agent'.",
+          "",
+          "Then, use the DBMS_CLOUD_AI_AGENT.RUN_TEAM procedure."
+        ],
+        "selectedVisualization" : "html",
+        "visualizationConfig" : null,
+        "hideCode" : true,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : true,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1760028642501,
+          "endTime" : 1760028642854,
+          "interpreter" : "md.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "<h3 id=\"interact-with-the-return-agency\">Interact with the Return Agency</h3>\n<p>First set the agent team and then interact with it on the SQL command line using 'select ai agent'.</p>\n<p>Then, use the DBMS_CLOUD_AI_AGENT.RUN_TEAM procedure.</p>\n",
+              "type" : "HTML"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : "Set the Return_Agency_Team",
+        "hasTitle" : true,
+        "message" : [
+          "%script",
+          "",
+          "BEGIN DBMS_CLOUD_AI_AGENT.clear_team();",
+          "EXCEPTION WHEN OTHERS THEN NULL; END;",
+          "/",
+          "EXEC DBMS_CLOUD_AI_AGENT.set_team(team_name  => 'Return_Agency_Team');"
+        ],
+        "selectedVisualization" : "raw",
+        "visualizationConfig" : null,
+        "hideCode" : false,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : false,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1760028647485,
+          "endTime" : 1760028648222,
+          "interpreter" : "script.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "\nPL/SQL procedure successfully completed.\n\n\n---------------------------\n\nPL/SQL procedure successfully completed.\n\n\n---------------------------\n",
+              "type" : "TEXT"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : null,
+        "hasTitle" : false,
+        "message" : [
+          "%sql",
+          "",
+          "select ai agent I want to return a smartphone case"
+        ],
+        "selectedVisualization" : "raw",
+        "visualizationConfig" : null,
+        "hideCode" : false,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : false,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1760028650914,
+          "endTime" : 1760028690374,
+          "interpreter" : "sql.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "RESPONSE\nCould you please tell me the reason for returning the smartphone case? Is it no longer needed, arrived too late, box broken, or defective?\n",
+              "type" : "TABLE"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : null,
+        "hasTitle" : false,
+        "message" : [
+          "%sql",
+          "",
+          "select ai agent the item is defective"
+        ],
+        "selectedVisualization" : "raw",
+        "visualizationConfig" : null,
+        "hideCode" : false,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : false,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1760028744522,
+          "endTime" : 1760028749630,
+          "interpreter" : "sql.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "RESPONSE\nI'm sorry to hear that the smartphone case is defective. Would you like a replacement or a refund?\n",
+              "type" : "TABLE"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : null,
+        "hasTitle" : false,
+        "message" : [
+          "%sql",
+          "",
+          "select ai agent I will need a replacement"
+        ],
+        "selectedVisualization" : "raw",
+        "visualizationConfig" : null,
+        "hideCode" : false,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : false,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1760028757360,
+          "endTime" : 1760028761560,
+          "interpreter" : "sql.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "RESPONSE\nCould you please confirm your name and order number so I can update the status and process the replacement?\n",
+              "type" : "TABLE"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : null,
+        "hasTitle" : false,
+        "message" : [
+          "%sql",
+          "",
+          "select ai agent I''m Bob Martinez and my order number is 7820"
+        ],
+        "selectedVisualization" : "raw",
+        "visualizationConfig" : null,
+        "hideCode" : false,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : false,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1760028780000,
+          "endTime" : 1760028789215,
+          "interpreter" : "sql.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "RESPONSE\nI'm glad to assist with the replacement. The replacement is on its way, and you will receive a return shipping label for the defective product. Can I help you with anything else?\n",
+              "type" : "TABLE"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : null,
+        "hasTitle" : false,
+        "message" : [
+          "%sql",
+          "",
+          "select ai agent Yes, I''d like to return a smartphone stand;"
+        ],
+        "selectedVisualization" : "raw",
+        "visualizationConfig" : null,
+        "hideCode" : false,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : false,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1760028806806,
+          "endTime" : 1760028810725,
+          "interpreter" : "sql.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "RESPONSE\nCould you please tell me the reason for returning the smartphone stand? Is it no longer needed, arrived too late, box broken, or defective?\n",
+              "type" : "TABLE"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : null,
+        "hasTitle" : false,
+        "message" : [
+          "%sql",
+          "",
+          "select ai agent I no longer need it"
+        ],
+        "selectedVisualization" : "raw",
+        "visualizationConfig" : null,
+        "hideCode" : false,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : false,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1760028814077,
+          "endTime" : 1760028817891,
+          "interpreter" : "sql.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "RESPONSE\nCould you please confirm your name and order number for the smartphone stand so I can update the status?\n",
+              "type" : "TABLE"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : null,
+        "hasTitle" : false,
+        "message" : [
+          "%sql",
+          "",
+          "select ai agent I''m Bob Martinez with order number is 7820"
+        ],
+        "selectedVisualization" : "raw",
+        "visualizationConfig" : null,
+        "hideCode" : false,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : false,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1760028822295,
+          "endTime" : 1760028831286,
+          "interpreter" : "sql.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "RESPONSE\nThank you for the information. Please ship the smartphone stand back to us at your own expense. Can I help you with anything else?\n",
+              "type" : "TABLE"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : null,
+        "hasTitle" : false,
+        "message" : [
+          "%sql",
+          "",
+          "select ai agent No, I''m all set. Thanks"
+        ],
+        "selectedVisualization" : "raw",
+        "visualizationConfig" : null,
+        "hideCode" : false,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : false,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1760028843510,
+          "endTime" : 1760028847203,
+          "interpreter" : "sql.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "RESPONSE\nThank you for reaching out, Bob. I'm glad I could assist with the returns for both the smartphone case and the smartphone stand. If you have any other questions or need assistance in the future, feel free to contact us. Have a great day!\n",
+              "type" : "TABLE"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : null,
+        "hasTitle" : false,
+        "message" : [
+          "%md",
+          "",
+          "#### Use DBMS_CLOUD_AI_AGENT.RUN_TEAM",
+          "",
+          "The `RUN_TEAM` procedure enables you to use your agent team from PL/SQL - as opposed to the SQL command line. This procedure is mainly to enable you to build",
+          "your own agentic applications where you may need greater control over individual conversations. ",
+          "",
+          "In the example, we're showing how to explicitly create a conversation id and provide it as input to `RUN_TEAM`. ",
+          "Note that if you run `SET_TEAM` first, you don't need to pass conversation_id to run_team. ",
+          "",
+          "Select AI Agent has a `team_conversation_id` concept. Every interaction with a given agent is preserved and used as context for subsequent questions to the LLM. ",
+          "When you pass a conversation_id to `RUN_TEAM`, it is set as the `team_conversation_id`.",
+          "",
+          "When `SET_TEAM` is used, a `team_conversation_id` is created internally and set for the session. "
+        ],
+        "selectedVisualization" : "html",
+        "visualizationConfig" : null,
+        "hideCode" : true,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : true,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1760028848459,
+          "endTime" : 1760028848799,
+          "interpreter" : "md.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "<h4 id=\"use-dbms_cloud_ai_agentrun_team\">Use DBMS_CLOUD_AI_AGENT.RUN_TEAM</h4>\n<p>The <code>RUN_TEAM</code> procedure enables you to use your agent team from PL/SQL - as opposed to the SQL command line. This procedure is mainly to enable you to build\nyour own agentic applications where you may need greater control over individual conversations.</p>\n<p>In the example, we're showing how to explicitly create a conversation id and provide it as input to <code>RUN_TEAM</code>.\nNote that if you run <code>SET_TEAM</code> first, you don't need to pass conversation_id to run_team.</p>\n<p>Select AI Agent has a <code>team_conversation_id</code> concept. Every interaction with a given agent is preserved and used as context for subsequent questions to the LLM.\nWhen you pass a conversation_id to <code>RUN_TEAM</code>, it is set as the <code>team_conversation_id</code>.</p>\n<p>When <code>SET_TEAM</code> is used, a <code>team_conversation_id</code> is created internally and set for the session.</p>\n",
+              "type" : "HTML"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : "Explicitly create a conversation id for use this RUN_TEAM",
+        "hasTitle" : true,
+        "message" : [
+          "%script",
+          "",
+          "CREATE OR REPLACE PACKAGE my_globals IS",
+          "  l_team_cov_id varchar2(4000);",
+          "END my_globals;",
+          "/",
+          "-- Create conversation",
+          "DECLARE",
+          "  l_team_cov_id varchar2(4000);",
+          "BEGIN",
+          "  l_team_cov_id := DBMS_CLOUD_AI.create_conversation();",
+          "  my_globals.l_team_cov_id := l_team_cov_id;",
+          "  DBMS_OUTPUT.PUT_LINE('Created conversation with ID: ' || my_globals.l_team_cov_id);",
+          "END;"
+        ],
+        "selectedVisualization" : "raw",
+        "visualizationConfig" : null,
+        "hideCode" : false,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : false,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1760028852750,
+          "endTime" : 1760028853268,
+          "interpreter" : "script.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "\nPackage MY_GLOBALS compiled\n\n\n---------------------------\nCreated conversation with ID: 40BD9369-DBE4-3376-E063-BB12000A5D83\n\n\nPL/SQL procedure successfully completed.\n\n",
+              "type" : "TEXT"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : null,
+        "hasTitle" : false,
+        "message" : [
+          "%script",
+          "",
+          "DECLARE",
+          "  v_response VARCHAR2(4000);",
+          "BEGIN",
+          "  v_response :=  DBMS_CLOUD_AI_AGENT.RUN_TEAM(",
+          "    team_name   => 'Return_Agency_Team',",
+          "    user_prompt => 'I want to return a smartphone case',",
+          "    params      => '{\"conversation_id\": \"' || my_globals.l_team_cov_id || '\"}'",
+          "  );",
+          "  DBMS_OUTPUT.PUT_LINE(v_response);",
+          "END;"
+        ],
+        "selectedVisualization" : "raw",
+        "visualizationConfig" : null,
+        "hideCode" : false,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : false,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1760028863230,
+          "endTime" : 1760028869316,
+          "interpreter" : "script.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "Could you please tell me the reason for returning the smartphone case? Is it no longer needed, arrived too late, box broken, or defective?\n\n\nPL/SQL procedure successfully completed.\n\n",
+              "type" : "TEXT"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : null,
+        "hasTitle" : false,
+        "message" : [
+          "%script",
+          "",
+          "DECLARE",
+          "  v_response VARCHAR2(4000);",
+          "BEGIN",
+          "  v_response :=  DBMS_CLOUD_AI_AGENT.RUN_TEAM(",
+          "    team_name   => 'Return_Agency_Team',",
+          "    user_prompt => 'the item is defective',",
+          "    params      => '{\"conversation_id\": \"' || my_globals.l_team_cov_id || '\"}'",
+          "  );",
+          "  DBMS_OUTPUT.PUT_LINE(v_response);",
+          "END;"
+        ],
+        "selectedVisualization" : "raw",
+        "visualizationConfig" : null,
+        "hideCode" : false,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : false,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1760028878134,
+          "endTime" : 1760028887829,
+          "interpreter" : "script.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "I'm sorry to hear that the smartphone case is defective. Would you like a replacement or a refund?\n\n\nPL/SQL procedure successfully completed.\n\n",
+              "type" : "TEXT"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : null,
+        "hasTitle" : false,
+        "message" : [
+          "%script",
+          "",
+          "DECLARE",
+          "  v_response VARCHAR2(4000);",
+          "BEGIN",
+          "  v_response :=  DBMS_CLOUD_AI_AGENT.RUN_TEAM(",
+          "    team_name   => 'Return_Agency_Team',",
+          "    user_prompt => 'I''d like a replacement',",
+          "    params      => '{\"conversation_id\": \"' || my_globals.l_team_cov_id || '\"}'",
+          "  );",
+          "  DBMS_OUTPUT.PUT_LINE(v_response);",
+          "END;"
+        ],
+        "selectedVisualization" : "raw",
+        "visualizationConfig" : null,
+        "hideCode" : false,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : false,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1760028895747,
+          "endTime" : 1760028900964,
+          "interpreter" : "script.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "Could you please confirm your name and order number so I can update the status and process the replacement?\n\n\nPL/SQL procedure successfully completed.\n\n",
+              "type" : "TEXT"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : null,
+        "hasTitle" : false,
+        "message" : [
+          "%script",
+          "",
+          "DECLARE",
+          "  v_response VARCHAR2(4000);",
+          "BEGIN",
+          "  v_response :=  DBMS_CLOUD_AI_AGENT.RUN_TEAM(",
+          "    team_name    => 'Return_Agency_Team',",
+          "    user_prompt => 'I''m Bob Martinez and my order number is 7820',",
+          "    params      => '{\"conversation_id\": \"' || my_globals.l_team_cov_id || '\"}'",
+          "  );",
+          "  DBMS_OUTPUT.PUT_LINE(v_response);",
+          "END;"
+        ],
+        "selectedVisualization" : "raw",
+        "visualizationConfig" : null,
+        "hideCode" : false,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : false,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1760028908563,
+          "endTime" : 1760028919704,
+          "interpreter" : "script.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "Thank you, Bob. The replacement smartphone case is on its way, and you will receive a return shipping label for the defective product. Is there anything else I can help you with?\n\n\nPL/SQL procedure successfully completed.\n\n",
+              "type" : "TEXT"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : null,
+        "hasTitle" : false,
+        "message" : [
+          "%script",
+          "",
+          "DECLARE",
+          "  v_response VARCHAR2(4000);",
+          "BEGIN",
+          "  v_response :=  DBMS_CLOUD_AI_AGENT.RUN_TEAM(",
+          "    team_name => 'Return_Agency_Team',",
+          "    user_prompt => 'No, thank you',",
+          "    params => '{\"conversation_id\": \"' || my_globals.l_team_cov_id || '\"}'",
+          "  );",
+          "  DBMS_OUTPUT.PUT_LINE(v_response);",
+          "END;"
+        ],
+        "selectedVisualization" : "raw",
+        "visualizationConfig" : null,
+        "hideCode" : false,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : false,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1760028971149,
+          "endTime" : 1760028975335,
+          "interpreter" : "script.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "Thank you, Bob. I'm glad we could assist with the replacement of your smartphone case. If you have any other concerns in the future, feel free to reach out. Have a great day!\n\n\nPL/SQL procedure successfully completed.\n\n",
+              "type" : "TEXT"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : null,
+        "hasTitle" : false,
+        "message" : [
+          "%md",
+          "",
+          "# Phase 2: Refine your agent",
+          "",
+          "While our agent addresses some of the key aspects of the task, we can make the customer agent more personable in customer interactions. ",
+          "",
+          "Further, we can generate a template email to be sent to the customer. "
+        ],
+        "selectedVisualization" : "html",
+        "visualizationConfig" : null,
+        "hideCode" : true,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : true,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1760028980648,
+          "endTime" : 1760028981004,
+          "interpreter" : "md.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "<h1 id=\"phase-2-refine-your-agent\">Phase 2: Refine your agent</h1>\n<p>While our agent addresses some of the key aspects of the task, we can make the customer agent more personable in customer interactions.</p>\n<p>Further, we can generate a template email to be sent to the customer.</p>\n",
+              "type" : "HTML"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : "Refine the role of your Customer_Return_Agent",
+        "hasTitle" : true,
+        "message" : [
+          "%script",
+          "",
+          "BEGIN DBMS_CLOUD_AI_AGENT.drop_agent('Customer_Return_Agent');",
+          "EXCEPTION WHEN OTHERS THEN NULL; END;",
+          "/",
+          "BEGIN",
+          "  DBMS_CLOUD_AI_AGENT.create_agent(",
+          "    'Customer_Return_Agent',",
+          "    '{\"profile_name\": \"OCI_GENAI_GROK\",",
+          "      \"role\": \"You are a convivial and chatty experienced customer return agent who deals with customers return requests.\"}');",
+          "END;"
+        ],
+        "selectedVisualization" : "raw",
+        "visualizationConfig" : null,
+        "hideCode" : false,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : false,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1760028981389,
+          "endTime" : 1760028982065,
+          "interpreter" : "script.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "\nPL/SQL procedure successfully completed.\n\n\n---------------------------\n\nPL/SQL procedure successfully completed.\n\n",
+              "type" : "TEXT"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : "Define the Generate_Email_Task to generate email output",
+        "hasTitle" : true,
+        "message" : [
+          "%script",
+          "",
+          "BEGIN DBMS_CLOUD_AI_AGENT.drop_task('Generate_Email_Task');",
+          "EXCEPTION WHEN OTHERS THEN NULL; END;",
+          "/",
+          "BEGIN",
+          "  DBMS_CLOUD_AI_AGENT.create_task(",
+          "    task_name => 'Generate_Email_Task',",
+          "    attributes => '{\"instruction\": \"Use the customer information and product details to generate an email in a professional format. The email should:' || ",
+          "                    '1. Include a greeting to the customer by name' || ",
+          "                    '2. Specify the item being returned, the order number, and the reason for the return' ||",
+          "                    '3. If it is a refund, state the refund will be issued to the credit card on record.' ||",
+          "                    '4. If it is a replacement, state that the replacement will be shipped in 3-5 business days.\"}'",
+          "  );",
+          "END;"
+        ],
+        "selectedVisualization" : "raw",
+        "visualizationConfig" : null,
+        "hideCode" : false,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : false,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1760028985216,
+          "endTime" : 1760028985787,
+          "interpreter" : "script.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "\nPL/SQL procedure successfully completed.\n\n\n---------------------------\n\nPL/SQL procedure successfully completed.\n\n",
+              "type" : "TEXT"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : "Add the Generate_Email_Task to the team",
+        "hasTitle" : true,
+        "message" : [
+          "%script",
+          "BEGIN DBMS_CLOUD_AI_AGENT.clear_team();",
+          "EXCEPTION WHEN OTHERS THEN NULL; END;",
+          "/  ",
+          "",
+          "BEGIN DBMS_CLOUD_AI_AGENT.drop_team('Return_Agency_Team');",
+          "EXCEPTION WHEN OTHERS THEN NULL; END;",
+          "/",
+          "BEGIN                                                                 ",
+          "  DBMS_CLOUD_AI_AGENT.create_team(  ",
+          "    team_name  => 'Return_Agency_Team',                                                ",
+          "    attributes => '{\"agents\": [{\"name\" : \"Customer_Return_Agent\", \"task\" : \"Handle_Product_Return_Task\"},",
+          "                               {\"name\" : \"Customer_Return_Agent\", \"task\" : \"Generate_Email_Task\"}],",
+          "                    \"process\": \"sequential\"}');                                                                 ",
+          "END;"
+        ],
+        "selectedVisualization" : "raw",
+        "visualizationConfig" : null,
+        "hideCode" : false,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : false,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1760028989050,
+          "endTime" : 1760029001149,
+          "interpreter" : "script.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "\nPL/SQL procedure successfully completed.\n\n\n---------------------------\n\nPL/SQL procedure successfully completed.\n\n\n---------------------------\n\nPL/SQL procedure successfully completed.\n\n",
+              "type" : "TEXT"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : null,
+        "hasTitle" : false,
+        "message" : [
+          "%md",
+          "",
+          "#### Interact with your refined agent"
+        ],
+        "selectedVisualization" : "html",
+        "visualizationConfig" : null,
+        "hideCode" : true,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : true,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1760029006784,
+          "endTime" : 1760029007148,
+          "interpreter" : "md.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "<h4 id=\"interact-with-your-refined-agent\">Interact with your refined agent</h4>\n",
+              "type" : "HTML"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : "Set the Return_Agency_Team",
+        "hasTitle" : true,
+        "message" : [
+          "%script",
+          "",
+          "EXEC DBMS_CLOUD_AI_AGENT.set_team(team_name  => 'Return_Agency_Team');                                                                   "
+        ],
+        "selectedVisualization" : "raw",
+        "visualizationConfig" : null,
+        "hideCode" : false,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : false,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1760029008903,
+          "endTime" : 1760029009414,
+          "interpreter" : "script.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "\nPL/SQL procedure successfully completed.\n\n\n---------------------------\n",
+              "type" : "TEXT"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : null,
+        "hasTitle" : false,
+        "message" : [
+          "%sql",
+          "",
+          "select ai agent Hello Sales Return Agent;"
+        ],
+        "selectedVisualization" : "raw",
+        "visualizationConfig" : null,
+        "hideCode" : false,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : false,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1760029022471,
+          "endTime" : 1760029031551,
+          "interpreter" : "sql.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "RESPONSE\nHello! I'm happy to assist with your return request. Could you please tell me the reason for the return? Is it because the product is no longer needed, arrived too late, the box is broken, or is it defective?\n",
+              "type" : "TABLE"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : null,
+        "hasTitle" : false,
+        "message" : [
+          "%sql",
+          "",
+          "select ai agent I want to return a smartphone cord;"
+        ],
+        "selectedVisualization" : "raw",
+        "visualizationConfig" : null,
+        "hideCode" : false,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : false,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1760029039385,
+          "endTime" : 1760029046579,
+          "interpreter" : "sql.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "RESPONSE\nThanks for letting me know you're returning a smartphone cord. Could you please clarify the reason for the return? Is it because the product is no longer needed, arrived too late, the box is broken, or is it defective?\n",
+              "type" : "TABLE"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : null,
+        "hasTitle" : false,
+        "message" : [
+          "%sql",
+          "",
+          "select ai agent The box was broken;"
+        ],
+        "selectedVisualization" : "raw",
+        "visualizationConfig" : null,
+        "hideCode" : false,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : false,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1760029054552,
+          "endTime" : 1760029060894,
+          "interpreter" : "sql.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "RESPONSE\nI'm sorry to hear that the box for your smartphone cord was broken. Would you like a replacement sent to you, or would you prefer a refund?\n",
+              "type" : "TABLE"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : null,
+        "hasTitle" : false,
+        "message" : [
+          "%sql",
+          "",
+          "select ai agent I''ll take a refund; "
+        ],
+        "selectedVisualization" : "raw",
+        "visualizationConfig" : null,
+        "hideCode" : false,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : false,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1760029064297,
+          "endTime" : 1760029070590,
+          "interpreter" : "sql.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "RESPONSE\nI'm happy to process the refund for you. Could you please confirm your full name and the order number associated with this smartphone cord purchase so I can update the status and provide you with a return shipping label?\n",
+              "type" : "TABLE"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : null,
+        "hasTitle" : false,
+        "message" : [
+          "%script",
+          "",
+          "select ai agent I''m Eva Green with order number 5019"
+        ],
+        "selectedVisualization" : "raw",
+        "visualizationConfig" : null,
+        "hideCode" : false,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : false,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1760029074314,
+          "endTime" : 1760029128566,
+          "interpreter" : "script.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "\nRESPONSE                                                                                                                                                                                                                                      \nThank you, Eva. Your refund has been processed. Please print out the return shipping label for the defective product and send it back to us. Once we receive it, the refund will be finalized. Is there anything else I can help you with?    \n\n",
+              "type" : "TEXT"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : null,
+        "hasTitle" : false,
+        "message" : [
+          "%script",
+          "",
+          "select ai agent No, not at the moment"
+        ],
+        "selectedVisualization" : "raw",
+        "visualizationConfig" : null,
+        "hideCode" : false,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : false,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1760029165183,
+          "endTime" : 1760029176992,
+          "interpreter" : "script.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "\nRESPONSE                                                                                                                                                                                                                                                               \nSubject: Return Confirmation for Smartphone Cord - Order #5019\n\nDear Eva Green,\n\nI hope this message finds you well. I'm writing to confirm the return of your smartphone cord associated with order number 5019. I understand that the box was broken upon arrival, and I apologize for any inconvenience this may have caused.\n\nAs per your request, a refund will be issued to the credit card on record once we receive the returned item. Please use the provided return shipping label to send the product back to us. Once we have it in our possession, the refund process will be finalized.\n\nIf you have any questions or need further assistance, please don't hesitate to reach out. We're here to help!\n\nWarm regards,\n\n[Your Name]\nCustomer Return Agent\n[Your Contact Information]\n[Company Name]    \n\n",
+              "type" : "TEXT"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : null,
+        "hasTitle" : false,
+        "message" : [
+          "%md",
+          "",
+          "# Phase 3: Define a function to populate a standard form email"
+        ],
+        "selectedVisualization" : "html",
+        "visualizationConfig" : null,
+        "hideCode" : true,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : true,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1760029194107,
+          "endTime" : 1760029194482,
+          "interpreter" : "md.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "<h1 id=\"phase-3-define-a-function-to-populate-a-standard-form-email\">Phase 3: Define a function to populate a standard form email</h1>\n",
+              "type" : "HTML"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : "Define function build_return_email",
+        "hasTitle" : true,
+        "message" : [
+          "%script",
+          "",
+          "CREATE OR REPLACE FUNCTION build_return_email (",
+          "    p_order_number      IN  VARCHAR2,",
+          "    p_item_name         IN  VARCHAR2,",
+          "    p_customer_name     IN  VARCHAR2,",
+          "    p_reason_for_return IN  VARCHAR2,",
+          "    p_email_type        IN  VARCHAR2   -- 'refund' or 'replacement'",
+          ") RETURN CLOB IS",
+          "    l_subject VARCHAR2(4000);",
+          "    l_body    CLOB;",
+          "    l_nl      CONSTANT VARCHAR2(2) := CHR(10);",
+          "    l_type    VARCHAR2(20) := LOWER(TRIM(p_email_type));",
+          "    l_json    CLOB;",
+          "BEGIN",
+          "    IF l_type NOT IN ('refund', 'replacement') THEN",
+          "        RAISE_APPLICATION_ERROR(-20001,",
+          "            'email_type must be ''refund'' or ''replacement''');",
+          "    END IF;",
+          "",
+          "    l_subject := 'Your Return Request for Order ' || p_order_number ||",
+          "                 ' - ' || p_item_name;",
+          "",
+          "    l_body := 'Dear ' || p_customer_name || ',' || l_nl || l_nl ||",
+          "              'Thank you for contacting us regarding your return request!' || l_nl || l_nl ||",
+          "              'This email confirms that we have received your request to return the following item from order number ' ||",
+          "              p_order_number || ':' || l_nl || l_nl ||",
+          "              'Item: ' || p_item_name || l_nl ||",
+          "              'Reason for Return: ' || p_reason_for_return || l_nl || l_nl;",
+          "",
+          "    IF l_type = 'refund' THEN",
+          "        l_body := l_body ||",
+          "          'A full refund will be issued to the credit card on file. ' ||",
+          "          'Please allow 7-10 business days for the refund to reflect in your account.' || l_nl || l_nl;",
+          "    ELSE",
+          "        l_body := l_body ||",
+          "          'Your replacement for the ' || p_item_name || ' will be shipped within 3-5 business days. ' ||",
+          "          'You will receive a separate email with tracking information once your replacement has shipped.' || l_nl || l_nl;",
+          "    END IF;",
+          "",
+          "    l_body := l_body ||",
+          "              'Please let me know if you have any questions or if there is anything else I can assist you with.' || l_nl || l_nl ||",
+          "              'Thank you, and have a great day!' || l_nl;",
+          "",
+          "    -- Build JSON in PL/SQL to avoid RETURNING clause issues",
+          "    DECLARE",
+          "        jo JSON_OBJECT_T := JSON_OBJECT_T();",
+          "    BEGIN",
+          "        jo.put('subject', l_subject);",
+          "        jo.put('body',    l_body);",
+          "        l_json := TO_CLOB(jo.to_string);",
+          "    END;",
+          "",
+          "    RETURN l_json;",
+          "END;"
+        ],
+        "selectedVisualization" : "raw",
+        "visualizationConfig" : null,
+        "hideCode" : false,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : false,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1760029196057,
+          "endTime" : 1760029196555,
+          "interpreter" : "script.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "\nFunction BUILD_RETURN_EMAIL compiled\n\n",
+              "type" : "TEXT"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : "Test function build_return_email",
+        "hasTitle" : true,
+        "message" : [
+          "%script",
+          "",
+          "DECLARE",
+          "    v_json CLOB;",
+          "BEGIN",
+          "    v_json := build_return_email(",
+          "        p_order_number      => '1234',",
+          "        p_item_name         => 'smartphone charging cord',",
+          "        p_customer_name     => 'Alice Thompson',",
+          "        p_reason_for_return => 'Item not compatible with my phone',",
+          "        p_email_type        => 'replacement'",
+          "    );",
+          "",
+          "    DBMS_OUTPUT.PUT_LINE(v_json);",
+          "END;"
+        ],
+        "selectedVisualization" : "raw",
+        "visualizationConfig" : null,
+        "hideCode" : false,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : false,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1760029201690,
+          "endTime" : 1760029202304,
+          "interpreter" : "script.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "{\"subject\":\"Your Return Request for Order 1234 - smartphone charging cord\",\"body\":\"Dear Alice Thompson,\\n\\nThank you for contacting us regarding your return request!\\n\\nThis email confirms that we have received your request to return the following item from order number 1234:\\n\\nItem: smartphone charging cord\\nReason for Return: Item not compatible with my phone\\n\\nYour replacement for the smartphone charging cord will be shipped within 3-5 business days. You will receive a separate email with tracking information once your replacement has shipped.\\n\\nPlease let me know if you have any questions or if there is anything else I can assist you with.\\n\\nThank you, and have a great day!\\n\"}\n\n\nPL/SQL procedure successfully completed.\n\n",
+              "type" : "TEXT"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : "Define build_email_tool",
+        "hasTitle" : true,
+        "message" : [
+          "%script",
+          "",
+          "BEGIN DBMS_CLOUD_AI_AGENT.drop_tool('build_email_tool');",
+          "EXCEPTION WHEN OTHERS THEN NULL; END;",
+          "/",
+          " BEGIN",
+          "    DBMS_CLOUD_AI_AGENT.CREATE_TOOL(",
+          "        tool_name => 'build_email_tool',",
+          "        attributes => '{\"instruction\": \"This tool constructs an email string using as input details from the customer interaction as to the product they want to return or get a refund.\",",
+          "                        \"function\" : \"build_return_email\",",
+          "                        \"tool_inputs\" : [{\"name\":\"p_email_type\",",
+          "                                          \"description\" : \"Only supported value is ''refund'' and ''replacement'' \"}]}',",
+          "        description => 'Tool for updating customer order status in database table.'",
+          "    );",
+          "END;"
+        ],
+        "selectedVisualization" : "raw",
+        "visualizationConfig" : null,
+        "hideCode" : false,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : false,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1760029205329,
+          "endTime" : 1760029206006,
+          "interpreter" : "script.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "\nPL/SQL procedure successfully completed.\n\n\n---------------------------\n\nPL/SQL procedure successfully completed.\n\n",
+              "type" : "TEXT"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : "Define Handle_Product_Return_Task",
+        "hasTitle" : true,
+        "message" : [
+          "%script",
+          "",
+          "BEGIN DBMS_CLOUD_AI_AGENT.drop_task('Handle_Product_Return_Task');",
+          "EXCEPTION WHEN OTHERS THEN NULL; END;",
+          "/",
+          "BEGIN",
+          "  DBMS_CLOUD_AI_AGENT.create_task(",
+          "    task_name => 'Handle_Product_Return_Task',",
+          "    attributes => '{\"instruction\": \"Process a product return request from a customer:{query} ' || ",
+          "                    '1. Ask customer the reason for return (no longer needed, arrived too late, box broken, or defective) ' || ",
+          "                    '2. If no longer needed:' ||",
+          "                    '   a. Inform customer to ship the product at their expense back to us.' ||",
+          "                    '   b. Update the order status to return_shipment_pending using Update_Order_Status_Tool.' ||",
+          "                     '3. If it arrived too late:' ||",
+          "                    '   a. Ask customer if they want a refund.' ||",
+          "                    '   b. If the customer wants a refund, then confirm refund processed and update the order status to refund_completed ' || ",
+          "                    '4. If the product was defective or the box broken:' ||",
+          "                    '   a. Ask customer if they want a replacement or a refund' ||",
+          "                    '   b. If a replacement, inform customer replacement is on its way and they will receive a return shipping label for the defective product, then update the order status to replaced' ||",
+          "                    '   c. If a refund, inform customer to print out the return shipping label for the defective product, return the product, and update the order status to refund. ' ||",
+          "                    '5. Use Build_Email_Tool to generate a confirmation email for the return/refund request. Display the email to customer and ask them to confirm if the information in email is correct' ||",
+          "                    '6. After the completion of a return or refund, ask if you can help with anything else. Say a friendly goodbye if user does not need help on anything else\",",
+          "                    \"tools\": [\"Update_Order_Status_Tool\", \"Build_Email_Tool\"]}'",
+          "  );",
+          "END;"
+        ],
+        "selectedVisualization" : "raw",
+        "visualizationConfig" : null,
+        "hideCode" : false,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : false,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1760029211488,
+          "endTime" : 1760029212178,
+          "interpreter" : "script.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "\nPL/SQL procedure successfully completed.\n\n\n---------------------------\n\nPL/SQL procedure successfully completed.\n\n",
+              "type" : "TEXT"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : "Update agent team",
+        "hasTitle" : true,
+        "message" : [
+          "%script",
+          "BEGIN DBMS_CLOUD_AI_AGENT.clear_team();",
+          "EXCEPTION WHEN OTHERS THEN NULL; END;",
+          "/",
+          "",
+          "BEGIN DBMS_CLOUD_AI_AGENT.drop_team('Return_Agency_Team');",
+          "EXCEPTION WHEN OTHERS THEN NULL; END;",
+          "/",
+          "BEGIN                                                                 ",
+          "  DBMS_CLOUD_AI_AGENT.create_team(  ",
+          "    team_name  => 'Return_Agency_Team',                                                            ",
+          "    attributes => '{\"agents\": [{\"name\" : \"Customer_Return_Agent\", \"task\" : \"Handle_Product_Return_Task\"}],",
+          "                    \"process\": \"sequential\"}');                                                                 ",
+          "END;"
+        ],
+        "selectedVisualization" : "raw",
+        "visualizationConfig" : null,
+        "hideCode" : false,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : false,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1760029217059,
+          "endTime" : 1760029229421,
+          "interpreter" : "script.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "\nPL/SQL procedure successfully completed.\n\n\n---------------------------\n\nPL/SQL procedure successfully completed.\n\n\n---------------------------\n\nPL/SQL procedure successfully completed.\n\n",
+              "type" : "TEXT"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : null,
+        "hasTitle" : false,
+        "message" : [
+          "%md",
+          "",
+          "#### Interact with your refined agent"
+        ],
+        "selectedVisualization" : "html",
+        "visualizationConfig" : null,
+        "hideCode" : true,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : true,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1760029272552,
+          "endTime" : 1760029272905,
+          "interpreter" : "md.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "<h4 id=\"interact-with-your-refined-agent\">Interact with your refined agent</h4>\n",
+              "type" : "HTML"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : "Set the Return_Agency_Team",
+        "hasTitle" : true,
+        "message" : [
+          "%script",
+          "",
+          "EXEC DBMS_CLOUD_AI_AGENT.set_team(team_name  => 'Return_Agency_Team');                                                                   "
+        ],
+        "selectedVisualization" : "raw",
+        "visualizationConfig" : null,
+        "hideCode" : false,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : false,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1760030204165,
+          "endTime" : 1760030204664,
+          "interpreter" : "script.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "\nPL/SQL procedure successfully completed.\n\n\n---------------------------\n",
+              "type" : "TEXT"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : null,
+        "hasTitle" : false,
+        "message" : [
+          "%script",
+          "",
+          "select ai agent I want to return a smartphone backup storage"
+        ],
+        "selectedVisualization" : "raw",
+        "visualizationConfig" : null,
+        "hideCode" : false,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : false,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1760030268812,
+          "endTime" : 1760030269200,
+          "interpreter" : "script.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "\nRESPONSE                                                                                                    \nI'm glad everything is sorted with your refund, Carol. Is there anything else I can help you with today?    \n\n",
+              "type" : "TEXT"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : null,
+        "hasTitle" : false,
+        "message" : [
+          "%script",
+          "",
+          "select ai agent It arrived too late"
+        ],
+        "selectedVisualization" : "raw",
+        "visualizationConfig" : null,
+        "hideCode" : false,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : false,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1760029294728,
+          "endTime" : 1760029305641,
+          "interpreter" : "script.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "\nRESPONSE                                                                                                         \nI'm sorry to hear that the smartphone backup storage arrived too late. Would you like a refund for this item?    \n\n",
+              "type" : "TEXT"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : null,
+        "hasTitle" : false,
+        "message" : [
+          "%script",
+          "",
+          "select ai agent Yes"
+        ],
+        "selectedVisualization" : "raw",
+        "visualizationConfig" : null,
+        "hideCode" : false,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : false,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1760029314765,
+          "endTime" : 1760029329887,
+          "interpreter" : "script.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "\nRESPONSE                                                                                                                               \nCould you please provide me with your full name and the order number for the smartphone backup storage so I can process the refund?    \n\n",
+              "type" : "TEXT"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : null,
+        "hasTitle" : false,
+        "message" : [
+          "%script",
+          "",
+          "select ai agent Carol Chen order number 7635"
+        ],
+        "selectedVisualization" : "raw",
+        "visualizationConfig" : null,
+        "hideCode" : false,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : false,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1760029357545,
+          "endTime" : 1760029382965,
+          "interpreter" : "script.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "\nRESPONSE                                                                                                                               \nHere is the confirmation email for your refund request:\n\nSubject: Your Return Request for Order 7635 - smartphone backup storage\nBody:\nDear Carol Chen,\n\nThank you for contacting us regarding your return request!\n\nThis email confirms that we have received your request to return the following item from order number 7635:\n\nItem: smartphone backup storage\nReason for Return: arrived too late\n\nA full refund will be issued to the credit card on file. Please allow 7-10 business days for the refund to reflect in your account.\n\nPlease let me know if you have any questions or if there is anything else I can assist you with.\n\nThank you, and have a great day!\n\nIs all the information in this email correct? If not, please let me know what needs to be updated.    \n\n\n---------------------------\n",
+              "type" : "TEXT"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : null,
+        "hasTitle" : false,
+        "message" : [
+          "%script",
+          "",
+          "select ai agent yes it is correct"
+        ],
+        "selectedVisualization" : "raw",
+        "visualizationConfig" : null,
+        "hideCode" : false,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : false,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1760029388333,
+          "endTime" : 1760029396334,
+          "interpreter" : "script.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "\nRESPONSE                                                                                                         \nI'm glad everything looks good with the email confirmation. Is there anything else I can help you with today?    \n\n",
+              "type" : "TEXT"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : null,
+        "hasTitle" : false,
+        "message" : [
+          "%script",
+          "",
+          "select ai agent No, thank you, nothing else"
+        ],
+        "selectedVisualization" : "raw",
+        "visualizationConfig" : null,
+        "hideCode" : false,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : false,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1760030288335,
+          "endTime" : 1760030301936,
+          "interpreter" : "script.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "\nRESPONSE                                                                                                                                                                   \nI'm happy to have assisted you with the return process, Carol. If you think of anything else in the future, don't hesitate to reach out. Have a wonderful day! Goodbye!    \n\n",
+              "type" : "TEXT"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : null,
+        "hasTitle" : false,
+        "message" : [
+          "%md",
+          "",
+          "# Phase 4: Introduce a RAG tool to enable recommending alternative products"
+        ],
+        "selectedVisualization" : "html",
+        "visualizationConfig" : null,
+        "hideCode" : true,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : true,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1760029422580,
+          "endTime" : 1760029422930,
+          "interpreter" : "md.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "<h1 id=\"phase-4-introduce-a-rag-tool-to-enable-recommending-alternative-products\">Phase 4: Introduce a RAG tool to enable recommending alternative products</h1>\n",
+              "type" : "HTML"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : "Define AI profile for RAG",
+        "hasTitle" : true,
+        "message" : [
+          "%script",
+          "",
+          "BEGIN DBMS_CLOUD_AI.drop_profile(profile_name => 'SALES_AGENT_RAG_PROFILE');",
+          "EXCEPTION WHEN OTHERS THEN NULL; END;",
+          "/",
+          "  -- default LLM: meta.llama-3.1-70b-instruct",
+          "  -- default transformer: cohere.embed-english-v3.0",
+          "BEGIN",
+          "  DBMS_CLOUD_AI.create_profile(                                              ",
+          "      profile_name => 'SALES_AGENT_RAG_PROFILE',                                                                 ",
+          "      attributes   => '{\"provider\": \"oci\",   ",
+          "                        \"credential_name\": \"AI_CREDENTIAL\",          ",
+          "                        \"vector_index_name\": \"SALES_AGENT_VECTOR_INDEX2\"}');  ",
+          "END;"
+        ],
+        "selectedVisualization" : "raw",
+        "visualizationConfig" : null,
+        "hideCode" : false,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : false,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1760029446524,
+          "endTime" : 1760029454841,
+          "interpreter" : "script.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "\nPL/SQL procedure successfully completed.\n\n\n---------------------------\n\nPL/SQL procedure successfully completed.\n\n",
+              "type" : "TEXT"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : "Create the credential to access Oracle Cloud Storage where the documents for RAG are stored",
+        "hasTitle" : true,
+        "message" : [
+          "%script",
+          "",
+          "begin",
+          "  DBMS_CLOUD.drop_credential(credential_name => 'OCI_SALES_CRED');",
+          "  EXCEPTION WHEN OTHERS THEN NULL; END;",
+          "end;",
+          "/",
+          "BEGIN",
+          "  DBMS_CLOUD.create_credential(",
+          "    credential_name => 'OCI_SALES_CRED',",
+          "    user_ocid       => '<ocid>',",
+          "    tenancy_ocid    => '<tenancy ocid>',",
+          "    private_key     => '<private key>',",
+          "    fingerprint     => '<fingerprint>'",
+          "  );",
+          "END;"
+        ],
+        "selectedVisualization" : "raw",
+        "visualizationConfig" : null,
+        "hideCode" : false,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : false,
+        "hideInIFrame" : false,
+        "enabled" : false,
+        "forms" : "[]",
+        "result" : null,
+        "relations" : [ ],
+        "dynamicFormParams" : null
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : "List documents in Object Storage",
+        "hasTitle" : true,
+        "message" : [
+          "%sql",
+          "",
+          "select * from",
+          "  DBMS_CLOUD.LIST_OBJECTS(",
+          "    credential_name => 'AI_CREDENTIAL',",
+          "    location_uri    => 'https://adwc4pm.objectstorage.us-ashburn-1.oci.customer-oci.com/p/b9UsLs4CwZi9iorADMTK9c-ziXkhmME6m7kcdJ9ypjqFTzzZmHSLqNve0t_Vi1du/n/adwc4pm/b/oaiw25-sales-agent-rag-documents/o/')"
+        ],
+        "selectedVisualization" : "table",
+        "visualizationConfig" : null,
+        "hideCode" : false,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : false,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1760030348934,
+          "endTime" : 1760030349959,
+          "interpreter" : "sql.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "OBJECT_NAME\tBYTES\tCHECKSUM\tCREATED\tLAST_MODIFIED\nABC_Smartphone_Supply_Catalog.pdf\t4700\tIGcgNW36qNIGNXr/AOpJ2Q==\t2025-08-08 18:46:05.802 +0:00\t2025-08-08 18:46:05.802 +0:00\nSmartphone-R-US_Catalog.pdf\t4248\tV00YSFD82fqfIjFZ82+0iw==\t2025-08-08 18:46:05.79 +0:00\t2025-08-08 18:46:05.79 +0:00\n",
+              "type" : "TABLE"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : "Create vector index ",
+        "hasTitle" : true,
+        "message" : [
+          "%script",
+          "",
+          "BEGIN",
+          "  DBMS_CLOUD_AI.DROP_VECTOR_INDEX(",
+          "   index_name  => 'SALES_AGENT_VECTOR_INDEX2',",
+          "   include_data => TRUE);",
+          "  EXCEPTION WHEN OTHERS THEN NULL;",
+          "END;",
+          "/",
+          "BEGIN",
+          "  DBMS_CLOUD_AI.CREATE_VECTOR_INDEX(",
+          "    index_name  => 'SALES_AGENT_VECTOR_INDEX2',",
+          "    attributes  => '{\"vector_db_provider\": \"oracle\",",
+          "                     \"location\": \"https://adwc4pm.objectstorage.us-ashburn-1.oci.customer-oci.com/p/b9UsLs4CwZi9iorADMTK9c-ziXkhmME6m7kcdJ9ypjqFTzzZmHSLqNve0t_Vi1du/n/adwc4pm/b/oaiw25-sales-agent-rag-documents/o/\",",
+          "                     \"object_storage_credential_name\": \"AI_CREDENTIAL\",",
+          "                     \"profile_name\": \"SALES_AGENT_RAG_PROFILE\", ",
+          "                     \"vector_distance_metric\": \"cosine\",",
+          "                     \"chunk_overlap\":50,",
+          "                     \"chunk_size\":450,",
+          "                     \"match_limit\":2}',",
+          "      description => 'Vector index for sales return agent scenario');",
+          "END;"
+        ],
+        "selectedVisualization" : "raw",
+        "visualizationConfig" : null,
+        "hideCode" : false,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : false,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1760030593467,
+          "endTime" : 1760030597868,
+          "interpreter" : "script.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "\nPL/SQL procedure successfully completed.\n\n\n---------------------------\n\nPL/SQL procedure successfully completed.\n\n",
+              "type" : "TEXT"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : null,
+        "hasTitle" : false,
+        "message" : [
+          "%script",
+          "",
+          "EXEC DBMS_CLOUD_AI.SET_PROFILE(profile_name => 'SALES_AGENT_RAG_PROFILE');"
+        ],
+        "selectedVisualization" : "raw",
+        "visualizationConfig" : null,
+        "hideCode" : false,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : false,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1760030621351,
+          "endTime" : 1760030621872,
+          "interpreter" : "script.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "\nPL/SQL procedure successfully completed.\n\n\n---------------------------\n",
+              "type" : "TEXT"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : null,
+        "hasTitle" : false,
+        "message" : [
+          "%script",
+          "",
+          "select ai narrate what are alternatives for the smartphone case"
+        ],
+        "selectedVisualization" : "raw",
+        "visualizationConfig" : null,
+        "hideCode" : false,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : false,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1760030628893,
+          "endTime" : 1760030668045,
+          "interpreter" : "script.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "\nRESPONSE                                                                                                                                                                                                                                                       \nAlternatives for smartphone cases include the TitanGuard Pro, ClearEdge Ultra, and ArmorFlex Shield. \nThe TitanGuard Pro is a military-grade case with reinforced corners, dust-proof port covers, and a matte anti-slip finish, designed for rugged outdoor use. \nThe ClearEdge Ultra is a crystal-clear slim case. \nThe ArmorFlex Shield is built with a shock-absorbing TPU frame and scratch-resistant polycarbonate back, designed for maximum impact protection without adding unnecessary bulk.\n\nSources:\n  - Smartphone-R-US_Catalog.pdf (https://adwc4pm.objectstorage.us-ashburn-1.oci.customer-oci.com/p/b9UsLs4CwZi9iorADMTK9c-ziXkhmME6m7kcdJ9ypjqFTzzZmHSLqNve0t_Vi1du/n/adwc4pm/b/oaiw25-sales-agent-rag-documents/o/Smartphone-R-US_Catalog.pdf)\n  - ABC_Smartphone_Supply_Catalog.pdf (https://adwc4pm.objectstorage.us-ashburn-1.oci.customer-oci.com/p/b9UsLs4CwZi9iorADMTK9c-ziXkhmME6m7kcdJ9ypjqFTzzZmHSLqNve0t_Vi1du/n/adwc4pm/b/oaiw25-sales-agent-rag-documents/o/ABC_Smartphone_Supply_Catalog.pdf)    \n\n",
+              "type" : "TEXT"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : "Create RAG Tool",
+        "hasTitle" : true,
+        "message" : [
+          "%script",
+          "",
+          "BEGIN DBMS_CLOUD_AI_AGENT.drop_tool('sales_rag_tool');",
+          "EXCEPTION WHEN OTHERS THEN NULL; END;",
+          "/",
+          "BEGIN",
+          "    DBMS_CLOUD_AI_AGENT.CREATE_TOOL(",
+          "        tool_name => 'sales_rag_tool',",
+          "        attributes => q'[{\"tool_type\": \"RAG\",",
+          "                          \"tool_params\": {\"profile_name\": \"SALES_AGENT_RAG_PROFILE\"}}]',",
+          "        description => 'Tool for doing RAG for product recommendations using supplier documents.'",
+          "    );",
+          "END;"
+        ],
+        "selectedVisualization" : "raw",
+        "visualizationConfig" : null,
+        "hideCode" : false,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : false,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1760030721969,
+          "endTime" : 1760030722666,
+          "interpreter" : "script.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "\nPL/SQL procedure successfully completed.\n\n\n---------------------------\n\nPL/SQL procedure successfully completed.\n\n",
+              "type" : "TEXT"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : "Update Handle_Product_Return_Task to make product recommendations",
+        "hasTitle" : true,
+        "message" : [
+          "%script",
+          "",
+          "BEGIN DBMS_CLOUD_AI_AGENT.drop_task('Handle_Product_Return_Task');",
+          "EXCEPTION WHEN OTHERS THEN NULL; END;",
+          "/",
+          "BEGIN",
+          "  DBMS_CLOUD_AI_AGENT.create_task(",
+          "    task_name => 'Handle_Product_Return_Task',",
+          "    attributes => '{\"instruction\": \"Process a product return request from a customer: {query} ' ||",
+          "                    'Steps to be followed: ' ||",
+          "                    '1. Ask customer the reason for return (no longer needed, arrived too late, box broken, or defective)' || ",
+          "                    '2. If no longer needed:' ||",
+          "                    '   a. Inform customer to ship the product at their expense back to us.' ||",
+          "                    '   b. Update the order status to return_shipment_pending using Update_Order_Status_Tool.' ||",
+          "                     '3. If it arrived too late:' ||",
+          "                    '   a. Ask customer if they want a refund.' ||",
+          "                    '   b. If the customer wants a refund, then confirm refund processed and update the order status to refund_completed' || ",
+          "                    '4. If the product was defective or the box broken:' ||",
+          "                    '   a. Ask customer if they want a replacement or a refund or if they would like to consider alternative recommendations' ||",
+          "                    '   b. If a replacement, inform customer replacement is on its way and they will receive a return shipping label for the defective product, then update the order status to replaced' ||",
+          "                    '   c. If a refund, inform customer to print out the return shipping label for the defective product, return the product, and update the order status to refund' ||",
+          "                    '   d. If consider alternative recommendations, use the RAG tool to present 2 alternatives to the customer and let them decide if they want this product or the original one' || ",
+          "                    '5. After the completion of a return or refund, ask if you can help with anything else.' ||",
+          "                    '   End the task and generatea a final answer only if user does not need help on anything else\",",
+          "                    \"tools\": [\"Update_Order_Status_Tool\",\"sales_rag_tool\"]}'",
+          "  );",
+          "END;"
+        ],
+        "selectedVisualization" : "raw",
+        "visualizationConfig" : null,
+        "hideCode" : false,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : false,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1760030725171,
+          "endTime" : 1760030725792,
+          "interpreter" : "script.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "\nPL/SQL procedure successfully completed.\n\n\n---------------------------\n\nPL/SQL procedure successfully completed.\n\n",
+              "type" : "TEXT"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : "Recreate the agent team",
+        "hasTitle" : true,
+        "message" : [
+          "%script",
+          "",
+          "BEGIN DBMS_CLOUD_AI_AGENT.clear_team();",
+          "EXCEPTION WHEN OTHERS THEN NULL; END;",
+          "/",
+          "",
+          "BEGIN DBMS_CLOUD_AI_AGENT.drop_team('Return_Agency_Team');",
+          "EXCEPTION WHEN OTHERS THEN NULL; END;",
+          "/",
+          "BEGIN                                                                 ",
+          "  DBMS_CLOUD_AI_AGENT.create_team(  ",
+          "    team_name  => 'Return_Agency_Team',                                                            ",
+          "    attributes => '{\"agents\": [{\"name\" : \"Customer_Return_Agent\", \"task\" : \"Handle_Product_Return_Task\"}],",
+          "                    \"process\": \"sequential\"}');                                                                 ",
+          "END;"
+        ],
+        "selectedVisualization" : "raw",
+        "visualizationConfig" : null,
+        "hideCode" : false,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : false,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1760030729247,
+          "endTime" : 1760030740944,
+          "interpreter" : "script.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "\nPL/SQL procedure successfully completed.\n\n\n---------------------------\n\nPL/SQL procedure successfully completed.\n\n\n---------------------------\n\nPL/SQL procedure successfully completed.\n\n",
+              "type" : "TEXT"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : null,
+        "hasTitle" : false,
+        "message" : [
+          "%md",
+          "",
+          "#### Interact with your updated agent"
+        ],
+        "selectedVisualization" : "html",
+        "visualizationConfig" : null,
+        "hideCode" : true,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : true,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1760030855349,
+          "endTime" : 1760030855723,
+          "interpreter" : "md.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "<h4 id=\"interact-with-your-updated-agent\">Interact with your updated agent</h4>\n",
+              "type" : "HTML"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : null,
+        "hasTitle" : false,
+        "message" : [
+          "%script",
+          "",
+          "EXEC DBMS_CLOUD_AI_AGENT.set_team(team_name  => 'Return_Agency_Team');                                                                   "
+        ],
+        "selectedVisualization" : "raw",
+        "visualizationConfig" : null,
+        "hideCode" : false,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : false,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1760030858034,
+          "endTime" : 1760030858574,
+          "interpreter" : "script.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "\nPL/SQL procedure successfully completed.\n\n\n---------------------------\n",
+              "type" : "TEXT"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : null,
+        "hasTitle" : false,
+        "message" : [
+          "%script",
+          "",
+          "select ai agent I want to return a smartphone case just received"
+        ],
+        "selectedVisualization" : "raw",
+        "visualizationConfig" : null,
+        "hideCode" : false,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : false,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1760030868419,
+          "endTime" : 1760030876414,
+          "interpreter" : "script.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "\nRESPONSE                                                                                                                                                                  \nCould you please tell me the reason for returning the smartphone case? Is it no longer needed, did it arrive too late, is the box broken, or is the product defective?    \n\n",
+              "type" : "TEXT"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : null,
+        "hasTitle" : false,
+        "message" : [
+          "%script",
+          "",
+          "select ai agent Hi, unforunately, it is defective"
+        ],
+        "selectedVisualization" : "raw",
+        "visualizationConfig" : null,
+        "hideCode" : false,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : false,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1760030934370,
+          "endTime" : 1760030939368,
+          "interpreter" : "script.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "\nRESPONSE                                                                                                                                                                                      \nI'm sorry to hear that the smartphone case is defective. Would you like a replacement, a refund, or would you like me to provide some alternative recommendations for a different product?    \n\n",
+              "type" : "TEXT"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : null,
+        "hasTitle" : false,
+        "message" : [
+          "%script",
+          "",
+          "select ai agent Sure, what are some alternatives you could recommend"
+        ],
+        "selectedVisualization" : "raw",
+        "visualizationConfig" : null,
+        "hideCode" : false,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : false,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1760030966768,
+          "endTime" : 1760030994886,
+          "interpreter" : "script.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "\nRESPONSE                                                                                                                                                             \nThank you for considering alternatives. I have two options for you to choose from:\n1. TitanGuard Pro - A military-grade case with reinforced corners, dust-proof port covers, and a matte anti-slip finish, perfect for rugged outdoor use.\n2. ClearEdge Ultra - A crystal-clear slim case that offers a sleek look while still providing protection.\nWould you like to go with one of these alternatives, or would you prefer to stick with the original smartphone case as a replacement or opt for a refund instead?    \n\n",
+              "type" : "TEXT"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : null,
+        "hasTitle" : false,
+        "message" : [
+          "%script",
+          "",
+          "select ai agent A refund please"
+        ],
+        "selectedVisualization" : "raw",
+        "visualizationConfig" : null,
+        "hideCode" : false,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : false,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1760031073265,
+          "endTime" : 1760031087159,
+          "interpreter" : "script.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "\nRESPONSE                                                                                                                                                                                                                                                                                                                                                                             \nI'm sorry to hear that you'd prefer a refund. Could you please provide me with your full name and the order number for the smartphone case so I can process the refund? Also, please print out the return shipping label that will be sent to you via email for the defective product and ship it back to us. Once I have your details, I’ll update the order status accordingly.    \n\n",
+              "type" : "TEXT"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : null,
+        "hasTitle" : false,
+        "message" : [
+          "%script",
+          "",
+          "select ai agent Carol Chen order number 7635"
+        ],
+        "selectedVisualization" : "raw",
+        "visualizationConfig" : null,
+        "hideCode" : false,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : false,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1760031098408,
+          "endTime" : 1760031108546,
+          "interpreter" : "script.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "\nRESPONSE                                                                                                                                                                                                                                                                                                \nThank you, Carol. The order status for order number 7635 has been updated to refund. You should receive an email shortly with the return shipping label for the defective smartphone case. Please ship it back to us at your earliest convenience. Is there anything else I can help you with today?    \n\n",
+              "type" : "TEXT"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : null,
+        "hasTitle" : false,
+        "message" : [
+          "%script",
+          "",
+          "select ai agent no, thank you"
+        ],
+        "selectedVisualization" : "raw",
+        "visualizationConfig" : null,
+        "hideCode" : false,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : false,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1760031141119,
+          "endTime" : 1760031146614,
+          "interpreter" : "script.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "\nRESPONSE                                                                                                                                                                   \nI'm happy to have assisted you with the return process, Carol. If you think of anything else in the future, don't hesitate to reach out. Have a wonderful day! Goodbye!    \n\n",
+              "type" : "TEXT"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : null,
+        "hasTitle" : false,
+        "message" : [
+          "%md",
+          "",
+          "### View the task and team history views"
+        ],
+        "selectedVisualization" : "html",
+        "visualizationConfig" : null,
+        "hideCode" : true,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : true,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1759425769410,
+          "endTime" : 1759425769730,
+          "interpreter" : "md.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "<h3 id=\"view-the-task-and-team-history-views\">View the task and team history views</h3>\n",
+              "type" : "HTML"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : "View the team processing: task, agent, prompt response",
+        "hasTitle" : true,
+        "message" : [
+          "%sql",
+          "",
+          "WITH latest_team AS (",
+          "  SELECT team_exec_id, team_name, start_date",
+          "  FROM user_ai_agent_team_history",
+          "  ORDER BY start_date DESC",
+          "  FETCH FIRST 1 ROW ONLY",
+          "),",
+          "latest_task AS (",
+          "    SELECT team_exec_id, task_name, agent_name, conversation_params, start_date,",
+          "           ROW_NUMBER() OVER (PARTITION BY team_exec_id, task_name, agent_name ",
+          "                             ORDER BY start_date DESC) as rn",
+          "  FROM user_ai_agent_task_history",
+          ")",
+          "SELECT",
+          "--  team.team_name,",
+          "  task.task_name,",
+          "  task.agent_name,",
+          "  p.prompt,",
+          "  p.prompt_response",
+          "FROM latest_team team",
+          "JOIN latest_task task",
+          "  ON team.team_exec_id = task.team_exec_id",
+          " AND task.rn = 1",
+          "LEFT JOIN user_cloud_ai_conversation_prompts p",
+          "  ON p.conversation_id = JSON_VALUE(task.conversation_params, '$.conversation_id')",
+          "ORDER BY task.start_date DESC NULLS LAST,",
+          "         p.created     DESC NULLS LAST;"
+        ],
+        "selectedVisualization" : "table",
+        "visualizationConfig" : null,
+        "hideCode" : false,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : false,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1760031151614,
+          "endTime" : 1760031152096,
+          "interpreter" : "sql.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "TASK_NAME\tAGENT_NAME\tPROMPT\tPROMPT_RESPONSE\nHANDLE_PRODUCT_RETURN_TASK\tCUSTOMER_RETURN_AGENT\tCLOB\tThought: I now have all the information needed to conclude the return process for Carol's smartphone case, and she has confirmed that she doesn't need help with anything else. Final Answer: I'm happy to have assisted you with the return process, Carol. If you think of anything else in the future, don't hesitate to reach out. Have a wonderful day! Goodbye!\nHANDLE_PRODUCT_RETURN_TASK\tCUSTOMER_RETURN_AGENT\tCLOB\tThought: The order status has been updated to refund for Carol Chen's smartphone case return. I need to confirm this with the customer and ask if they need help with anything else. Action: ORA$HUMAN_TOOL Action Input:  ```json { \"QUESTION_TO_HUMAN\": \"Thank you, Carol. The order status for order number 7635 has been updated to refund. You should receive an email shortly with the return shipping label for the defective smartphone case. Please ship it back to us at your earliest convenience. Is there anything else I can help you with today?\" } ``` Observation: no, thank you```\nHANDLE_PRODUCT_RETURN_TASK\tCUSTOMER_RETURN_AGENT\tCLOB\tThought: I have the customer's details and can now update the order status to refund for the defective smartphone case. Action: Update_Order_Status_Tool Action Input:  ```json { \"P_CUSTOMER_NAME\": \"Carol Chen\", \"P_ORDER_NUMBER\": \"7635\", \"P_STATUS\": \"refund\" } ``` Observation: {\"status\": \"success\", \"result\": 'Update successful.'}```\nHANDLE_PRODUCT_RETURN_TASK\tCUSTOMER_RETURN_AGENT\tCLOB\tThought: The customer has decided to opt for a refund instead of choosing an alternative or a replacement for the defective smartphone case. I need to inform them about the return shipping label and update the order status to refund. Action: ORA$HUMAN_TOOL Action Input:  ```json { \"QUESTION_TO_HUMAN\": \"I'm sorry to hear that you'd prefer a refund. Could you please provide me with your full name and the order number for the smartphone case so I can process the refund? Also, please print out the return shipping label that will be sent to you via email for the defective product and ship it back to us. Once I have your details, I’ll update the order status accordingly.\" } ``` Observation: Carol Chen order number 7635```\nHANDLE_PRODUCT_RETURN_TASK\tCUSTOMER_RETURN_AGENT\tCLOB\tThought: I have the search results for alternative smartphone cases and can now present them to the customer for their decision. Action: ORA$HUMAN_TOOL Action Input:  ```json { \"QUESTION_TO_HUMAN\": \"Thank you for considering alternatives. I have two options for you to choose from: 1. TitanGuard Pro - A military-grade case with reinforced corners, dust-proof port covers, and a matte anti-slip finish, perfect for rugged outdoor use. 2. ClearEdge Ultra - A crystal-clear slim case that offers a sleek look while still providing protection. Would you like to go with one of these alternatives, or would you prefer to stick with the original smartphone case as a replacement or opt for a refund instead?\" } ``` Observation: A refund please```\nHANDLE_PRODUCT_RETURN_TASK\tCUSTOMER_RETURN_AGENT\tCLOB\tThought: The customer has chosen to consider alternative recommendations for the defective smartphone case. I will use the sales_rag_tool to search for two alternative products to present to the customer. Action: sales_rag_tool Action Input:  ```json { \"TOOL_NAME\": \"sales_rag_tool\", \"QUERY\": \"smartphone case alternatives\" } ``` Observation: {\"status\": \"success\", \"result\": 'Alternatives for smartphone cases include the TitanGuard Pro and ClearEdge Ultra.  The TitanGuard Pro is a military-grade case with reinforced corners, dust-proof port covers, and a matte anti-slip finish, designed for rugged outdoor use.  The ClearEdge Ultra is a crystal-clear slim case.  Sources:   - Smartphone-R-US_Catalog.pdf (https://adwc4pm.objectstorage.us-ashburn-1.oci.customer-oci.com/p/b9UsLs4CwZi9iorADMTK9c-ziXkhmME6m7kcdJ9ypjqFTzzZmHSLqNve0t_Vi1du/n/adwc4pm/b/oaiw25-sales-agent-rag-documents/o/Smartphone-R-US_Catalog.pdf)'}```\nHANDLE_PRODUCT_RETURN_TASK\tCUSTOMER_RETURN_AGENT\tCLOB\tThought: Since the smartphone case is defective, I need to ask the customer if they would like a replacement, a refund, or if they would like to consider alternative recommendations. Action: ORA$HUMAN_TOOL Action Input:  ```json { \"QUESTION_TO_HUMAN\": \"I'm sorry to hear that the smartphone case is defective. Would you like a replacement, a refund, or would you like me to provide some alternative recommendations for a different product?\" } ``` Observation: Sure, what are some alternatives you could recommend```\nHANDLE_PRODUCT_RETURN_TASK\tCUSTOMER_RETURN_AGENT\tCLOB\tThought: I need to start the return process for the smartphone case by asking the customer the reason for the return. Action: ORA$HUMAN_TOOL Action Input:  ```json { \"QUESTION_TO_HUMAN\": \"Could you please tell me the reason for returning the smartphone case? Is it no longer needed, did it arrive too late, is the box broken, or is the product defective?\" } ``` Observation: Hi, unforunately, it is defective```\nHANDLE_PRODUCT_RETURN_TASK\tCUSTOMER_RETURN_AGENT\tCurrent Task: Process a product return request from a customer: I want to return a smartphone case just received Steps to be followed: 1. Ask customer the reason for return (no longer needed, arrived too late, box broken, or defective)2. If no longer needed:   a. Inform customer to ship the product at their expense back to us.   b. Update the order status to return_shipment_pending using Update_Order_Status_Tool.3. If it arrived too late:   a. Ask customer if they want a refund.   b. If the customer wants a refund, then confirm refund processed and update the order status to refund_completed4. If the product was defective or the box broken:   a. Ask customer if they want a replacement or a refund or if they would like to consider alternative recommendations   b. If a replacement, inform customer replacement is on its way and they will receive a return shipping label for the defective product, then update the order status to replaced   c. If a refund, inform customer to print out the return shipping label for the defective product, return the product, and update the order status to refund   d. If consider alternative recommendations, use the RAG tool to present 2 alternatives to the customer and let them decide if they want this product or the original one5. After the completion of a return or refund, ask if you can help with anything else.   End the task and generatea a final answer only if user does not need help on anything else  Useful previous conversation context with user for this task:  'User: I want to return a smartphone backup storage Response: Could you please tell me the reason for returning the smartphone backup storage? Is it no longer needed, did it arrive too late, is the box broken, or is the product defective? User: It arrived too late Response: I'm sorry to hear that the smartphone backup storage arrived too late. Would you like a refund for this item? User: Yes Response: Could you please provide me with your full name and the order number for the smartphone backup storage so I can process the refund? User: Carol Chen order number 7635 Response: Here is the confirmation email for your refund request:  Subject: Your Return Request for Order 7635 - smartphone backup storage Body: Dear Carol Chen,  Thank you for contacting us regarding your return request!  This email confirms that we have received your request to return the following item from order number 7635:  Item: smartphone backup storage Reason for Return: arrived too late  A full refund will be issued to the credit card on file. Please allow 7-10 business days for the refund to reflect in your account.  Please let me know if you have any questions or if there is anything else I can assist you with.  Thank you, and have a great day!  Is all the information in this email correct? If not, please let me know what needs to be updated. User: yes it is correct Response: I'm glad everything looks good with the email confirmation. Is there anything else I can help you with today? User: No, thank you, nothing else Response: I'm happy to have assisted you with the return process, Carol. If you think of anything else in the future, don't hesitate to reach out. Have a wonderful day! Goodbye! User: I want to return a smartphone backup storage. Response: I'm glad everything is sorted with your refund, Carol. Is there anything else I can help you with today? User: No, thank you, nothing else. Response: I'm happy to have assisted you with the return process, Carol. If you think of anything else in the future, don't hesitate to reach out. Have a wonderful day! Goodbye! '. IMPORTANT: Use relevant details from this context to answer the current task appropriately for information already provided.  You ONLY have access to the following tools. You MUST NOT invent, reference, or attempt to use any tools not explicitly listed here: Tool Name: Update_Order_Status_Tool Description: This tool updates the database to reflect return status change. Always confirm user name and order number with user before update status Arguments:   - P_CUSTOMER_NAME (VARCHAR2)   - P_ORDER_NUMBER (VARCHAR2)   - P_STATUS (VARCHAR2)  Tool Name: sales_rag_tool Description: This tool is used to search the knowledgebase using Retrieval Augmented Generation search. Input should be a search query. This tool will return search results. Arguments:   - TOOL_NAME (VARCHAR2)   - QUERY (CLOB)  Tool Name: ORA$HUMAN_TOOL Description: This tool is used to ask human to give response for a question. Input is the question. This tool will ask human for the answer and return answer. Arguments:   - QUESTION_TO_HUMAN (CLOB)    IMPORTANT: For every response, you MUST adhere to ONE of the following two formats:  Format 1 (when using a tool): ``` Thought: Your reasoning for what action to take Action: The exact name of one tool from [Update_Order_Status_Tool, sales_rag_tool, ORA$HUMAN_TOOL], just the name, exactly as listed. Action Input: Provide ONLY a valid single line JSON object for the tool's input, using double quotes for all keys and string values, and enclose the JSON in a ```json code block as shown below.  CRITICAL: Action Input MUST be ONE-LINE JSON object. NO line breaks between JSON elements. NO formatting. NO indentation. Use \\n inside string values for line breaks.  ```json { \"TOOL_NAME\": \"Example\", \"PARAM_1\": \"value\", ... } ``` Observation: Result of the action. This section will be populated by the system with the tool's output. ```  Format 2 (when you have a complete answer and do NOT need to use a tool): ``` Thought: I now have all the information needed to answer the question. Final Answer: Your final answer to the original input question. ```  VERY IMPORTANT: For each response, you MUST EITHER use exactly ONE tool, OR provide a final answer. NEVER do both in the same response. No extra commentary or wrapping.\tCLOB\n",
+              "type" : "TABLE"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : "Describe each HISTORY views: tool, task, team",
+        "hasTitle" : true,
+        "message" : [
+          "%script",
+          "",
+          "describe USER_AI_AGENT_TOOL_HISTORY;",
+          "describe USER_AI_AGENT_TASK_HISTORY;",
+          "describe USER_AI_AGENT_TEAM_HISTORY;"
+        ],
+        "selectedVisualization" : "raw",
+        "visualizationConfig" : null,
+        "hideCode" : false,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : false,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1760031188856,
+          "endTime" : 1760031192866,
+          "interpreter" : "script.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "\nName             Null?       Type                           \nINVOCATION_ID    NOT NULL    NUMBER                         \nTEAM_EXEC_ID                 VARCHAR2(36)                   \nTASK_ORDER                   NUMBER                         \nTOOL_NAME        NOT NULL    VARCHAR2(128)                  \nAGENT_NAME       NOT NULL    VARCHAR2(128)                  \nTASK_NAME        NOT NULL    VARCHAR2(128)                  \nSTART_DATE                   TIMESTAMP(6) WITH TIME ZONE    \nEND_DATE                     TIMESTAMP(6) WITH TIME ZONE    \nINPUT                        CLOB                           \nOUTPUT                       CLOB                           \nTOOL_OUTPUT                  CLOB                           \n\n---------------------------\n\nName                   Null?       Type                           \nTEAM_EXEC_ID                       VARCHAR2(36)                   \nTEAM_NAME              NOT NULL    VARCHAR2(128)                  \nTASK_ORDER                         NUMBER                         \nAGENT_NAME             NOT NULL    VARCHAR2(128)                  \nTASK_NAME              NOT NULL    VARCHAR2(128)                  \nCONVERSATION_PARAMS                CLOB                           \nINPUT                              CLOB                           \nRESULT                             CLOB                           \nSTATE                              VARCHAR2(128)                  \nSTART_DATE                         TIMESTAMP(6) WITH TIME ZONE    \nEND_DATE                           TIMESTAMP(6) WITH TIME ZONE    \n\n---------------------------\n\nName               Null?       Type                           \nTEAM_EXEC_ID                   VARCHAR2(36)                   \nTEAM_NAME          NOT NULL    VARCHAR2(128)                  \nSTATE                          VARCHAR2(128)                  \nSTART_DATE                     TIMESTAMP(6) WITH TIME ZONE    \nEND_DATE                       TIMESTAMP(6) WITH TIME ZONE    \nCONVERSATION_ID                VARCHAR2(36)                   \n\n---------------------------\n",
+              "type" : "TEXT"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : "View the tool history",
+        "hasTitle" : true,
+        "message" : [
+          "%sql",
+          "",
+          "select * from USER_AI_AGENT_TOOL_HISTORY",
+          "order by START_DATE desc"
+        ],
+        "selectedVisualization" : "table",
+        "visualizationConfig" : null,
+        "hideCode" : false,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : false,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1760031192216,
+          "endTime" : 1760031192905,
+          "interpreter" : "sql.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "INVOCATION_ID\tTEAM_EXEC_ID\tTASK_ORDER\tTOOL_NAME\tAGENT_NAME\tTASK_NAME\tSTART_DATE\tEND_DATE\tINPUT\tOUTPUT\tTOOL_OUTPUT\n36\t40BD9369-DC80-3376-E063-BB12000A5D83\t0\tUPDATE_ORDER_STATUS_TOOL\tCUSTOMER_RETURN_AGENT\tHANDLE_PRODUCT_RETURN_TASK\t2025-10-09 17:31:48.30965 +0:00\t2025-10-09 17:32:21.514888 UTC\t{ \"QUESTION_TO_HUMAN\": \"Thank you, Carol. The order status for order number 7635 has been updated to refund. You should receive an email shortly with the return shipping label for the defective smartphone case. Please ship it back to us at your earliest convenience. Is there anything else I can help you with today?\" }\tno, thank you\tCLOB\n35\t40BD9369-DC80-3376-E063-BB12000A5D83\t0\tUPDATE_ORDER_STATUS_TOOL\tCUSTOMER_RETURN_AGENT\tHANDLE_PRODUCT_RETURN_TASK\t2025-10-09 17:31:43.740914 +0:00\t2025-10-09 17:31:43.871047 +0:00\t{ \"P_CUSTOMER_NAME\": \"Carol Chen\", \"P_ORDER_NUMBER\": \"7635\", \"P_STATUS\": \"refund\" }\t{\"status\": \"success\", \"result\": 'Update successful.'}\tCLOB\n33\t40BD9369-DC80-3376-E063-BB12000A5D83\t0\tSALES_RAG_TOOL\tCUSTOMER_RETURN_AGENT\tHANDLE_PRODUCT_RETURN_TASK\t2025-10-09 17:29:54.638137 +0:00\t2025-10-09 17:31:13.646981 UTC\t{ \"QUESTION_TO_HUMAN\": \"Thank you for considering alternatives. I have two options for you to choose from:\\n1. TitanGuard Pro - A military-grade case with reinforced corners, dust-proof port covers, and a matte anti-slip finish, perfect for rugged outdoor use.\\n2. ClearEdge Ultra - A crystal-clear slim case that offers a sleek look while still providing protection.\\nWould you like to go with one of these alternatives, or would you prefer to stick with the original smartphone case as a replacement or opt for a refund instead?\" }\tA refund please\tCLOB\n32\t40BD9369-DC80-3376-E063-BB12000A5D83\t0\tSALES_RAG_TOOL\tCUSTOMER_RETURN_AGENT\tHANDLE_PRODUCT_RETURN_TASK\t2025-10-09 17:29:42.656745 +0:00\t2025-10-09 17:29:49.722034 +0:00\t{ \"TOOL_NAME\": \"sales_rag_tool\", \"QUERY\": \"smartphone case alternatives\" }\t{\"status\": \"success\", \"result\": 'Alternatives for smartphone cases include the TitanGuard Pro and ClearEdge Ultra.  The TitanGuard Pro is a military-grade case with reinforced corners, dust-proof port covers, and a matte anti-slip finish, designed for rugged outdoor use.  The ClearEdge Ultra is a crystal-clear slim case.  Sources:   - Smartphone-R-US_Catalog.pdf (https://adwc4pm.objectstorage.us-ashburn-1.oci.customer-oci.com/p/b9UsLs4CwZi9iorADMTK9c-ziXkhmME6m7kcdJ9ypjqFTzzZmHSLqNve0t_Vi1du/n/adwc4pm/b/oaiw25-sales-agent-rag-documents/o/Smartphone-R-US_Catalog.pdf)'}\tCLOB\n",
+              "type" : "TABLE"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : "View the task history",
+        "hasTitle" : true,
+        "message" : [
+          "%sql",
+          "",
+          " select * from USER_AI_AGENT_TASK_HISTORY",
+          " order by START_DATE desc"
+        ],
+        "selectedVisualization" : "table",
+        "visualizationConfig" : null,
+        "hideCode" : false,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : false,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1760031196468,
+          "endTime" : 1760031196876,
+          "interpreter" : "sql.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "TEAM_EXEC_ID\tTEAM_NAME\tTASK_ORDER\tAGENT_NAME\tTASK_NAME\tCONVERSATION_PARAMS\tINPUT\tRESULT\tSTATE\tSTART_DATE\tEND_DATE\n40BD9369-DC80-3376-E063-BB12000A5D83\tRETURN_AGENCY_TEAM\t0\tCUSTOMER_RETURN_AGENT\tHANDLE_PRODUCT_RETURN_TASK\t{\"conversation_id\":\"40BD9369-DC81-3376-E063-BB12000A5D83\"}\tI want to return a smartphone case just received\tI'm happy to have assisted you with the return process, Carol. If you think of anything else in the future, don't hesitate to reach out. Have a wonderful day! Goodbye!\tSUCCEEDED\t2025-10-09 17:27:50.208846 +0:00\t2025-10-09 17:32:26.328051 +0:00\n",
+              "type" : "TABLE"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : "View the team history",
+        "hasTitle" : true,
+        "message" : [
+          "%sql",
+          "",
+          "select * from USER_AI_AGENT_TEAM_HISTORY",
+          "order by START_DATE desc"
+        ],
+        "selectedVisualization" : "table",
+        "visualizationConfig" : null,
+        "hideCode" : false,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : false,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1760031199396,
+          "endTime" : 1760031200008,
+          "interpreter" : "sql.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "TEAM_EXEC_ID\tTEAM_NAME\tSTATE\tSTART_DATE\tEND_DATE\tCONVERSATION_ID\n40BD9369-DC80-3376-E063-BB12000A5D83\tRETURN_AGENCY_TEAM\tSUCCEEDED\t2025-10-09 17:27:48.815488 UTC\t2025-10-09 17:32:26.512812 +0:00\t40BD9369-DC2F-3376-E063-BB12000A5D83\n",
+              "type" : "TABLE"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : null,
+        "hasTitle" : false,
+        "message" : [
+          "%md",
+          "",
+          "## End of Script"
+        ],
+        "selectedVisualization" : "html",
+        "visualizationConfig" : null,
+        "hideCode" : true,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : true,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1759425790963,
+          "endTime" : 1759425791292,
+          "interpreter" : "md.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "<h2 id=\"end-of-script\">End of Script</h2>\n",
+              "type" : "HTML"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      }
+    ]
+  }
+]
