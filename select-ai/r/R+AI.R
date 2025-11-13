@@ -1,6 +1,9 @@
 # ==============================================================================
-# R+AI: Use RAG from your database to answer questions about the R Consortium
+# R and Select AI: 
+# Use RAG from your database to answer questions about the R Consortium
 # ==============================================================================
+#
+# Setup -Run R+AI-helper-functions.R - R+AI-helper-functions.R
 #
 # This script demonstrates Retrieval Augmented Generation (RAG) using 
 # Oracle Autonomous AI Database Select AI to answer natural language questions 
@@ -9,7 +12,11 @@
 # RAG augments your prompt to give the LLM new knowledge without fine tuning 
 # using your natural language prompt for semantic similarity search.
 #
-# Prerequisite: Run R+AI-helper-functions.R
+# Copyright (c) 2025 Oracle Corporation and/or its affilitiates.
+# 
+# The Universal Permissive License (UPL), Version 1.0
+# https://oss.oracle.com/licenses/upl/
+#
 # ==============================================================================
 # SETUP: Load Libraries and establish database connection
 # ==============================================================================
