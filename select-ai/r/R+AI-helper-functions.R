@@ -1,7 +1,15 @@
 # ==============================================================================
-# HELPER FUNCTIONS LIBRARY FOR R+AI RAG IMPLEMENTATION
+# R and Select AI: 
+# Use RAG from your database to answer questions about the R Consortium
 # ==============================================================================
-
+#
+# Helper functions for R+AI.R
+#
+# Copyright (c) 2025 Oracle Corporation and/or its affilitiates.
+# 
+# The Universal Permissive License (UPL), Version 1.0
+# https://oss.oracle.com/licenses/upl/
+#
 # ------------------------------------------------------------------------------
 # DATABASE CONNECTION FUNCTIONS
 # ------------------------------------------------------------------------------
