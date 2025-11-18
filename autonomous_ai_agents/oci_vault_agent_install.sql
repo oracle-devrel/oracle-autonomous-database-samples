@@ -1,0 +1,1488 @@
+-- Copyright (c) 2025 Oracle and/or its affiliates.
+-- Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl/
+--
+-- Installer script for OCI Vault AI tools (Select AI Agent / Oracle AI Database)
+--
+-- Purpose:
+--   Install a consolidated PL/SQL package and AI Agent tool registrations
+--   to automate OCI Vault operations via Select AI Agent (Oracle AI Database).
+--
+-- Script Structure
+--   1) Initialization: grants, configuration setup, and resource-principal handling.
+--   2) Package deployment: &&INSTALL_SCHEMA.oci_object_storage_agents (spec and body).
+--   3) AI tool setup: creation of all Object Storage agent tools.
+--
+-- Usage:
+--   sqlplus admin@db @oci_vault_agent_install.sql <INSTALL_SCHEMA> [CONFIG_JSON]
+--   Minimal:
+--     sqlplus admin@db @oci_vault_agent_install.sql <INSTALL_SCHEMA>
+--
+--
+-- Notes:
+--   - Optional CONFIG_JSON keys:
+--       * use_resource_principal (true/false)   -- default: true when omitted
+--       * credential_name (string)              -- used if not using resource principal
+--       * compartment_ocid (string)             -- optional default compartment OCID
+--   - You may also store or update config in OCI_AGENT_CONFIG after install.
+--
+SET SERVEROUTPUT ON
+SET VERIFY OFF
+
+-- First argument: schema
+DEFINE INSTALL_SCHEMA = '<SCHEMA_NAME>'
+
+-- Second argument: JSON config (optional)
+-- If not passed, default to empty string
+DEFINE INSTALL_CONFIG_JSON = '{"use_resource_principal": <true/false>, "credential_name": "<cred_name>", "compartment_name": "<comp_name>", "compartment_ocid": "<comp_ocid>"}'
+
+-------------------------------------------------------------------------------
+-- Initializes the OCI Vault AI Agent. This procedure:
+--   • Grants all required DBMS_CLOUD_OCI Vault type privileges.
+--   • Creates the OCI_AGENT_CONFIG table.
+--   • Parses the JSON config and persists credential, compartment, and RP flags.
+--   • Enables resource principal if configured.
+-- Ensures the Vault agent is fully ready for tool execution.
+-------------------------------------------------------------------------------
+CREATE OR REPLACE PROCEDURE initilize_vault_agent(
+  p_install_schema_name IN VARCHAR2,
+  p_config_json         IN CLOB
+)
+IS
+  -- local vars
+  l_use_rp              BOOLEAN := NULL;
+  l_credential_name     VARCHAR2(4000) := NULL;
+  l_compartment_ocid    VARCHAR2(4000) := NULL;
+  l_compartment_name    VARCHAR2(4000) := NULL;
+  l_schema_name         VARCHAR2(128);
+  c_vault_agent CONSTANT VARCHAR2(64) := 'OCI_VAULT';
+
+  TYPE priv_list_t IS VARRAY(100) OF VARCHAR2(4000);
+  l_priv_list CONSTANT priv_list_t := priv_list_t(
+    'DBMS_CLOUD_OCI_VT_VAULTS_CREATE_SECRET_RESPONSE_T',
+    'DBMS_CLOUD_OCI_VAULT_SECRET_T',
+    'DBMS_CLOUD_OCI_VAULT_CREATE_SECRET_DETAILS_T',
+    'DBMS_CLOUD_OCI_VAULT_BASE64_SECRET_CONTENT_DETAILS_T',
+    'DBMS_CLOUD_OCI_VAULT_SECRET_RULE_TBL',
+    'DBMS_CLOUD_OCI_VT_VAULTS_GET_SECRET_RESPONSE_T',
+    'DBMS_CLOUD_OCI_VT_VAULTS_LIST_SECRETS_RESPONSE_T',
+    'DBMS_CLOUD_OCI_VAULT_SECRET_SUMMARY_TBL',
+    'DBMS_CLOUD_OCI_VT_VAULTS_LIST_SECRET_VERSIONS_RESPONSE_T',
+    'DBMS_CLOUD_OCI_VAULT_SECRET_VERSION_SUMMARY_TBL',
+    'DBMS_CLOUD_OCI_VT_VAULTS_GET_SECRET_VERSION_RESPONSE_T',
+    'DBMS_CLOUD_OCI_VAULT_SECRET_VERSION_T',
+    'DBMS_CLOUD_OCI_VT_VAULTS_UPDATE_SECRET_RESPONSE_T',
+    'DBMS_CLOUD_OCI_VAULT_UPDATE_SECRET_DETAILS_T',
+    'DBMS_CLOUD_OCI_VT_VAULTS_SCHEDULE_SECRET_DELETION_RESPONSE_T',
+    'DBMS_CLOUD_OCI_VAULT_SCHEDULE_SECRET_DELETION_DETAILS_T',
+    'DBMS_CLOUD_OCI_VT_VAULTS_CANCEL_SECRET_DELETION_RESPONSE_T',
+    'DBMS_CLOUD_OCI_VT_VAULTS_CHANGE_SECRET_COMPARTMENT_RESPONSE_T',
+    'DBMS_CLOUD_OCI_VAULT_CHANGE_SECRET_COMPARTMENT_DETAILS_T',
+    'DBMS_CLOUD_OCI_VT_VAULTS_SCHEDULE_SECRET_VERSION_DELETION_RESPONSE_T',
+    'DBMS_CLOUD_OCI_VAULT_SCHEDULE_SECRET_VERSION_DELETION_DETAILS_T',
+    'DBMS_CLOUD_OCI_VT_VAULTS_CANCEL_SECRET_VERSION_DELETION_RESPONSE_T'
+  );
+
+  ----------------------------------------------------------------------------
+  -- Helper: grant execute on list of objects
+  ----------------------------------------------------------------------------
+  PROCEDURE execute_grants(p_schema IN VARCHAR2, p_objects IN priv_list_t) IS
+  BEGIN
+    FOR i IN 1 .. p_objects.COUNT LOOP
+      BEGIN
+        EXECUTE IMMEDIATE 'GRANT EXECUTE ON ' || p_objects(i) || ' TO ' || p_schema;
+      EXCEPTION
+        WHEN OTHERS THEN
+          DBMS_OUTPUT.PUT_LINE('Warning: failed to grant ' || p_objects(i) ||
+                               ' to ' || p_schema || ' - ' || SQLERRM);
+      END;
+    END LOOP;
+  END execute_grants;
+
+  ----------------------------------------------------------------------------
+  -- get_config: returns parsed values via OUT params (no globals modified)
+  ----------------------------------------------------------------------------
+  PROCEDURE get_config(
+    p_config_json       IN  CLOB,
+    o_use_rp            OUT BOOLEAN,
+    o_credential_name   OUT VARCHAR2,
+    o_compartment_name  OUT VARCHAR2,
+    o_compartment_ocid  OUT VARCHAR2
+  ) IS
+    l_cfg JSON_OBJECT_T := NULL;
+  BEGIN
+    -- initialize outs to NULL for deterministic behavior
+    o_use_rp := NULL;
+    o_credential_name := NULL;
+    o_compartment_name := NULL;
+    o_compartment_ocid := NULL;
+
+    -- only parse if JSON is not null or empty
+    IF p_config_json IS NOT NULL AND TRIM(p_config_json) IS NOT NULL THEN
+      BEGIN
+        l_cfg := JSON_OBJECT_T.parse(p_config_json);
+
+        IF l_cfg.has('use_resource_principal') THEN
+          o_use_rp := l_cfg.get_boolean('use_resource_principal');
+        END IF;
+
+        IF l_cfg.has('credential_name') THEN
+          o_credential_name := l_cfg.get_string('credential_name');
+        END IF;
+
+        IF l_cfg.has('compartment_name') THEN
+          o_compartment_name := l_cfg.get_string('compartment_name');
+        END IF;
+
+        IF l_cfg.has('compartment_ocid') THEN
+          o_compartment_ocid := l_cfg.get_string('compartment_ocid');
+        END IF;
+
+      EXCEPTION
+        WHEN OTHERS THEN
+          DBMS_OUTPUT.PUT_LINE('Config JSON parse failed: ' || SQLERRM);
+          -- leave outs as NULL so default logic applies upstream
+          o_use_rp := NULL;
+          o_credential_name := NULL;
+          o_compartment_name := NULL;
+          o_compartment_ocid := NULL;
+      END;
+    ELSE
+      DBMS_OUTPUT.PUT_LINE('No config JSON provided, using defaults.');
+    END IF;
+  END get_config;
+
+  ----------------------------------------------------------------------------
+  -- Helper: generic MERGE for a single config key/value
+  ----------------------------------------------------------------------------
+  PROCEDURE merge_config_key(p_key IN VARCHAR2, p_val IN CLOB, p_agent IN VARCHAR2) IS
+  BEGIN
+    EXECUTE IMMEDIATE
+      'MERGE INTO OCI_AGENT_CONFIG c
+         USING (SELECT :k AS "KEY", :v AS "VALUE", :a AS "AGENT" FROM DUAL) src
+           ON (c."KEY" = src."KEY" AND c."AGENT" = src."AGENT")
+       WHEN MATCHED THEN
+         UPDATE SET c."VALUE" = src."VALUE"
+       WHEN NOT MATCHED THEN
+         INSERT ("KEY", "VALUE", "AGENT") VALUES (src."KEY", src."VALUE", src."AGENT")'
+    USING p_key, p_val, p_agent;
+  EXCEPTION
+    WHEN OTHERS THEN
+      DBMS_OUTPUT.PUT_LINE('Warning: failed to persist ' || p_key || ' config: ' || SQLERRM);
+  END merge_config_key;
+
+  ----------------------------------------------------------------------------
+  -- Combined helper: Apply config and insert into config table
+  ----------------------------------------------------------------------------
+  PROCEDURE apply_config(
+    p_schema                IN VARCHAR2,
+    p_use_rp                IN BOOLEAN,
+    p_credential_name       IN VARCHAR2,
+    p_compartment_name      IN VARCHAR2,
+    p_compartment_ocid      IN VARCHAR2
+  ) IS
+    l_effective_use_rp  BOOLEAN;
+    l_enable_rp_str     VARCHAR2(3);
+  BEGIN
+    -- Determine effective value for resource principal:
+    -- If JSON supplied a value, use it. If not supplied, default to TRUE (YES).
+    IF p_use_rp IS NULL THEN
+      l_effective_use_rp := TRUE; -- default is YES when not provided
+    ELSE
+      l_effective_use_rp := p_use_rp;
+    END IF;
+
+    -- Persist credential_name, compartment_ocid, compartment_name if present
+    IF p_credential_name IS NOT NULL THEN
+      merge_config_key('CREDENTIAL_NAME', p_credential_name, c_vault_agent);
+    END IF;
+
+    IF p_compartment_ocid IS NOT NULL THEN
+      merge_config_key('COMPARTMENT_OCID', p_compartment_ocid, c_vault_agent);
+    END IF;
+
+    IF p_compartment_name IS NOT NULL THEN
+      merge_config_key('COMPARTMENT_NAME', p_compartment_name, c_vault_agent);
+    END IF;
+
+    -- Persist ENABLE_RESOURCE_PRINCIPAL as YES/NO based on effective value (default YES)
+    IF l_effective_use_rp THEN
+      l_enable_rp_str := 'YES';
+    ELSE
+      l_enable_rp_str := 'NO';
+    END IF;
+
+    merge_config_key('ENABLE_RESOURCE_PRINCIPAL', l_enable_rp_str, c_vault_agent);
+
+    -- Now enable or skip enabling resource principal at DB level based on effective flag
+    IF l_effective_use_rp THEN
+      BEGIN
+        DBMS_CLOUD_ADMIN.ENABLE_RESOURCE_PRINCIPAL(USERNAME => p_schema);
+        DBMS_OUTPUT.PUT_LINE('Resource principal enabled for ' || p_schema);
+      EXCEPTION
+        WHEN OTHERS THEN
+          DBMS_OUTPUT.PUT_LINE('Failed to enable resource principal for ' || p_schema || ' - ' || SQLERRM);
+          -- continue; user may prefer to use a credential instead
+      END;
+    ELSE
+      DBMS_OUTPUT.PUT_LINE(
+        'Resource principal NOT enabled per config. Using credential: '
+        || NVL(p_credential_name, '<not provided>')
+      );
+    END IF;
+  END apply_config;
+
+BEGIN
+  -- Validate schema name to avoid SQL injection when used in identifiers
+  l_schema_name := DBMS_ASSERT.SIMPLE_SQL_NAME(p_install_schema_name);
+
+  -- Grant required execute privileges using helper
+  execute_grants(l_schema_name, l_priv_list);
+
+  -- Parse optional config JSON into local variables
+  get_config(
+    p_config_json       => p_config_json,
+    o_use_rp            => l_use_rp,
+    o_credential_name   => l_credential_name,
+    o_compartment_name  => l_compartment_name,
+    o_compartment_ocid  => l_compartment_ocid
+  );
+
+  -- Create generic agent config table (idempotent: ignore if already exists)
+  BEGIN
+    EXECUTE IMMEDIATE
+      'CREATE TABLE OCI_AGENT_CONFIG (
+         "ID"     NUMBER GENERATED BY DEFAULT AS IDENTITY,
+         "KEY"    VARCHAR2(200) NOT NULL,
+         "VALUE"  CLOB,
+         "AGENT"  VARCHAR2(128) NOT NULL,
+         CONSTRAINT OCI_AGENT_CONFIG_PK PRIMARY KEY ("ID"),
+         CONSTRAINT OCI_AGENT_CONFIG_UK UNIQUE ("KEY","AGENT")
+       )';
+  EXCEPTION
+    WHEN OTHERS THEN
+      IF SQLCODE = -955 THEN
+        NULL; -- table already exists; safe to continue on re-run
+      ELSE
+        RAISE;
+      END IF;
+  END;
+
+  -- Apply config and insert into config table
+  apply_config(
+    p_schema              => l_schema_name,
+    p_use_rp              => l_use_rp,
+    p_credential_name     => l_credential_name,
+    p_compartment_name    => l_compartment_name,
+    p_compartment_ocid    => l_compartment_ocid
+  );
+
+  DBMS_OUTPUT.PUT_LINE('initilize_vault_agent completed for schema ' || l_schema_name);
+EXCEPTION
+  WHEN OTHERS THEN
+    DBMS_OUTPUT.PUT_LINE('Fatal error in initilize_vault_agent: ' || SQLERRM);
+    RAISE;
+END initilize_vault_agent;
+/
+-------------------------------------------------------------------------------
+-- Call initilize_vault_agent procedure
+-------------------------------------------------------------------------------
+BEGIN
+  initilize_vault_agent(
+    p_install_schema_name => '&&INSTALL_SCHEMA',
+    p_config_json         => '&&INSTALL_CONFIG_JSON'
+  );
+END;
+/
+
+
+
+------------------------------------------------------------------------
+-- Package specification
+------------------------------------------------------------------------
+CREATE OR REPLACE PACKAGE &&INSTALL_SCHEMA.oci_vault_agents
+AS
+  /*
+    Package: oci_vault_agents
+    Purpose: collection of PL/SQL helper functions for OCI Vault operations
+    NOTE: functions return CLOB JSON describing result, status_code, and headers
+  */
+  
+  FUNCTION create_secret (
+      secret_name         IN VARCHAR2,
+      plain_text          IN VARCHAR2,
+      description         IN VARCHAR2,
+      vault_id            IN VARCHAR2,
+      key_id              IN VARCHAR2,
+      region              IN VARCHAR2
+  ) RETURN CLOB;
+
+  FUNCTION get_secret (
+      secret_id       IN VARCHAR2,
+      region          IN VARCHAR2
+  ) RETURN CLOB;
+
+  -- Additional functions consolidated into the package
+  FUNCTION list_secrets (
+      compartment_name IN VARCHAR2,
+      region           IN VARCHAR2
+  ) RETURN CLOB;
+
+  FUNCTION list_secret_versions (
+      secret_id IN VARCHAR2,
+      region    IN VARCHAR2
+  ) RETURN CLOB;
+
+  FUNCTION get_secret_version (
+      secret_id             IN VARCHAR2,
+      secret_version_number IN NUMBER,
+      region                IN VARCHAR2
+  ) RETURN CLOB;
+
+  FUNCTION update_secret (
+      secret_id              IN VARCHAR2,
+      description            IN VARCHAR2 DEFAULT NULL,
+      current_version_number IN NUMBER   DEFAULT NULL,
+      plain_text             IN VARCHAR2 DEFAULT NULL,
+      defined_tags           IN JSON_ELEMENT_T DEFAULT NULL,
+      freeform_tags          IN JSON_ELEMENT_T DEFAULT NULL,
+      secret_rules           IN DBMS_CLOUD_OCI_VAULT_SECRET_RULE_TBL DEFAULT NULL,
+      region                 IN VARCHAR2
+  ) RETURN CLOB;
+
+  FUNCTION schedule_secret_deletion (
+      secret_id        IN VARCHAR2,
+      time_of_deletion IN TIMESTAMP WITH TIME ZONE,
+      region           IN VARCHAR2
+  ) RETURN CLOB;
+
+  FUNCTION schedule_secret_version_deletion (
+      secret_id              IN VARCHAR2,
+      secret_version_number  IN NUMBER,
+      time_of_deletion       IN TIMESTAMP WITH TIME ZONE,
+      region                 IN VARCHAR2
+  ) RETURN CLOB;
+
+  FUNCTION cancel_secret_deletion (
+      secret_id IN VARCHAR2,
+      region    IN VARCHAR2
+  ) RETURN CLOB;
+
+  FUNCTION cancel_secret_version_deletion (
+      secret_id             IN VARCHAR2,
+      secret_version_number IN NUMBER,
+      region                IN VARCHAR2
+  ) RETURN CLOB;
+
+  FUNCTION change_secret_compartment (
+      secret_id         IN VARCHAR2,
+      compartment_name  IN VARCHAR2,
+      region            IN VARCHAR2
+  ) RETURN CLOB;
+
+END &&INSTALL_SCHEMA.oci_vault_agents;
+/
+
+------------------------------------------------------------------------
+-- Package body
+------------------------------------------------------------------------
+CREATE OR REPLACE PACKAGE BODY &&INSTALL_SCHEMA.oci_vault_agents
+AS
+
+  -- Helper function to get configuration parameters
+  FUNCTION get_agent_config(
+    schema_name   IN VARCHAR2,
+    table_name    IN VARCHAR2,
+    agent_name    IN VARCHAR2
+  ) RETURN CLOB
+  IS
+      l_sql          VARCHAR2(4000);
+      l_cursor       SYS_REFCURSOR;
+      l_config_json  JSON_OBJECT_T := JSON_OBJECT_T();
+      l_row          VARCHAR2(4000);
+      l_key          VARCHAR2(200);
+      l_value        CLOB;
+      l_result_json  JSON_OBJECT_T := JSON_OBJECT_T();
+  BEGIN
+      -- Build dynamic SQL to fetch the config key and value from the specified schema and table
+      l_sql := 'SELECT "KEY", "VALUE" FROM ' || schema_name || '.' || table_name ||
+               ' WHERE "AGENT" = :agent';
+
+      -- Open a cursor for the dynamic SQL
+      OPEN l_cursor FOR l_sql USING agent_name;
+
+      -- Loop through the result set and populate the JSON object
+      LOOP
+          FETCH l_cursor INTO l_key, l_value;
+          EXIT WHEN l_cursor%NOTFOUND;
+
+          -- Add each config key-value pair to the JSON object
+          l_config_json.put(l_key, l_value);
+      END LOOP;
+
+      -- Close the cursor
+      CLOSE l_cursor;
+
+      -- Return the JSON object as CLOB
+      l_result_json.put('status', 'success');
+      l_result_json.put('config_params', l_config_json);
+
+      RETURN l_result_json.to_clob();
+  EXCEPTION
+      WHEN OTHERS THEN
+          l_result_json := JSON_OBJECT_T();
+          l_result_json.put('status', 'error');
+          l_result_json.put('message', 'Error: ' || SQLERRM);
+          RETURN l_result_json.to_clob();
+  END get_agent_config;
+
+  ----------------------------------------------------------------------
+  -- create_secret
+  ----------------------------------------------------------------------
+  FUNCTION create_secret (
+      secret_name         IN VARCHAR2,
+      plain_text          IN VARCHAR2,
+      description         IN VARCHAR2,
+      vault_id            IN VARCHAR2,
+      key_id              IN VARCHAR2,
+      region              IN VARCHAR2
+  ) RETURN CLOB
+  AS
+      l_response      DBMS_CLOUD_OCI_VT_VAULTS_CREATE_SECRET_RESPONSE_T;
+      l_details       DBMS_CLOUD_OCI_VAULT_CREATE_SECRET_DETAILS_T;
+      l_content       DBMS_CLOUD_OCI_VAULT_BASE64_SECRET_CONTENT_DETAILS_T;
+      l_encoded       VARCHAR2(32767);
+      l_output        CLOB;
+      compartment_id  VARCHAR2(256);
+      credential_name VARCHAR2(256);
+      l_json          JSON_OBJECT_T := JSON_OBJECT_T();
+      l_secret_obj    JSON_OBJECT_T := JSON_OBJECT_T();
+      l_current_user  VARCHAR2(128):= SYS_CONTEXT('USERENV', 'CURRENT_USER');
+      l_config_json  CLOB;
+      l_config_obj   JSON_OBJECT_T;
+      l_config_params JSON_OBJECT_T;
+      
+  BEGIN
+      -- Resolve compartment OCID (uses persisted config or provided name)
+      l_config_json := get_agent_config(l_current_user, 'OCI_AGENT_CONFIG', 'OCI_VAULT');
+      l_config_obj := JSON_OBJECT_T.parse(l_config_json);
+      
+      IF l_config_obj.get_string('status') = 'success' THEN
+          l_config_params := l_config_obj.get_object('config_params');
+
+          compartment_id  := l_config_params.get_string('COMPARTMENT_OCID');
+          credential_name := l_config_params.get_string('CREDENTIAL_NAME');
+      ELSE
+          DBMS_OUTPUT.PUT_LINE('Error: ' || l_config_obj.get_string('message'));
+      END IF;
+
+      -- Encode plain text as Base64
+      l_encoded := UTL_RAW.cast_to_varchar2(
+                    UTL_ENCODE.base64_encode(
+                      UTL_RAW.cast_to_raw(plain_text)
+                    )
+                  );
+
+      -- Build secret content details
+      l_content := DBMS_CLOUD_OCI_VAULT_BASE64_SECRET_CONTENT_DETAILS_T(
+                    content_type => 'BASE64',
+                    name         => secret_name,
+                    stage        => 'CURRENT',
+                    content      => l_encoded
+                  );
+
+      -- Build the secret creation details
+      l_details := DBMS_CLOUD_OCI_VAULT_CREATE_SECRET_DETAILS_T(
+                    compartment_id => compartment_id,
+                    defined_tags   => NULL,
+                    description    => description,
+                    freeform_tags  => NULL,
+                    key_id         => key_id,
+                    metadata       => NULL,
+                    secret_content => l_content,
+                    secret_name    => secret_name,
+                    secret_rules   => NULL,
+                    vault_id       => vault_id
+                  );
+
+      -- Call the CREATE_SECRET API
+      l_response := DBMS_CLOUD_OCI_VT_VAULTS.CREATE_SECRET(
+          create_secret_details => l_details,
+          opc_request_id        => NULL,
+          opc_retry_token       => NULL,
+          region                => region,
+          endpoint              => NULL,
+          credential_name       => credential_name
+      );
+
+      -- Build the JSON response
+      l_json.put('status_code', l_response.status_code);
+
+      IF l_response.headers IS NOT NULL THEN
+          l_json.put('headers', l_response.headers.to_clob);
+      END IF;
+
+      IF l_response.response_body IS NOT NULL THEN
+          l_secret_obj.put('id',               l_response.response_body.id);
+          l_secret_obj.put('name',             l_response.response_body.secret_name);
+          l_secret_obj.put('compartment_id',   l_response.response_body.compartment_id);
+          l_secret_obj.put('vault_id',         l_response.response_body.vault_id);
+          l_secret_obj.put('lifecycle_state',  l_response.response_body.lifecycle_state);
+          l_secret_obj.put('description',      l_response.response_body.description);
+
+          IF l_response.response_body.time_created IS NOT NULL THEN
+              l_secret_obj.put('time_created',
+                TO_CHAR(l_response.response_body.time_created, 'YYYY-MM-DD"T"HH24:MI:SS"Z"')
+              );
+          END IF;
+
+          l_json.put('secret', l_secret_obj);
+      END IF;
+
+      l_output := l_json.to_clob;
+      RETURN l_output;
+  EXCEPTION
+    WHEN OTHERS THEN
+      -- return an error JSON to caller
+      l_json := JSON_OBJECT_T();
+      l_json.put('error', SQLERRM);
+      RETURN l_json.to_clob;
+  END create_secret;
+
+  ----------------------------------------------------------------------
+  -- get_secret
+  ----------------------------------------------------------------------
+  FUNCTION get_secret (
+      secret_id       IN VARCHAR2,
+      region          IN VARCHAR2
+  ) RETURN CLOB
+  AS
+      l_response   DBMS_CLOUD_OCI_VT_VAULTS_GET_SECRET_RESPONSE_T;
+      l_secret     DBMS_CLOUD_OCI_VAULT_SECRET_T;
+      l_output     CLOB;
+      l_json       JSON_OBJECT_T := JSON_OBJECT_T();
+      l_secret_obj JSON_OBJECT_T := JSON_OBJECT_T();
+      credential_name VARCHAR2(256);
+      l_current_user  VARCHAR2(128):= SYS_CONTEXT('USERENV', 'CURRENT_USER');
+      l_config_json  CLOB;
+      l_config_obj   JSON_OBJECT_T;
+      l_config_params JSON_OBJECT_T;
+  BEGIN
+      l_config_json := get_agent_config(l_current_user, 'OCI_AGENT_CONFIG', 'OCI_VAULT');
+      l_config_obj := JSON_OBJECT_T.parse(l_config_json);
+      
+      IF l_config_obj.get_string('status') = 'success' THEN
+          l_config_params := l_config_obj.get_object('config_params');
+
+          credential_name := l_config_params.get_string('CREDENTIAL_NAME');
+      ELSE
+          DBMS_OUTPUT.PUT_LINE('Error: ' || l_config_obj.get_string('message'));
+      END IF;
+
+      -- Call the OCI Vault GET_SECRET API
+      l_response := DBMS_CLOUD_OCI_VT_VAULTS.GET_SECRET(
+          secret_id       => secret_id,
+          opc_request_id  => NULL,
+          region          => region,
+          endpoint        => NULL,
+          credential_name => credential_name
+      );
+
+      -- Add status code
+      l_json.put('status_code', l_response.status_code);
+
+      -- Add headers if present
+      IF l_response.headers IS NOT NULL THEN
+          l_json.put('headers', l_response.headers.to_clob);
+      END IF;
+
+      -- Add secret details if present
+      IF l_response.response_body IS NOT NULL THEN
+          l_secret := l_response.response_body;
+
+          l_secret_obj.put('id', l_secret.id);
+          l_secret_obj.put('name', l_secret.secret_name);
+          l_secret_obj.put('compartment_id', l_secret.compartment_id);
+          l_secret_obj.put('vault_id', l_secret.vault_id);
+          l_secret_obj.put('description', l_secret.description);
+          l_secret_obj.put('lifecycle_state', l_secret.lifecycle_state);
+
+          IF l_secret.time_created IS NOT NULL THEN
+              l_secret_obj.put(
+                  'time_created',
+                  TO_CHAR(l_secret.time_created, 'YYYY-MM-DD"T"HH24:MI:SS"Z"')
+              );
+          END IF;
+
+          IF l_secret.time_of_deletion IS NOT NULL THEN
+              l_secret_obj.put(
+                  'time_of_deletion',
+                  TO_CHAR(l_secret.time_of_deletion, 'YYYY-MM-DD"T"HH24:MI:SS"Z"')
+              );
+          END IF;
+
+          IF l_secret.time_of_current_version_expiry IS NOT NULL THEN
+              l_secret_obj.put(
+                  'time_of_current_version_expiry',
+                  TO_CHAR(l_secret.time_of_current_version_expiry, 'YYYY-MM-DD"T"HH24:MI:SS"Z"')
+              );
+          END IF;
+
+          l_json.put('secret', l_secret_obj);
+      END IF;
+
+      l_output := l_json.to_clob;
+      RETURN l_output;
+  EXCEPTION
+    WHEN OTHERS THEN
+      l_json := JSON_OBJECT_T();
+      l_json.put('error', SQLERRM);
+      RETURN l_json.to_clob;
+  END get_secret;
+
+  ----------------------------------------------------------------------
+  -- list_secrets (package version)
+  ----------------------------------------------------------------------
+  FUNCTION list_secrets (
+      compartment_name   IN VARCHAR2,
+      region             IN VARCHAR2
+  ) RETURN CLOB
+  AS
+      l_response      DBMS_CLOUD_OCI_VT_VAULTS_LIST_SECRETS_RESPONSE_T;
+      l_secret_tbl    DBMS_CLOUD_OCI_VAULT_SECRET_SUMMARY_TBL;
+      l_output        CLOB;
+      l_json          JSON_OBJECT_T := JSON_OBJECT_T();
+      l_secrets_arr   JSON_ARRAY_T := JSON_ARRAY_T();
+      l_secret_obj    JSON_OBJECT_T := JSON_OBJECT_T();
+      l_current_user  VARCHAR2(128):= SYS_CONTEXT('USERENV', 'CURRENT_USER');
+      l_config_json   CLOB;
+      l_cfg           JSON_OBJECT_T;
+      l_params        JSON_OBJECT_T;
+      credential_name VARCHAR2(256);
+      compartment_id  VARCHAR2(256);
+  BEGIN
+      l_config_json := get_agent_config(l_current_user, 'OCI_AGENT_CONFIG', 'OCI_VAULT');
+      l_cfg := JSON_OBJECT_T.parse(l_config_json);
+      IF l_cfg.get_string('status') = 'success' THEN
+          l_params := l_cfg.get_object('config_params');
+          credential_name := l_params.get_string('CREDENTIAL_NAME');
+          compartment_id  := l_params.get_string('COMPARTMENT_OCID');
+      END IF;
+
+      l_response := DBMS_CLOUD_OCI_VT_VAULTS.LIST_SECRETS(
+          compartment_id   => compartment_id,
+          name             => NULL,
+          limit            => NULL,
+          page             => NULL,
+          opc_request_id   => NULL,
+          sort_by          => NULL,
+          sort_order       => NULL,
+          vault_id         => NULL,
+          lifecycle_state  => NULL,
+          region           => region,
+          endpoint         => NULL,
+          credential_name  => credential_name
+      );
+
+      l_json.put('status_code', l_response.status_code);
+
+      IF l_response.headers IS NOT NULL THEN
+          l_json.put('headers', l_response.headers.to_clob);
+      END IF;
+
+      IF l_response.response_body IS NOT NULL THEN
+          l_secret_tbl := l_response.response_body;
+
+          FOR i IN 1 .. l_secret_tbl.COUNT LOOP
+              l_secret_obj := JSON_OBJECT_T();
+              l_secret_obj.put('id',              l_secret_tbl(i).id);
+              l_secret_obj.put('name',            l_secret_tbl(i).secret_name);
+              l_secret_obj.put('compartment_id',  l_secret_tbl(i).compartment_id);
+              l_secret_obj.put('vault_id',        l_secret_tbl(i).vault_id);
+              l_secret_obj.put('description',     l_secret_tbl(i).description);
+              l_secret_obj.put('lifecycle_state', l_secret_tbl(i).lifecycle_state);
+              IF l_secret_tbl(i).time_created IS NOT NULL THEN
+                  l_secret_obj.put('time_created',
+                    TO_CHAR(l_secret_tbl(i).time_created, 'YYYY-MM-DD"T"HH24:MI:SS"Z"'));
+              END IF;
+              l_secrets_arr.append(l_secret_obj);
+          END LOOP;
+
+          l_json.put('secrets', l_secrets_arr);
+      END IF;
+
+      l_output := l_json.to_clob;
+      RETURN l_output;
+  EXCEPTION
+      WHEN OTHERS THEN
+          l_json := JSON_OBJECT_T();
+          l_json.put('error', SQLERRM);
+          RETURN l_json.to_clob;
+  END list_secrets;
+
+  ----------------------------------------------------------------------
+  -- list_secret_versions
+  ----------------------------------------------------------------------
+  FUNCTION list_secret_versions (
+      secret_id       IN VARCHAR2,
+      region          IN VARCHAR2
+  ) RETURN CLOB
+  AS
+      l_response     DBMS_CLOUD_OCI_VT_VAULTS_LIST_SECRET_VERSIONS_RESPONSE_T;
+      l_versions     DBMS_CLOUD_OCI_VAULT_SECRET_VERSION_SUMMARY_TBL;
+      l_output       CLOB;
+      l_json         JSON_OBJECT_T := JSON_OBJECT_T();
+      l_versions_arr JSON_ARRAY_T := JSON_ARRAY_T();
+      l_version_obj  JSON_OBJECT_T;
+      l_stages_arr   JSON_ARRAY_T;
+      l_current_user  VARCHAR2(128):= SYS_CONTEXT('USERENV', 'CURRENT_USER');
+      l_config_json   CLOB;
+      l_cfg           JSON_OBJECT_T;
+      l_params        JSON_OBJECT_T;
+      credential_name VARCHAR2(256);
+  BEGIN
+      l_config_json := get_agent_config(l_current_user, 'OCI_AGENT_CONFIG', 'OCI_VAULT');
+      l_cfg := JSON_OBJECT_T.parse(l_config_json);
+      IF l_cfg.get_string('status') = 'success' THEN
+          l_params := l_cfg.get_object('config_params');
+          credential_name := l_params.get_string('CREDENTIAL_NAME');
+      END IF;
+
+      l_response := DBMS_CLOUD_OCI_VT_VAULTS.LIST_SECRET_VERSIONS(
+          secret_id       => secret_id,
+          limit           => NULL,
+          page            => NULL,
+          opc_request_id  => NULL,
+          sort_by         => NULL,
+          sort_order      => NULL,
+          region          => region,
+          endpoint        => NULL,
+          credential_name => credential_name
+      );
+
+      l_json.put('status_code', l_response.status_code);
+
+      IF l_response.headers IS NOT NULL THEN
+          l_json.put('headers', l_response.headers.to_clob);
+      END IF;
+
+      IF l_response.response_body IS NOT NULL THEN
+          l_versions := l_response.response_body;
+
+          FOR i IN 1 .. l_versions.COUNT LOOP
+              l_version_obj := JSON_OBJECT_T();
+
+              l_version_obj.put('version_number', l_versions(i).version_number);
+              l_version_obj.put('content_type', l_versions(i).content_type);
+              l_version_obj.put('name', l_versions(i).name);
+              l_version_obj.put('secret_id', l_versions(i).secret_id);
+
+              IF l_versions(i).stages IS NOT NULL THEN
+                  l_stages_arr := JSON_ARRAY_T();
+                  FOR j IN 1 .. l_versions(i).stages.COUNT LOOP
+                      l_stages_arr.append(l_versions(i).stages(j));
+                  END LOOP;
+                  l_version_obj.put('stages', l_stages_arr);
+              END IF;
+
+              IF l_versions(i).time_created IS NOT NULL THEN
+                  l_version_obj.put('time_created',
+                    TO_CHAR(l_versions(i).time_created, 'YYYY-MM-DD"T"HH24:MI:SS"Z"'));
+              END IF;
+
+              IF l_versions(i).time_of_deletion IS NOT NULL THEN
+                  l_version_obj.put('time_of_deletion',
+                    TO_CHAR(l_versions(i).time_of_deletion, 'YYYY-MM-DD"T"HH24:MI:SS"Z"'));
+              END IF;
+
+              IF l_versions(i).time_of_expiry IS NOT NULL THEN
+                  l_version_obj.put('time_of_expiry',
+                    TO_CHAR(l_versions(i).time_of_expiry, 'YYYY-MM-DD"T"HH24:MI:SS"Z"'));
+              END IF;
+
+              l_versions_arr.append(l_version_obj);
+          END LOOP;
+
+          l_json.put('versions', l_versions_arr);
+      END IF;
+
+      l_output := l_json.to_clob;
+      RETURN l_output;
+  EXCEPTION
+      WHEN OTHERS THEN
+          l_json := JSON_OBJECT_T();
+          l_json.put('error', SQLERRM);
+          RETURN l_json.to_clob;
+  END list_secret_versions;
+
+  ----------------------------------------------------------------------
+  -- get_secret_version
+  ----------------------------------------------------------------------
+  FUNCTION get_secret_version (
+      secret_id             IN VARCHAR2,
+      secret_version_number IN NUMBER,
+      region                IN VARCHAR2
+  ) RETURN CLOB
+  AS
+      l_response   DBMS_CLOUD_OCI_VT_VAULTS_GET_SECRET_VERSION_RESPONSE_T;
+      l_version    DBMS_CLOUD_OCI_VAULT_SECRET_VERSION_T;
+      l_output     CLOB;
+      l_json       JSON_OBJECT_T := JSON_OBJECT_T();
+      l_version_obj JSON_OBJECT_T := JSON_OBJECT_T();
+      l_stages_arr JSON_ARRAY_T := JSON_ARRAY_T();
+      l_current_user  VARCHAR2(128):= SYS_CONTEXT('USERENV', 'CURRENT_USER');
+      l_config_json   CLOB;
+      l_cfg           JSON_OBJECT_T;
+      l_params        JSON_OBJECT_T;
+      credential_name VARCHAR2(256);
+  BEGIN
+      l_config_json := get_agent_config(l_current_user, 'OCI_AGENT_CONFIG', 'OCI_VAULT');
+      l_cfg := JSON_OBJECT_T.parse(l_config_json);
+      IF l_cfg.get_string('status') = 'success' THEN
+          l_params := l_cfg.get_object('config_params');
+          credential_name := l_params.get_string('CREDENTIAL_NAME');
+      END IF;
+
+      l_response := DBMS_CLOUD_OCI_VT_VAULTS.GET_SECRET_VERSION(
+          secret_id             => secret_id,
+          secret_version_number => secret_version_number,
+          opc_request_id        => NULL,
+          region                => region,
+          endpoint              => NULL,
+          credential_name       => credential_name
+      );
+
+      l_json.put('status_code', l_response.status_code);
+
+      IF l_response.headers IS NOT NULL THEN
+          l_json.put('headers', l_response.headers.to_clob);
+      END IF;
+
+      IF l_response.response_body IS NOT NULL THEN
+          l_version := l_response.response_body;
+
+          l_version_obj.put('secret_id', l_version.secret_id);
+          l_version_obj.put('version_number', l_version.version_number);
+          l_version_obj.put('content_type', l_version.content_type);
+          l_version_obj.put('name', l_version.name);
+
+          IF l_version.stages IS NOT NULL THEN
+              FOR i IN 1 .. l_version.stages.COUNT LOOP
+                  l_stages_arr.append(l_version.stages(i));
+              END LOOP;
+              l_version_obj.put('stages', l_stages_arr);
+          END IF;
+
+          IF l_version.time_created IS NOT NULL THEN
+              l_version_obj.put('time_created',
+                TO_CHAR(l_version.time_created, 'YYYY-MM-DD"T"HH24:MI:SS"Z"'));
+          END IF;
+
+          IF l_version.time_of_deletion IS NOT NULL THEN
+              l_version_obj.put('time_of_deletion',
+                TO_CHAR(l_version.time_of_deletion, 'YYYY-MM-DD"T"HH24:MI:SS"Z"'));
+          END IF;
+
+          IF l_version.time_of_current_version_expiry IS NOT NULL THEN
+              l_version_obj.put('time_of_current_version_expiry',
+                TO_CHAR(l_version.time_of_current_version_expiry, 'YYYY-MM-DD"T"HH24:MI:SS"Z"'));
+          END IF;
+
+          l_json.put('secret_version', l_version_obj);
+      END IF;
+
+      l_output := l_json.to_clob;
+      RETURN l_output;
+  EXCEPTION
+      WHEN OTHERS THEN
+          l_json := JSON_OBJECT_T();
+          l_json.put('error', SQLERRM);
+          RETURN l_json.to_clob;
+  END get_secret_version;
+
+  ----------------------------------------------------------------------
+  -- update_secret
+  ----------------------------------------------------------------------
+  FUNCTION update_secret (
+      secret_id              IN VARCHAR2,
+      description            IN VARCHAR2 DEFAULT NULL,
+      current_version_number IN NUMBER   DEFAULT NULL,
+      plain_text             IN VARCHAR2 DEFAULT NULL,
+      defined_tags           IN JSON_ELEMENT_T DEFAULT NULL,
+      freeform_tags          IN JSON_ELEMENT_T DEFAULT NULL,
+      secret_rules           IN DBMS_CLOUD_OCI_VAULT_SECRET_RULE_TBL DEFAULT NULL,
+      region                 IN VARCHAR2
+  ) RETURN CLOB
+  AS
+      l_response    DBMS_CLOUD_OCI_VT_VAULTS_UPDATE_SECRET_RESPONSE_T;
+      l_details     DBMS_CLOUD_OCI_VAULT_UPDATE_SECRET_DETAILS_T;
+      l_content     DBMS_CLOUD_OCI_VAULT_BASE64_SECRET_CONTENT_DETAILS_T;
+      l_get_resp    DBMS_CLOUD_OCI_VT_VAULTS_GET_SECRET_RESPONSE_T;
+      l_secret_name VARCHAR2(512);
+      l_encoded     VARCHAR2(32767);
+      l_output      CLOB;
+      l_json        JSON_OBJECT_T := JSON_OBJECT_T();
+      l_secret_obj  JSON_OBJECT_T := JSON_OBJECT_T();
+      l_current_user  VARCHAR2(128):= SYS_CONTEXT('USERENV', 'CURRENT_USER');
+      l_config_json   CLOB;
+      l_cfg           JSON_OBJECT_T;
+      l_params        JSON_OBJECT_T;
+      credential_name VARCHAR2(256);
+  BEGIN
+      IF current_version_number IS NOT NULL AND (plain_text IS NOT NULL OR secret_rules IS NOT NULL) THEN
+          RAISE_APPLICATION_ERROR(-20001,
+            'Cannot update current_version_number together with secret_content or secret_rules in one call.');
+      END IF;
+
+      l_config_json := get_agent_config(l_current_user, 'OCI_AGENT_CONFIG', 'OCI_VAULT');
+      l_cfg := JSON_OBJECT_T.parse(l_config_json);
+      IF l_cfg.get_string('status') = 'success' THEN
+          l_params := l_cfg.get_object('config_params');
+          credential_name := l_params.get_string('CREDENTIAL_NAME');
+      END IF;
+
+      l_get_resp := DBMS_CLOUD_OCI_VT_VAULTS.GET_SECRET(
+          secret_id       => secret_id,
+          opc_request_id  => NULL,
+          region          => region,
+          endpoint        => NULL,
+          credential_name => credential_name
+      );
+
+      IF l_get_resp.response_body IS NOT NULL THEN
+          l_secret_name := l_get_resp.response_body.secret_name;
+      ELSE
+          RAISE_APPLICATION_ERROR(-20002, 'Could not fetch secret_name for secret_id: ' || secret_id);
+      END IF;
+
+      IF plain_text IS NOT NULL THEN
+          l_encoded := UTL_RAW.cast_to_varchar2(
+                         UTL_ENCODE.base64_encode(
+                           UTL_RAW.cast_to_raw(plain_text)
+                         )
+                       );
+
+          l_content := DBMS_CLOUD_OCI_VAULT_BASE64_SECRET_CONTENT_DETAILS_T(
+              content_type => 'BASE64',
+              name         => l_secret_name || '_' || TO_CHAR(SYSTIMESTAMP, 'YYYYMMDDHH24MISS'),
+              stage        => 'CURRENT',
+              content      => l_encoded
+          );
+      END IF;
+
+      l_details := DBMS_CLOUD_OCI_VAULT_UPDATE_SECRET_DETAILS_T(
+          current_version_number => current_version_number,
+          defined_tags           => defined_tags,
+          description            => description,
+          freeform_tags          => freeform_tags,
+          metadata               => NULL,
+          secret_content         => l_content,
+          secret_rules           => secret_rules
+      );
+
+      l_response := DBMS_CLOUD_OCI_VT_VAULTS.UPDATE_SECRET(
+          secret_id             => secret_id,
+          update_secret_details => l_details,
+          if_match              => NULL,
+          opc_request_id        => NULL,
+          region                => region,
+          endpoint              => NULL,
+          credential_name       => credential_name
+      );
+
+      l_json.put('status_code', l_response.status_code);
+
+      IF l_response.headers IS NOT NULL THEN
+          l_json.put('headers', l_response.headers.to_clob);
+      END IF;
+
+      IF l_response.response_body IS NOT NULL THEN
+          l_secret_obj.put('id',               l_response.response_body.id);
+          l_secret_obj.put('name',             l_response.response_body.secret_name);
+          l_secret_obj.put('compartment_id',   l_response.response_body.compartment_id);
+          l_secret_obj.put('vault_id',         l_response.response_body.vault_id);
+          l_secret_obj.put('lifecycle_state',  l_response.response_body.lifecycle_state);
+          l_secret_obj.put('description',      l_response.response_body.description);
+
+          IF l_response.response_body.time_created IS NOT NULL THEN
+              l_secret_obj.put(
+                  'time_created',
+                  TO_CHAR(l_response.response_body.time_created, 'YYYY-MM-DD"T"HH24:MI:SS"Z"')
+              );
+          END IF;
+
+          l_json.put('secret', l_secret_obj);
+      END IF;
+
+      l_output := l_json.to_clob;
+      RETURN l_output;
+  EXCEPTION
+      WHEN OTHERS THEN
+          l_json := JSON_OBJECT_T();
+          l_json.put('error', SQLERRM);
+          RETURN l_json.to_clob;
+  END update_secret;
+
+  ----------------------------------------------------------------------
+  -- schedule_secret_deletion
+  ----------------------------------------------------------------------
+  FUNCTION schedule_secret_deletion (
+      secret_id        IN VARCHAR2,
+      time_of_deletion IN TIMESTAMP WITH TIME ZONE,
+      region           IN VARCHAR2
+  ) RETURN CLOB
+  AS
+      l_response DBMS_CLOUD_OCI_VT_VAULTS_SCHEDULE_SECRET_DELETION_RESPONSE_T;
+      l_details  DBMS_CLOUD_OCI_VAULT_SCHEDULE_SECRET_DELETION_DETAILS_T;
+      l_json     JSON_OBJECT_T := JSON_OBJECT_T();
+      l_output   CLOB;
+      l_current_user  VARCHAR2(128):= SYS_CONTEXT('USERENV', 'CURRENT_USER');
+      l_config_json   CLOB;
+      l_cfg           JSON_OBJECT_T;
+      l_params        JSON_OBJECT_T;
+      credential_name VARCHAR2(256);
+  BEGIN
+      l_config_json := get_agent_config(l_current_user, 'OCI_AGENT_CONFIG', 'OCI_VAULT');
+      l_cfg := JSON_OBJECT_T.parse(l_config_json);
+      IF l_cfg.get_string('status') = 'success' THEN
+          l_params := l_cfg.get_object('config_params');
+          credential_name := l_params.get_string('CREDENTIAL_NAME');
+      END IF;
+
+      l_details := DBMS_CLOUD_OCI_VAULT_SCHEDULE_SECRET_DELETION_DETAILS_T(
+                     time_of_deletion => time_of_deletion
+                   );
+
+      l_response := DBMS_CLOUD_OCI_VT_VAULTS.SCHEDULE_SECRET_DELETION(
+          secret_id                         => secret_id,
+          schedule_secret_deletion_details  => l_details,
+          if_match                          => NULL,
+          opc_request_id                    => NULL,
+          region                            => region,
+          endpoint                          => NULL,
+          credential_name                   => credential_name
+      );
+
+      l_json.put('status_code', l_response.status_code);
+
+      IF l_response.headers IS NOT NULL THEN
+          l_json.put('headers', l_response.headers.to_clob);
+      END IF;
+
+      l_json.put('message', 'Secret deletion has been scheduled.');
+
+      l_output := l_json.to_clob;
+      RETURN l_output;
+  EXCEPTION
+      WHEN OTHERS THEN
+          l_json := JSON_OBJECT_T();
+          l_json.put('error', SQLERRM);
+          RETURN l_json.to_clob;
+  END schedule_secret_deletion;
+
+  ----------------------------------------------------------------------
+  -- schedule_secret_version_deletion
+  ----------------------------------------------------------------------
+  FUNCTION schedule_secret_version_deletion (
+      secret_id              IN VARCHAR2,
+      secret_version_number  IN NUMBER,
+      time_of_deletion       IN TIMESTAMP WITH TIME ZONE,
+      region                 IN VARCHAR2
+  ) RETURN CLOB
+  AS
+      l_response DBMS_CLOUD_OCI_VT_VAULTS_SCHEDULE_SECRET_VERSION_DELETION_RESPONSE_T;
+      l_details  DBMS_CLOUD_OCI_VAULT_SCHEDULE_SECRET_VERSION_DELETION_DETAILS_T;
+      l_json     JSON_OBJECT_T := JSON_OBJECT_T();
+      l_output   CLOB;
+      l_current_user  VARCHAR2(128):= SYS_CONTEXT('USERENV', 'CURRENT_USER');
+      l_config_json   CLOB;
+      l_cfg           JSON_OBJECT_T;
+      l_params        JSON_OBJECT_T;
+      credential_name VARCHAR2(256);
+  BEGIN
+      l_config_json := get_agent_config(l_current_user, 'OCI_AGENT_CONFIG', 'OCI_VAULT');
+      l_cfg := JSON_OBJECT_T.parse(l_config_json);
+      IF l_cfg.get_string('status') = 'success' THEN
+          l_params := l_cfg.get_object('config_params');
+          credential_name := l_params.get_string('CREDENTIAL_NAME');
+      END IF;
+
+      l_details := DBMS_CLOUD_OCI_VAULT_SCHEDULE_SECRET_VERSION_DELETION_DETAILS_T(
+                     time_of_deletion => time_of_deletion
+                   );
+
+      l_response := DBMS_CLOUD_OCI_VT_VAULTS.SCHEDULE_SECRET_VERSION_DELETION(
+          secret_id                                => secret_id,
+          secret_version_number                    => secret_version_number,
+          schedule_secret_version_deletion_details => l_details,
+          if_match                                 => NULL,
+          opc_request_id                           => NULL,
+          region                                   => region,
+          endpoint                                 => NULL,
+          credential_name                          => credential_name
+      );
+
+      l_json.put('status_code', l_response.status_code);
+
+      IF l_response.headers IS NOT NULL THEN
+          l_json.put('headers', l_response.headers.to_clob);
+      END IF;
+
+      l_json.put('message', 'Secret version deletion has been scheduled.');
+
+      l_output := l_json.to_clob;
+      RETURN l_output;
+  EXCEPTION
+      WHEN OTHERS THEN
+          l_json := JSON_OBJECT_T();
+          l_json.put('error', SQLERRM);
+          RETURN l_json.to_clob;
+  END schedule_secret_version_deletion;
+
+  ----------------------------------------------------------------------
+  -- cancel_secret_deletion
+  ----------------------------------------------------------------------
+  FUNCTION cancel_secret_deletion (
+      secret_id       IN VARCHAR2,
+      region          IN VARCHAR2
+  ) RETURN CLOB
+  AS
+      l_response   DBMS_CLOUD_OCI_VT_VAULTS_CANCEL_SECRET_DELETION_RESPONSE_T;
+      l_json       JSON_OBJECT_T := JSON_OBJECT_T();
+      l_output     CLOB;
+      l_current_user  VARCHAR2(128):= SYS_CONTEXT('USERENV', 'CURRENT_USER');
+      l_config_json   CLOB;
+      l_cfg           JSON_OBJECT_T;
+      l_params        JSON_OBJECT_T;
+      credential_name VARCHAR2(256);
+  BEGIN
+      l_config_json := get_agent_config(l_current_user, 'OCI_AGENT_CONFIG', 'OCI_VAULT');
+      l_cfg := JSON_OBJECT_T.parse(l_config_json);
+      IF l_cfg.get_string('status') = 'success' THEN
+          l_params := l_cfg.get_object('config_params');
+          credential_name := l_params.get_string('CREDENTIAL_NAME');
+      END IF;
+
+      l_response := DBMS_CLOUD_OCI_VT_VAULTS.CANCEL_SECRET_DELETION(
+          secret_id       => secret_id,
+          if_match        => NULL,
+          opc_request_id  => NULL,
+          region          => region,
+          endpoint        => NULL,
+          credential_name => credential_name
+      );
+
+      l_json.put('status_code', l_response.status_code);
+      IF l_response.headers IS NOT NULL THEN
+          l_json.put('headers', l_response.headers.to_clob);
+      END IF;
+      l_json.put('message', 'Scheduled deletion has been cancelled for the secret.');
+      l_output := l_json.to_clob;
+      RETURN l_output;
+  EXCEPTION
+      WHEN OTHERS THEN
+          l_json := JSON_OBJECT_T();
+          l_json.put('error', SQLERRM);
+          RETURN l_json.to_clob;
+  END cancel_secret_deletion;
+
+  ----------------------------------------------------------------------
+  -- cancel_secret_version_deletion
+  ----------------------------------------------------------------------
+  FUNCTION cancel_secret_version_deletion (
+      secret_id             IN VARCHAR2,
+      secret_version_number IN NUMBER,
+      region                IN VARCHAR2
+  ) RETURN CLOB
+  AS
+      l_response   DBMS_CLOUD_OCI_VT_VAULTS_CANCEL_SECRET_VERSION_DELETION_RESPONSE_T;
+      l_json       JSON_OBJECT_T := JSON_OBJECT_T();
+      l_output     CLOB;
+      l_current_user  VARCHAR2(128):= SYS_CONTEXT('USERENV', 'CURRENT_USER');
+      l_config_json   CLOB;
+      l_cfg           JSON_OBJECT_T;
+      l_params        JSON_OBJECT_T;
+      credential_name VARCHAR2(256);
+  BEGIN
+      l_config_json := get_agent_config(l_current_user, 'OCI_AGENT_CONFIG', 'OCI_VAULT');
+      l_cfg := JSON_OBJECT_T.parse(l_config_json);
+      IF l_cfg.get_string('status') = 'success' THEN
+          l_params := l_cfg.get_object('config_params');
+          credential_name := l_params.get_string('CREDENTIAL_NAME');
+      END IF;
+
+      l_response := DBMS_CLOUD_OCI_VT_VAULTS.CANCEL_SECRET_VERSION_DELETION(
+          secret_id             => secret_id,
+          secret_version_number => secret_version_number,
+          if_match              => NULL,
+          opc_request_id        => NULL,
+          region                => region,
+          endpoint              => NULL,
+          credential_name       => credential_name
+      );
+
+      l_json.put('status_code', l_response.status_code);
+      IF l_response.headers IS NOT NULL THEN
+          l_json.put('headers', l_response.headers.to_clob);
+      END IF;
+      l_json.put('message', 'Scheduled deletion has been cancelled for the secret version.');
+      l_output := l_json.to_clob;
+      RETURN l_output;
+  EXCEPTION
+      WHEN OTHERS THEN
+          l_json := JSON_OBJECT_T();
+          l_json.put('error', SQLERRM);
+          RETURN l_json.to_clob;
+  END cancel_secret_version_deletion;
+
+  ----------------------------------------------------------------------
+  -- change_secret_compartment
+  ----------------------------------------------------------------------
+  FUNCTION change_secret_compartment (
+      secret_id         IN VARCHAR2,
+      compartment_name  IN VARCHAR2,
+      region            IN VARCHAR2
+  ) RETURN CLOB
+  AS
+      l_response     DBMS_CLOUD_OCI_VT_VAULTS_CHANGE_SECRET_COMPARTMENT_RESPONSE_T;
+      l_details      DBMS_CLOUD_OCI_VAULT_CHANGE_SECRET_COMPARTMENT_DETAILS_T;
+      l_output       CLOB;
+      l_json         JSON_OBJECT_T := JSON_OBJECT_T();
+      compartment_id VARCHAR2(256);
+      l_current_user  VARCHAR2(128):= SYS_CONTEXT('USERENV', 'CURRENT_USER');
+      l_config_json   CLOB;
+      l_cfg           JSON_OBJECT_T;
+      l_params        JSON_OBJECT_T;
+      credential_name VARCHAR2(256);
+  BEGIN
+      l_config_json := get_agent_config(l_current_user, 'OCI_AGENT_CONFIG', 'OCI_VAULT');
+      l_cfg := JSON_OBJECT_T.parse(l_config_json);
+      IF l_cfg.get_string('status') = 'success' THEN
+          l_params := l_cfg.get_object('config_params');
+          credential_name := l_params.get_string('CREDENTIAL_NAME');
+          compartment_id  := l_params.get_string('COMPARTMENT_OCID');
+      END IF;
+
+      l_details := DBMS_CLOUD_OCI_VAULT_CHANGE_SECRET_COMPARTMENT_DETAILS_T(
+                     compartment_id => compartment_id
+                   );
+
+      l_response := DBMS_CLOUD_OCI_VT_VAULTS.CHANGE_SECRET_COMPARTMENT(
+          secret_id                         => secret_id,
+          change_secret_compartment_details => l_details,
+          if_match                          => NULL,
+          opc_request_id                    => NULL,
+          opc_retry_token                   => NULL,
+          region                            => region,
+          endpoint                          => NULL,
+          credential_name                   => credential_name
+      );
+
+      l_json.put('status_code', l_response.status_code);
+      IF l_response.headers IS NOT NULL THEN
+          l_json.put('headers', l_response.headers.to_clob);
+      END IF;
+      l_json.put('message', 'Secret has been moved to the new compartment.');
+      l_output := l_json.to_clob;
+      RETURN l_output;
+  EXCEPTION
+      WHEN OTHERS THEN
+          l_json := JSON_OBJECT_T();
+          l_json.put('error', SQLERRM);
+          RETURN l_json.to_clob;
+  END change_secret_compartment;
+
+END &&INSTALL_SCHEMA.oci_vault_agents;
+/
+
+
+-------------------------------------------------------------------------------
+-- This procedure installs or refreshes the OCI Vault AI Agent tools in the
+-- current schema. It drops any existing tool definitions and recreates them
+-- pointing to the latest implementations in &&INSTALL_SCHEMA.oci_vault_agents.
+-------------------------------------------------------------------------------
+CREATE OR REPLACE PROCEDURE initilize_vault_tools
+IS
+    PROCEDURE drop_tool_if_exists (
+        tool_name         IN VARCHAR2
+    )
+    IS
+        l_tool_count NUMBER;
+    BEGIN
+        SELECT COUNT(*)
+          INTO l_tool_count
+          FROM USER_AI_AGENT_TOOLS
+         WHERE TOOL_NAME = tool_name;
+
+        IF l_tool_count > 0 THEN
+            DBMS_CLOUD_AI_AGENT.DROP_TOOL(tool_name);
+        END IF;
+    END drop_tool_if_exists;
+BEGIN
+    ------------------------------------------------------------------------
+    -- AI TOOL: LIST_SECRETS_TOOL
+    -- maps to &&INSTALL_SCHEMA.oci_vault_agents.list_secrets
+    ------------------------------------------------------------------------
+    drop_tool_if_exists(tool_name => 'LIST_SECRETS_TOOL');
+    DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
+        tool_name => 'LIST_SECRETS_TOOL',
+        attributes => '{
+            "instruction": "List all secrets in a specified OCI Vault compartment. Provide compartment name, region, and credential name. Returns structured JSON including status code, headers, and array of secrets with details and timestamps.",
+            "function": "&&INSTALL_SCHEMA.oci_vault_agents.list_secrets"
+            }',
+        description => 'Tool for listing all secrets in a given OCI Vault compartment'
+    );
+
+    ------------------------------------------------------------------------
+    -- AI TOOL: LIST_SECRET_VERSIONS_TOOL
+    -- maps to &&INSTALL_SCHEMA.oci_vault_agents.list_secret_versions
+    ------------------------------------------------------------------------
+    drop_tool_if_exists(tool_name => 'LIST_SECRET_VERSIONS_TOOL');
+    DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
+        tool_name => 'LIST_SECRET_VERSIONS_TOOL',
+        attributes => '{
+            "instruction": "List all versions of an OCI Vault secret. Provide secret OCID, region, and credential name. Returns structured JSON including status code, headers, and an array of secret versions with stages and timestamps.",
+            "function": "&&INSTALL_SCHEMA.oci_vault_agents.list_secret_versions"
+            }',
+        description => 'Tool for listing all versions of an OCI Vault secret'
+    );
+
+    ------------------------------------------------------------------------
+    -- AI TOOL: GET_SECRET_VERSION_TOOL
+    -- maps to &&INSTALL_SCHEMA.oci_vault_agents.get_secret_version
+    ------------------------------------------------------------------------
+    drop_tool_if_exists(tool_name => 'GET_SECRET_VERSION_TOOL');
+    DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
+        tool_name => 'GET_SECRET_VERSION_TOOL',
+        attributes => '{
+            "instruction": "Retrieve a specific version of an OCI Vault secret. Provide secret OCID, version number, region, and credential name. Returns structured JSON including status code, headers, stages, and timestamps.",
+            "function": "&&INSTALL_SCHEMA.oci_vault_agents.get_secret_version"
+            }',
+        description => 'Tool for fetching a specific version of an OCI Vault secret'
+    );
+
+    ------------------------------------------------------------------------
+    -- AI TOOL: UPDATE_SECRET_TOOL
+    -- maps to &&INSTALL_SCHEMA.oci_vault_agents.update_secret
+    ------------------------------------------------------------------------
+    drop_tool_if_exists(tool_name => 'UPDATE_SECRET_TOOL');
+    DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
+        tool_name => 'UPDATE_SECRET_TOOL',
+        attributes => '{
+            "instruction": "Update an OCI Vault secret. Provide secret OCID, optional description, current version, new secret value, defined tags, freeform tags, secret rules, region, and credential name. Returns structured JSON with status code, headers, and updated secret details.",
+            "function": "&&INSTALL_SCHEMA.oci_vault_agents.update_secret"
+            }',
+        description => 'Tool for updating an OCI Vault secret'
+    );
+
+    ------------------------------------------------------------------------
+    -- AI TOOL: SCHEDULE_SECRET_DELETION_TOOL
+    -- maps to &&INSTALL_SCHEMA.oci_vault_agents.schedule_secret_deletion
+    ------------------------------------------------------------------------
+    drop_tool_if_exists(tool_name => 'SCHEDULE_SECRET_DELETION_TOOL');
+    DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
+        tool_name => 'SCHEDULE_SECRET_DELETION_TOOL',
+        attributes => '{
+            "instruction": "Schedule deletion of an OCI Vault secret. Provide secret OCID, optional deletion timestamp, region, and credential name. Returns structured JSON with status code, headers, and confirmation message.",
+            "function": "&&INSTALL_SCHEMA.oci_vault_agents.schedule_secret_deletion"
+            }',
+        description => 'Tool for scheduling deletion of an OCI Vault secret'
+    );
+
+    ------------------------------------------------------------------------
+    -- AI TOOL: SCHEDULE_SECRET_VERSION_DELETION_TOOL
+    -- maps to &&INSTALL_SCHEMA.oci_vault_agents.schedule_secret_version_deletion
+    ------------------------------------------------------------------------
+    drop_tool_if_exists(tool_name => 'SCHEDULE_SECRET_VERSION_DELETION_TOOL');
+    DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
+        tool_name => 'SCHEDULE_SECRET_VERSION_DELETION_TOOL',
+        attributes => '{
+            "instruction": "Schedule deletion of a specific OCI Vault secret version. Provide secret OCID, version number, optional deletion timestamp, region, and credential name. Returns structured JSON with status code, headers, and confirmation message.",
+            "function": "&&INSTALL_SCHEMA.oci_vault_agents.schedule_secret_version_deletion"
+            }',
+        description => 'Tool for scheduling deletion of a specific OCI Vault secret version'
+    );
+
+    ------------------------------------------------------------------------
+    -- AI TOOL: CANCEL_SECRET_DELETION_TOOL
+    -- maps to &&INSTALL_SCHEMA.oci_vault_agents.cancel_secret_deletion
+    ------------------------------------------------------------------------
+    drop_tool_if_exists(tool_name => 'CANCEL_SECRET_DELETION_TOOL');
+    DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
+        tool_name => 'CANCEL_SECRET_DELETION_TOOL',
+        attributes => '{"instruction": "Cancels a scheduled deletion for an OCI Vault secret. ' ||
+                                  'Provide the secret OCID, region, and credential name. ' ||
+                                  'Returns structured JSON with status, message, HTTP status code (if available), and headers.", 
+                        "function" : "&&INSTALL_SCHEMA.oci_vault_agents.cancel_secret_deletion"}',
+        description => 'Tool for cancelling a scheduled deletion of an OCI Vault secret'
+    );
+
+    ------------------------------------------------------------------------
+    -- AI TOOL: CANCEL_SECRET_VERSION_DELETION_TOOL
+    -- maps to &&INSTALL_SCHEMA.oci_vault_agents.cancel_secret_version_deletion
+    ------------------------------------------------------------------------
+    drop_tool_if_exists(tool_name => 'CANCEL_SECRET_VERSION_DELETION_TOOL');
+    DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
+        tool_name => 'CANCEL_SECRET_VERSION_DELETION_TOOL',
+        attributes => '{
+            "instruction": "Cancel scheduled deletion of a specific OCI Vault secret version. Provide secret OCID, version number, region, and credential name. Returns structured JSON with status code, headers, and confirmation message.",
+            "function": "&&INSTALL_SCHEMA.oci_vault_agents.cancel_secret_version_deletion"
+            }',
+        description => 'Tool for cancelling scheduled deletion of a specific secret version'
+    );
+
+    ------------------------------------------------------------------------
+    -- AI TOOL: CHANGE_SECRET_COMPARTMENT_TOOL
+    -- maps to &&INSTALL_SCHEMA.oci_vault_agents.change_secret_compartment
+    ------------------------------------------------------------------------
+    drop_tool_if_exists(tool_name => 'CHANGE_SECRET_COMPARTMENT_TOOL');
+    DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
+        tool_name => 'CHANGE_SECRET_COMPARTMENT_TOOL',
+        attributes => '{"instruction": "Change the compartment of an OCI Vault secret. ' ||
+                       'Provide secret OCID, target compartment name, region, and credential name. ' ||
+                       'Returns structured JSON describing success or failure.", 
+                        "function" : "&&INSTALL_SCHEMA.oci_vault_agents.change_secret_compartment"}',
+        description => 'Tool for changing the compartment of an OCI Vault secret'
+    );
+
+    ------------------------------------------------------------------------
+    -- AI TOOL: CREATE_SECRET_TOOL
+    -- maps to &&INSTALL_SCHEMA.oci_vault_agents.create_secret
+    ------------------------------------------------------------------------
+    drop_tool_if_exists(tool_name => 'CREATE_SECRET_TOOL');
+    DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
+        tool_name => 'CREATE_SECRET_TOOL',
+        attributes => '{
+            "instruction": "Create a new OCI Vault secret. Provide secret name, plaintext, description, compartment name or OCID, vault OCID, key OCID, region, and credential name (optional). Returns structured JSON with status, secret details, HTTP status code, and headers.",
+            "function": "&&INSTALL_SCHEMA.oci_vault_agents.create_secret"
+            }',
+        description => 'Tool for creating a secret in OCI Vault (Select AI Agent / Oracle AI Database)'
+    );
+
+    ------------------------------------------------------------------------
+    -- AI TOOL: GET_SECRET_TOOL
+    -- maps to &&INSTALL_SCHEMA.oci_vault_agents.get_secret
+    ------------------------------------------------------------------------
+    drop_tool_if_exists(tool_name => 'GET_SECRET_TOOL');
+    DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
+        tool_name => 'GET_SECRET_TOOL',
+        attributes => '{
+            "instruction": "Retrieve an OCI Vault secret. Provide secret OCID, region, and credential name (optional). Returns structured JSON including status code, headers, and secret details with timestamps.",
+            "function": "&&INSTALL_SCHEMA.oci_vault_agents.get_secret"
+            }',
+        description => 'Tool for fetching an OCI Vault secret (Select AI Agent / Oracle AI Database)'
+    );
+
+    DBMS_OUTPUT.PUT_LINE('create_vault_tools completed.');
+EXCEPTION
+    WHEN OTHERS THEN
+        DBMS_OUTPUT.PUT_LINE('Error in create_vault_tools: ' || SQLERRM);
+        RAISE;
+END initilize_vault_tools;
+/
+-------------------------------------------------------------------------------
+-- Call the procedure to (re)create all OCI Vault AI Agent tools
+-------------------------------------------------------------------------------
+BEGIN
+    initilize_vault_tools;
+END;
+/
