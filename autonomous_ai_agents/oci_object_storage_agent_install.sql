@@ -28,11 +28,11 @@ SET SERVEROUTPUT ON
 SET VERIFY OFF
 
 -- First argument: schema
-DEFINE INSTALL_SCHEMA = '<SCHEMA_NAME>'
+DEFINE INSTALL_SCHEMA = 'ADB_APP_STORE_USER'
 
 -- Second argument: JSON config (optional)
 -- If not passed, default to empty string
-DEFINE INSTALL_CONFIG_JSON = '{"use_resource_principal": <true/false>, "credential_name": "<cred_name>", "compartment_name": "<comp_name>", "compartment_ocid": "<comp_ocid>"}'
+DEFINE INSTALL_CONFIG_JSON = '{"use_resource_principal": true, "credential_name": "GENAI_CRED", "compartment_name": "dwcsdev"}'
 
 -------------------------------------------------------------------------------
 -- Initializes the OCI Object Storage AI Agent. This procedure:
@@ -57,7 +57,9 @@ IS
 
   TYPE priv_list_t IS VARRAY(300) OF VARCHAR2(4000);
   l_priv_list CONSTANT priv_list_t := priv_list_t(
-    -- Common JSON/Cloud types for Object Storage (expand as needed; warns on non-existent)
+    'DBMS_CLOUD',
+    'DBMS_CLOUD_ADMIN',
+    'DBMS_CLOUD_AI_AGENT',
     'DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE_LIST_OBJECTS_RESPONSE_T',
     'DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE_LIST_OBJECT_VERSIONS_RESPONSE_T',
     'DBMS_CLOUD_OCI_OBJECT_STORAGE_LIST_OBJECTS_T',
@@ -158,6 +160,7 @@ IS
   ----------------------------------------------------------------------------
   PROCEDURE execute_grants(p_schema IN VARCHAR2, p_objects IN priv_list_t) IS
   BEGIN
+    EXECUTE IMMEDIATE 'GRANT SELECT ON SYS.V_$PDBS TO ' || p_schema;
     FOR i IN 1 .. p_objects.COUNT LOOP
       BEGIN
         EXECUTE IMMEDIATE 'GRANT EXECUTE ON ' || p_objects(i) || ' TO ' || p_schema;
@@ -280,20 +283,20 @@ IS
     l_enable_rp_str := CASE WHEN l_effective_use_rp THEN 'YES' ELSE 'NO' END;
     merge_config_key(p_schema, 'ENABLE_RESOURCE_PRINCIPAL', l_enable_rp_str, c_obs_agent);
 
-    IF l_effective_use_rp THEN
-      BEGIN
-        DBMS_CLOUD_ADMIN.ENABLE_RESOURCE_PRINCIPAL(USERNAME => p_schema);
-        DBMS_OUTPUT.PUT_LINE('Resource principal enabled for ' || p_schema);
-      EXCEPTION
-        WHEN OTHERS THEN
-          DBMS_OUTPUT.PUT_LINE('Failed to enable resource principal for ' || p_schema || ' - ' || SQLERRM);
-      END;
-    ELSE
-      DBMS_OUTPUT.PUT_LINE(
-        'Resource principal NOT enabled per config. Using credential: '
-        || NVL(p_credential_name, '<not provided>')
-      );
-    END IF;
+    -- IF l_effective_use_rp THEN
+    --   BEGIN
+    --     DBMS_CLOUD_ADMIN.ENABLE_RESOURCE_PRINCIPAL(USERNAME => p_schema);
+    --     DBMS_OUTPUT.PUT_LINE('Resource principal enabled for ' || p_schema);
+    --   EXCEPTION
+    --     WHEN OTHERS THEN
+    --       DBMS_OUTPUT.PUT_LINE('Failed to enable resource principal for ' || p_schema || ' - ' || SQLERRM);
+    --   END;
+    -- ELSE
+    --   DBMS_OUTPUT.PUT_LINE(
+    --     'Resource principal NOT enabled per config. Using credential: '
+    --     || NVL(p_credential_name, '<not provided>')
+    --   );
+    -- END IF;
   END apply_config;
 
 BEGIN
@@ -362,11 +365,11 @@ BEGIN
 END;
 /
 
-
+alter session set current_schema = &&INSTALL_SCHEMA;
 ------------------------------------------------------------------------
 -- Package specification
 ------------------------------------------------------------------------
-CREATE OR REPLACE PACKAGE &&INSTALL_SCHEMA.oci_object_storage_agents
+CREATE OR REPLACE PACKAGE oci_object_storage_agents
 AS
   /*
     Package: oci_object_storage_agents
@@ -374,20 +377,17 @@ AS
   */
 
   FUNCTION list_objects(
-    compartment_name  IN VARCHAR2,
     region            IN VARCHAR2,
     bucket_name       IN VARCHAR2
   ) RETURN CLOB;
 
   FUNCTION get_object(
-    compartment_name  IN VARCHAR2,
     region            IN VARCHAR2,
     bucket_name       IN VARCHAR2,
     object_name       IN VARCHAR2
   ) RETURN CLOB;
 
   FUNCTION list_buckets(
-    compartment_name  IN VARCHAR2,
     region            IN VARCHAR2
   ) RETURN CLOB;
 
@@ -400,19 +400,16 @@ AS
   ) RETURN CLOB;
 
   FUNCTION get_bucket(
-    compartment_name  IN VARCHAR2,
     bucket_name       IN VARCHAR2,
     region            IN VARCHAR2
   ) RETURN CLOB;
 
   FUNCTION head_bucket(
-    compartment_name  IN VARCHAR2,
     bucket_name       IN VARCHAR2,
     region            IN VARCHAR2
   ) RETURN CLOB;
 
   FUNCTION head_object(
-    compartment_name  IN VARCHAR2,
     region            IN VARCHAR2,
     bucket_name       IN VARCHAR2,
     object_name       IN VARCHAR2
@@ -528,7 +525,6 @@ AS
   ) RETURN CLOB;
 
   FUNCTION update_namespace_metadata(
-    compartment_name IN VARCHAR2,
     region           IN VARCHAR2
   ) RETURN CLOB;
 
@@ -542,7 +538,6 @@ AS
   ) RETURN CLOB;
 
   FUNCTION list_work_requests(
-    compartment_name IN VARCHAR2,
     region           IN VARCHAR2
   ) RETURN CLOB;
 
@@ -562,19 +557,16 @@ AS
   ) RETURN CLOB;
 
   FUNCTION create_bucket(
-    compartment_name  IN VARCHAR2,
     bucket_name       IN VARCHAR2,
     region            IN VARCHAR2
   ) RETURN CLOB;
 
   FUNCTION delete_bucket(
-    compartment_name  IN VARCHAR2,
     bucket_name       IN VARCHAR2,
     region            IN VARCHAR2
   ) RETURN CLOB;
 
   FUNCTION delete_object(
-    compartment_name  IN VARCHAR2,
     region            IN VARCHAR2,
     bucket_name       IN VARCHAR2,
     object_name       IN VARCHAR2
@@ -673,18 +665,16 @@ AS
   ) RETURN CLOB;
 
   FUNCTION get_namespace(
-    compartment_name IN VARCHAR2,
     region           IN VARCHAR2
   ) RETURN CLOB;
 
 
-
-END &&INSTALL_SCHEMA.oci_object_storage_agents;
+END oci_object_storage_agents;
 /
 ------------------------------------------------------------------------
 -- Package body
 ------------------------------------------------------------------------
-CREATE OR REPLACE PACKAGE BODY &&INSTALL_SCHEMA.oci_object_storage_agents
+CREATE OR REPLACE PACKAGE BODY oci_object_storage_agents
 AS
   -- Helper function to get configuration parameters
   FUNCTION get_agent_config(
@@ -724,11 +714,261 @@ AS
           RETURN l_result_json.to_clob();
   END get_agent_config;
 
+  -- Helper: gets the list of compartments
+  FUNCTION list_compartments(credential_name VARCHAR2)
+  RETURN CLOB
+  IS
+      l_response        CLOB;
+      l_endpoint        VARCHAR2(1000);
+      l_result_json     JSON_OBJECT_T := JSON_OBJECT_T();
+      l_compartments    JSON_ARRAY_T := JSON_ARRAY_T();
+      l_comp_data       JSON_ARRAY_T;
+      l_comp_obj        JSON_OBJECT_T;
+      l_name            VARCHAR2(200);
+      l_ocid            VARCHAR2(200);
+      l_description     VARCHAR2(500);
+      l_lifecycle_state VARCHAR2(50);
+      l_time_created    VARCHAR2(100);
+      tenancy_id        VARCHAR2(128);
+      l_region          VARCHAR2(128);
+
+  BEGIN
+
+      SELECT
+        JSON_VALUE(cloud_identity, '$.TENANT_OCID') AS tenant_ocid,
+        JSON_VALUE(cloud_identity, '$.REGION') AS region
+      into tenancy_id,l_region
+      FROM v$pdbs;
+
+      -- Construct endpoint to list compartments in tenancy
+      l_endpoint := 'https://identity.'||l_region||'.oci.oraclecloud.com/20160918/compartments?compartmentId='
+                    || tenancy_id ;
+
+      BEGIN
+          -- Call OCI REST API
+          l_response := DBMS_CLOUD.get_response_text(
+              DBMS_CLOUD.send_request(
+                  credential_name => credential_name,
+                  uri             => l_endpoint,
+                  method          => DBMS_CLOUD.METHOD_GET
+              )
+          );
+
+          -- Parse response JSON as array
+          l_comp_data := JSON_ARRAY_T.parse(l_response);
+
+          IF l_comp_data.get_size() > 0 THEN
+              FOR i IN 0 .. l_comp_data.get_size() - 1 LOOP
+                  l_comp_obj := JSON_OBJECT_T(l_comp_data.get(i));
+                  l_name := l_comp_obj.get_string('name');
+                  l_ocid := l_comp_obj.get_string('id');
+                  l_description := l_comp_obj.get_string('description');
+                  l_lifecycle_state := l_comp_obj.get_string('lifecycleState');
+                  l_time_created := l_comp_obj.get_string('timeCreated');
+
+              IF l_name in ('COMP_STABLE','COMP_PUBLIC') then
+                  
+                  IF l_name = 'COMP_STABLE' THEN 
+                  l_name := 'COMP_AI_AGENT';
+                  ELSE
+                  l_name := 'COMP_DB';
+                  END IF;
+                  
+                  l_compartments.append(
+                      JSON_OBJECT(
+                          'name' VALUE l_name,
+                          'id' VALUE l_ocid,
+                          'description' VALUE l_description,
+                          'lifecycle_state' VALUE l_lifecycle_state,
+                          'time_created' VALUE l_time_created
+                      )
+                  );
+              END IF;
+
+              END LOOP;
+
+              l_result_json.put('status', 'success');
+              l_result_json.put('message', 'Successfully retrieved compartments');
+              l_result_json.put('total_compartments', l_compartments.get_size());
+              l_result_json.put('compartments', l_compartments);
+          ELSE
+              l_result_json.put('status', 'error');
+              l_result_json.put('message', 'No compartments found in response');
+          END IF;
+
+      EXCEPTION
+          WHEN OTHERS THEN
+              l_result_json.put('status', 'error');
+              l_result_json.put('message', 'Failed to retrieve compartments: ' || SQLERRM);
+              l_result_json.put('endpoint_used', l_endpoint);
+      END;
+
+      RETURN l_result_json.to_clob();
+  END list_compartments;
+
+  -- Helper: gets the compartment ocid with the given compatment name
+  FUNCTION get_compartment_ocid_by_name(
+    compartment_name IN VARCHAR2
+  ) RETURN CLOB
+  IS
+    l_comp_json_clob    CLOB;
+    l_result_json       JSON_OBJECT_T := JSON_OBJECT_T();
+    l_compartments      JSON_ARRAY_T;
+    l_compartment_str   VARCHAR2(32767);
+    l_comp_obj          JSON_OBJECT_T;
+    l_ocid              VARCHAR2(200);
+    found               BOOLEAN := FALSE;
+    l_compartment_name  VARCHAR2(256);
+    credential_name     VARCHAR2(256);
+    l_current_user      VARCHAR2(128):= SYS_CONTEXT('USERENV','CURRENT_USER');
+    l_cfg_json          CLOB;
+    l_cfg               JSON_OBJECT_T;
+    l_params            JSON_OBJECT_T;
+  BEGIN
+    l_cfg_json := get_agent_config(l_current_user,'OCI_AGENT_CONFIG','OCI_OBJECT_STORAGE');
+    l_cfg := JSON_OBJECT_T.parse(l_cfg_json);
+    IF l_cfg.get_string('status')='success' THEN
+      l_params      := l_cfg.get_object('config_params');
+      credential_name := l_params.get_string('CREDENTIAL_NAME');
+    END IF;
+
+    -- Call existing list_compartments function
+    l_comp_json_clob := list_compartments(credential_name);
+
+    -- Parse returned JSON object
+    l_result_json := JSON_OBJECT_T.parse(l_comp_json_clob);
+
+    IF l_result_json.get('status').to_string() = '"success"' THEN
+        -- Get compartments array (array of JSON strings)
+        l_compartments := l_result_json.get_array('compartments');
+
+        FOR i IN 0 .. l_compartments.get_size() - 1 LOOP
+            -- Each element is a JSON string, parse it to JSON object
+            l_compartment_str := l_compartments.get_string(i);
+            l_comp_obj := JSON_OBJECT_T.parse(l_compartment_str);
+
+            IF l_comp_obj.get_string('name') = compartment_name THEN
+                l_ocid := l_comp_obj.get_string('id');
+                found := TRUE;
+                EXIT;
+            END IF;
+        END LOOP;
+
+        IF found THEN
+            l_result_json := JSON_OBJECT_T();
+            l_result_json.put('status', 'success');
+            l_result_json.put('compartment_name', compartment_name);
+            l_result_json.put('compartment_ocid', l_ocid);
+        ELSE
+            l_result_json := JSON_OBJECT_T();
+            l_result_json.put('status', 'error');
+            l_result_json.put('message', 'Compartment "' || compartment_name || '" not found');
+        END IF;
+
+    ELSE
+        -- Forward error from list_compartments
+        RETURN l_comp_json_clob;
+    END IF;
+
+    RETURN l_result_json.to_clob();
+
+  EXCEPTION
+    WHEN OTHERS THEN
+        l_result_json := JSON_OBJECT_T();
+        l_result_json.put('status', 'error');
+        l_result_json.put('message', 'Unexpected error: ' || SQLERRM);
+        RETURN l_result_json.to_clob();
+  END get_compartment_ocid_by_name;
+
+  ----------------------------------------------------------------------
+  -- get_namespace: Retrieve namespace metadata
+  ----------------------------------------------------------------------
+  FUNCTION get_namespace(
+    region           IN VARCHAR2
+  ) RETURN CLOB
+  AS
+    l_resp           DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE_GET_NAMESPACE_RESPONSE_T;
+    result_json      JSON_OBJECT_T := JSON_OBJECT_T();
+    l_current_user   VARCHAR2(128):= SYS_CONTEXT('USERENV','CURRENT_USER');
+    l_cfg_json       CLOB;
+    l_cfg            JSON_OBJECT_T;
+    l_params         JSON_OBJECT_T;
+    credential_name  VARCHAR2(256);
+    compartment_name VARCHAR2(256);
+    compartment_id   VARCHAR2(256);
+    l_json           CLOB;
+    l_obj            JSON_OBJECT_T;
+  BEGIN
+    l_cfg_json := get_agent_config(l_current_user,'OCI_AGENT_CONFIG','OCI_OBJECT_STORAGE');
+    l_cfg := JSON_OBJECT_T.parse(l_cfg_json);
+    IF l_cfg.get_string('status')='success' THEN
+      l_params         := l_cfg.get_object('config_params');
+      credential_name  := l_params.get_string('CREDENTIAL_NAME');
+      compartment_name := l_params.get_string('COMPARTMENT_NAME');
+      compartment_id   := l_params.get_string('COMPARTMENT_OCID');
+    END IF;
+
+    IF compartment_id IS NULL THEN
+      l_json := get_compartment_ocid_by_name(compartment_name => compartment_name);
+      l_obj := JSON_OBJECT_T.parse(l_json);
+      IF l_obj.has('compartment_ocid') THEN
+        compartment_id := l_obj.get_string('compartment_ocid');
+      END IF;
+    END IF;
+
+    l_resp := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.GET_NAMESPACE(
+      opc_client_request_id => NULL,
+      compartment_id        => compartment_id,
+      region                => region,
+      endpoint              => NULL,
+      credential_name       => credential_name
+    );
+
+    result_json.put('namespace', TRIM(BOTH CHR(34) FROM l_resp.response_body));
+    result_json.put('region',    region);
+    result_json.put('compartment_id', compartment_id);
+    result_json.put('status_code', l_resp.status_code);
+    IF l_resp.headers IS NOT NULL AND l_resp.headers.has('opc-request-id') THEN
+      result_json.put('opc_request_id', l_resp.headers.get_string('opc-request-id'));
+    END IF;
+
+    RETURN result_json.to_clob();
+  EXCEPTION WHEN OTHERS THEN
+    result_json := JSON_OBJECT_T(); result_json.put('status','error'); result_json.put('message', SQLERRM);
+    result_json.put('region', region); RETURN result_json.to_clob();
+  END get_namespace;
+
+  -- Helper: resolve metadata (namespace and compartment_id) using local get_namespace
+  PROCEDURE resolve_metadata(
+    region          IN  VARCHAR2,
+    namespace       OUT VARCHAR2,
+    compartment_id  OUT VARCHAR2
+  )
+  IS
+    l_json     CLOB;
+    l_obj      JSON_OBJECT_T;
+    l_ns       VARCHAR2(256);
+    l_com_id   VARCHAR2(256);
+  BEGIN
+    l_json := get_namespace(region => region);
+    l_obj := JSON_OBJECT_T.parse(l_json);
+    IF l_obj.has('namespace') THEN
+      l_ns := l_obj.get_string('namespace');
+    END IF;
+    IF l_obj.has('compartment_id') THEN
+      l_com_id := l_obj.get_string('compartment_id');
+    END IF;
+    namespace := l_ns;
+    compartment_id := l_com_id;
+  EXCEPTION
+    WHEN OTHERS THEN
+    NULL;
+  END resolve_metadata;
+
   ----------------------------------------------------------------------
   -- list_objects: List all objects in a bucket (uses namespace lookup API)
   ----------------------------------------------------------------------
   FUNCTION list_objects(
-    compartment_name  IN VARCHAR2,
     region            IN VARCHAR2,
     bucket_name       IN VARCHAR2
   ) RETURN CLOB
@@ -744,6 +984,7 @@ AS
     l_params              JSON_OBJECT_T;
     credential_name       VARCHAR2(256);
     namespace             VARCHAR2(256);
+    compartment_id        VARCHAR2(256);
   BEGIN
     -- Load credential from config
     l_cfg_json := get_agent_config(l_current_user, 'OCI_AGENT_CONFIG', 'OCI_OBJECT_STORAGE');
@@ -753,23 +994,7 @@ AS
       credential_name := l_params.get_string('CREDENTIAL_NAME');
     END IF;
 
-    -- Resolve namespace via Object Storage API (uses compartment context)
-    -- Prefer GET_NAMESPACE API that derives or returns current tenancy namespace
-    DECLARE
-      l_ns_resp  DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE_GET_NAMESPACE_RESPONSE_T;
-    BEGIN
-      l_ns_resp := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.GET_NAMESPACE(
-        compartment_id  => NULL,       -- if available, can pass OCID; otherwise returns default
-        region          => region,
-        credential_name => credential_name
-      );
-      IF l_ns_resp.response_body IS NOT NULL THEN
-        namespace := l_ns_resp.response_body;
-      END IF;
-    EXCEPTION WHEN OTHERS THEN
-      -- Fallback: leave namespace null and let LIST_OBJECTS error out with clear message
-      NULL;
-    END;
+    resolve_metadata(region => region, namespace => namespace, compartment_id => compartment_id);
 
     -- Call LIST_OBJECTS API
     l_resp := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.LIST_OBJECTS(
@@ -820,7 +1045,6 @@ AS
   -- list_buckets: List all buckets in a compartment
   ----------------------------------------------------------------------
   FUNCTION list_buckets(
-    compartment_name  IN VARCHAR2,
     region            IN VARCHAR2
   ) RETURN CLOB
   AS
@@ -842,24 +1066,9 @@ AS
     IF l_cfg.get_string('status') = 'success' THEN
       l_params := l_cfg.get_object('config_params');
       credential_name := l_params.get_string('CREDENTIAL_NAME');
-      compartment_id  := l_params.get_string('COMPARTMENT_OCID');
     END IF;
 
-    -- Resolve namespace via GET_NAMESPACE
-    DECLARE
-      l_ns_resp  DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE_GET_NAMESPACE_RESPONSE_T;
-    BEGIN
-      l_ns_resp := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.GET_NAMESPACE(
-        compartment_id  => NULL,
-        region          => region,
-        credential_name => credential_name
-      );
-      IF l_ns_resp.response_body IS NOT NULL THEN
-        namespace := l_ns_resp.response_body;
-      END IF;
-    EXCEPTION WHEN OTHERS THEN
-      NULL;
-    END;
+    resolve_metadata(region => region, namespace => namespace, compartment_id => compartment_id);
 
     -- Call LIST_BUCKETS API
     resp := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.LIST_BUCKETS(
@@ -902,7 +1111,6 @@ AS
   -- get_bucket: Retrieve bucket metadata (summary)
   ----------------------------------------------------------------------
   FUNCTION get_bucket(
-    compartment_name  IN VARCHAR2,
     bucket_name       IN VARCHAR2,
     region            IN VARCHAR2
   ) RETURN CLOB
@@ -916,6 +1124,7 @@ AS
     l_params        JSON_OBJECT_T;
     credential_name VARCHAR2(256);
     namespace       VARCHAR2(256);
+    compartment_id  VARCHAR2(256);
   BEGIN
     -- Load credential from config
     l_cfg_json := get_agent_config(l_current_user, 'OCI_AGENT_CONFIG', 'OCI_OBJECT_STORAGE');
@@ -925,21 +1134,7 @@ AS
       credential_name := l_params.get_string('CREDENTIAL_NAME');
     END IF;
 
-    -- Resolve namespace via GET_NAMESPACE
-    DECLARE
-      l_ns_resp  DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE_GET_NAMESPACE_RESPONSE_T;
-    BEGIN
-      l_ns_resp := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.GET_NAMESPACE(
-        compartment_id  => NULL,
-        region          => region,
-        credential_name => credential_name
-      );
-      IF l_ns_resp.response_body IS NOT NULL THEN
-        namespace := l_ns_resp.response_body;
-      END IF;
-    EXCEPTION WHEN OTHERS THEN
-      NULL;
-    END;
+    resolve_metadata(region => region, namespace => namespace, compartment_id => compartment_id);
 
     -- Call GET_BUCKET with selected fields
     l_resp := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.GET_BUCKET(
@@ -996,7 +1191,6 @@ AS
   -- head_bucket: Retrieve bucket metadata headers (HEAD_BUCKET)
   ----------------------------------------------------------------------
   FUNCTION head_bucket(
-    compartment_name  IN VARCHAR2,
     bucket_name       IN VARCHAR2,
     region            IN VARCHAR2
   ) RETURN CLOB
@@ -1009,6 +1203,7 @@ AS
     l_params       JSON_OBJECT_T;
     credential_name VARCHAR2(256);
     namespace       VARCHAR2(256);
+    compartment_id  VARCHAR2(256);
   BEGIN
     -- Load credential from config
     l_cfg_json := get_agent_config(l_current_user, 'OCI_AGENT_CONFIG', 'OCI_OBJECT_STORAGE');
@@ -1018,21 +1213,7 @@ AS
       credential_name := l_params.get_string('CREDENTIAL_NAME');
     END IF;
 
-    -- Resolve namespace via GET_NAMESPACE
-    DECLARE
-      l_ns_resp  DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE_GET_NAMESPACE_RESPONSE_T;
-    BEGIN
-      l_ns_resp := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.GET_NAMESPACE(
-        compartment_id  => NULL,
-        region          => region,
-        credential_name => credential_name
-      );
-      IF l_ns_resp.response_body IS NOT NULL THEN
-        namespace := l_ns_resp.response_body;
-      END IF;
-    EXCEPTION WHEN OTHERS THEN
-      NULL;
-    END;
+    resolve_metadata(region => region, namespace => namespace, compartment_id => compartment_id);
 
     -- Call HEAD_BUCKET API
     l_response := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.HEAD_BUCKET(
@@ -1067,7 +1248,6 @@ AS
   -- head_object: Retrieve object metadata headers (HEAD_OBJECT)
   ----------------------------------------------------------------------
   FUNCTION head_object(
-    compartment_name  IN VARCHAR2,
     region            IN VARCHAR2,
     bucket_name       IN VARCHAR2,
     object_name       IN VARCHAR2
@@ -1081,6 +1261,7 @@ AS
     l_params       JSON_OBJECT_T;
     credential_name VARCHAR2(256);
     namespace       VARCHAR2(256);
+    compartment_id  VARCHAR2(256);
   BEGIN
     -- Load credential from config
     l_cfg_json := get_agent_config(l_current_user, 'OCI_AGENT_CONFIG', 'OCI_OBJECT_STORAGE');
@@ -1090,21 +1271,7 @@ AS
       credential_name := l_params.get_string('CREDENTIAL_NAME');
     END IF;
 
-    -- Resolve namespace via GET_NAMESPACE
-    DECLARE
-      l_ns_resp  DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE_GET_NAMESPACE_RESPONSE_T;
-    BEGIN
-      l_ns_resp := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.GET_NAMESPACE(
-        compartment_id  => NULL,
-        region          => region,
-        credential_name => credential_name
-      );
-      IF l_ns_resp.response_body IS NOT NULL THEN
-        namespace := l_ns_resp.response_body;
-      END IF;
-    EXCEPTION WHEN OTHERS THEN
-      NULL;
-    END;
+    resolve_metadata(region => region, namespace => namespace, compartment_id => compartment_id);
 
     -- Call HEAD_OBJECT API
     l_response := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.HEAD_OBJECT(
@@ -1150,6 +1317,7 @@ AS
     l_params       JSON_OBJECT_T;
     credential_name VARCHAR2(256);
     namespace       VARCHAR2(256);
+    compartment_id  VARCHAR2(256);
   BEGIN
     -- Load credential from config
     l_cfg_json := get_agent_config(l_current_user, 'OCI_AGENT_CONFIG', 'OCI_OBJECT_STORAGE');
@@ -1159,21 +1327,7 @@ AS
       credential_name := l_params.get_string('CREDENTIAL_NAME');
     END IF;
 
-    -- Resolve namespace via GET_NAMESPACE
-    DECLARE
-      l_ns_resp  DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE_GET_NAMESPACE_RESPONSE_T;
-    BEGIN
-      l_ns_resp := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.GET_NAMESPACE(
-        compartment_id  => NULL,
-        region          => region,
-        credential_name => credential_name
-      );
-      IF l_ns_resp.response_body IS NOT NULL THEN
-        namespace := l_ns_resp.response_body;
-      END IF;
-    EXCEPTION WHEN OTHERS THEN
-      NULL;
-    END;
+    resolve_metadata(region => region, namespace => namespace, compartment_id => compartment_id);
 
     -- Call LIST_OBJECT_VERSIONS API
     l_response := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.LIST_OBJECT_VERSIONS(
@@ -1240,6 +1394,7 @@ AS
     l_params       JSON_OBJECT_T;
     credential_name VARCHAR2(256);
     namespace       VARCHAR2(256);
+    compartment_id  VARCHAR2(256);
   BEGIN
     -- Load credential from config
     l_cfg_json := get_agent_config(l_current_user, 'OCI_AGENT_CONFIG', 'OCI_OBJECT_STORAGE');
@@ -1249,21 +1404,7 @@ AS
       credential_name := l_params.get_string('CREDENTIAL_NAME');
     END IF;
 
-    -- Resolve namespace via GET_NAMESPACE
-    DECLARE
-      l_ns_resp  DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE_GET_NAMESPACE_RESPONSE_T;
-    BEGIN
-      l_ns_resp := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.GET_NAMESPACE(
-        compartment_id  => NULL,
-        region          => region,
-        credential_name => credential_name
-      );
-      IF l_ns_resp.response_body IS NOT NULL THEN
-        namespace := l_ns_resp.response_body;
-      END IF;
-    EXCEPTION WHEN OTHERS THEN
-      NULL;
-    END;
+    resolve_metadata(region => region, namespace => namespace, compartment_id => compartment_id);
 
     -- Call LIST_MULTIPART_UPLOADS API
     l_response := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.LIST_MULTIPART_UPLOADS(
@@ -1327,6 +1468,7 @@ AS
     l_params       JSON_OBJECT_T;
     credential_name VARCHAR2(256);
     namespace       VARCHAR2(256);
+    compartment_id  VARCHAR2(256);
   BEGIN
     -- Load credential from config
     l_cfg_json := get_agent_config(l_current_user, 'OCI_AGENT_CONFIG', 'OCI_OBJECT_STORAGE');
@@ -1336,21 +1478,7 @@ AS
       credential_name := l_params.get_string('CREDENTIAL_NAME');
     END IF;
 
-    -- Resolve namespace via GET_NAMESPACE
-    DECLARE
-      l_ns_resp  DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE_GET_NAMESPACE_RESPONSE_T;
-    BEGIN
-      l_ns_resp := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.GET_NAMESPACE(
-        compartment_id  => NULL,
-        region          => region,
-        credential_name => credential_name
-      );
-      IF l_ns_resp.response_body IS NOT NULL THEN
-        namespace := l_ns_resp.response_body;
-      END IF;
-    EXCEPTION WHEN OTHERS THEN
-      NULL;
-    END;
+    resolve_metadata(region => region, namespace => namespace, compartment_id => compartment_id);
 
     -- Call LIST_MULTIPART_UPLOAD_PARTS API
     l_response := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.LIST_MULTIPART_UPLOAD_PARTS(
@@ -1426,21 +1554,7 @@ AS
       compartment_id  := l_params.get_string('COMPARTMENT_OCID');
     END IF;
 
-    -- Resolve namespace
-    DECLARE
-      l_ns_resp DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE_GET_NAMESPACE_RESPONSE_T;
-    BEGIN
-      l_ns_resp := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.GET_NAMESPACE(
-        compartment_id  => NULL,
-        region          => region,
-        credential_name => credential_name
-      );
-      IF l_ns_resp.response_body IS NOT NULL THEN
-        namespace := l_ns_resp.response_body;
-      END IF;
-    EXCEPTION WHEN OTHERS THEN
-      NULL;
-    END;
+    resolve_metadata(region => region, namespace => namespace, compartment_id => compartment_id);
 
     -- Build update details
     l_details := DBMS_CLOUD_OCI_OBJECT_STORAGE_UPDATE_BUCKET_DETAILS_T(
@@ -1507,6 +1621,7 @@ AS
     l_params       JSON_OBJECT_T;
     credential_name VARCHAR2(256);
     namespace       VARCHAR2(256);
+    compartment_id  VARCHAR2(256);
   BEGIN
     -- Load credential from config
     l_cfg_json := get_agent_config(l_current_user, 'OCI_AGENT_CONFIG', 'OCI_OBJECT_STORAGE');
@@ -1516,21 +1631,7 @@ AS
       credential_name := l_params.get_string('CREDENTIAL_NAME');
     END IF;
 
-    -- Resolve namespace via GET_NAMESPACE
-    DECLARE
-      l_ns_resp DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE_GET_NAMESPACE_RESPONSE_T;
-    BEGIN
-      l_ns_resp := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.GET_NAMESPACE(
-        compartment_id  => NULL,
-        region          => region,
-        credential_name => credential_name
-      );
-      IF l_ns_resp.response_body IS NOT NULL THEN
-        namespace := l_ns_resp.response_body;
-      END IF;
-    EXCEPTION WHEN OTHERS THEN
-      NULL;
-    END;
+    resolve_metadata(region => region, namespace => namespace, compartment_id => compartment_id);
 
     -- Call MAKE_BUCKET_WRITABLE API
     l_response := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.MAKE_BUCKET_WRITABLE(
@@ -1590,6 +1691,7 @@ AS
     l_params       JSON_OBJECT_T;
     credential_name VARCHAR2(256);
     namespace       VARCHAR2(256);
+    compartment_id  VARCHAR2(256);
   BEGIN
     -- Load credential from config
     l_cfg_json := get_agent_config(l_current_user, 'OCI_AGENT_CONFIG', 'OCI_OBJECT_STORAGE');
@@ -1599,21 +1701,7 @@ AS
       credential_name := l_params.get_string('CREDENTIAL_NAME');
     END IF;
 
-    -- Resolve namespace via GET_NAMESPACE
-    DECLARE
-      l_ns_resp DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE_GET_NAMESPACE_RESPONSE_T;
-    BEGIN
-      l_ns_resp := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.GET_NAMESPACE(
-        compartment_id  => NULL,
-        region          => region,
-        credential_name => credential_name
-      );
-      IF l_ns_resp.response_body IS NOT NULL THEN
-        namespace := l_ns_resp.response_body;
-      END IF;
-    EXCEPTION WHEN OTHERS THEN
-      NULL;
-    END;
+    resolve_metadata(region => region, namespace => namespace, compartment_id => compartment_id);
 
     -- Construct object name filter with empty include/exclude lists
     l_filter := DBMS_CLOUD_OCI_OBJECT_STORAGE_OBJECT_NAME_FILTER_T(
@@ -1679,6 +1767,7 @@ AS
     l_params       JSON_OBJECT_T;
     credential_name VARCHAR2(256);
     namespace       VARCHAR2(256);
+    compartment_id  VARCHAR2(256);
   BEGIN
     -- Load credential from config
     l_cfg_json := get_agent_config(l_current_user, 'OCI_AGENT_CONFIG', 'OCI_OBJECT_STORAGE');
@@ -1688,21 +1777,7 @@ AS
       credential_name := l_params.get_string('CREDENTIAL_NAME');
     END IF;
 
-    -- Resolve namespace via GET_NAMESPACE
-    DECLARE
-      l_ns_resp DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE_GET_NAMESPACE_RESPONSE_T;
-    BEGIN
-      l_ns_resp := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.GET_NAMESPACE(
-        compartment_id  => NULL,
-        region          => region,
-        credential_name => credential_name
-      );
-      IF l_ns_resp.response_body IS NOT NULL THEN
-        namespace := l_ns_resp.response_body;
-      END IF;
-    EXCEPTION WHEN OTHERS THEN
-      NULL;
-    END;
+    resolve_metadata(region => region, namespace => namespace, compartment_id => compartment_id);
 
     -- Call LIST_RETENTION_RULES API
     l_resp := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.LIST_RETENTION_RULES(
@@ -1798,6 +1873,7 @@ AS
     l_params       JSON_OBJECT_T;
     credential_name VARCHAR2(256);
     namespace       VARCHAR2(256);
+    compartment_id  VARCHAR2(256);
   BEGIN
     -- Load credential
     l_cfg_json := get_agent_config(l_current_user, 'OCI_AGENT_CONFIG', 'OCI_OBJECT_STORAGE');
@@ -1807,21 +1883,7 @@ AS
       credential_name := l_params.get_string('CREDENTIAL_NAME');
     END IF;
 
-    -- Resolve namespace
-    DECLARE
-      l_ns_resp DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE_GET_NAMESPACE_RESPONSE_T;
-    BEGIN
-      l_ns_resp := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.GET_NAMESPACE(
-        compartment_id  => NULL,
-        region          => region,
-        credential_name => credential_name
-      );
-      IF l_ns_resp.response_body IS NOT NULL THEN
-        namespace := l_ns_resp.response_body;
-      END IF;
-    EXCEPTION WHEN OTHERS THEN
-      NULL;
-    END;
+    resolve_metadata(region => region, namespace => namespace, compartment_id => compartment_id);
 
     -- Call GET_RETENTION_RULE
     l_resp := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.GET_RETENTION_RULE(
@@ -1896,7 +1958,6 @@ AS
   -- get_object: Retrieve object metadata (headers/summary, not payload)
   ----------------------------------------------------------------------
   FUNCTION get_object(
-    compartment_name  IN VARCHAR2,
     region            IN VARCHAR2,
     bucket_name       IN VARCHAR2,
     object_name       IN VARCHAR2
@@ -1911,6 +1972,7 @@ AS
     l_params        JSON_OBJECT_T;
     credential_name VARCHAR2(256);
     namespace       VARCHAR2(256);
+    compartment_id  VARCHAR2(256);
   BEGIN
     -- Load credential from config
     l_cfg_json := get_agent_config(l_current_user, 'OCI_AGENT_CONFIG', 'OCI_OBJECT_STORAGE');
@@ -1920,21 +1982,7 @@ AS
       credential_name := l_params.get_string('CREDENTIAL_NAME');
     END IF;
 
-    -- Resolve namespace via GET_NAMESPACE
-    DECLARE
-      l_ns_resp  DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE_GET_NAMESPACE_RESPONSE_T;
-    BEGIN
-      l_ns_resp := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.GET_NAMESPACE(
-        compartment_id  => NULL,
-        region          => region,
-        credential_name => credential_name
-      );
-      IF l_ns_resp.response_body IS NOT NULL THEN
-        namespace := l_ns_resp.response_body;
-      END IF;
-    EXCEPTION WHEN OTHERS THEN
-      NULL;
-    END;
+    resolve_metadata(region => region, namespace => namespace, compartment_id => compartment_id);
 
     -- Call OCI GET_OBJECT API (metadata only)
     l_resp := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.GET_OBJECT(
@@ -2002,6 +2050,7 @@ AS
     l_params       JSON_OBJECT_T;
     credential_name VARCHAR2(256);
     namespace       VARCHAR2(256);
+    compartment_id  VARCHAR2(256);
   BEGIN
     -- Load credential from config
     l_cfg_json := get_agent_config(l_current_user, 'OCI_AGENT_CONFIG', 'OCI_OBJECT_STORAGE');
@@ -2011,21 +2060,7 @@ AS
       credential_name := l_params.get_string('CREDENTIAL_NAME');
     END IF;
 
-    -- Resolve namespace
-    DECLARE
-      l_ns_resp  DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE_GET_NAMESPACE_RESPONSE_T;
-    BEGIN
-      l_ns_resp := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.GET_NAMESPACE(
-        compartment_id  => NULL,
-        region          => region,
-        credential_name => credential_name
-      );
-      IF l_ns_resp.response_body IS NOT NULL THEN
-        namespace := l_ns_resp.response_body;
-      END IF;
-    EXCEPTION WHEN OTHERS THEN
-      NULL;
-    END;
+    resolve_metadata(region => region, namespace => namespace, compartment_id => compartment_id);
 
     -- Convert CLOB content to BLOB (UTF-8)
     l_blob := TO_BLOB(UTL_I18N.STRING_TO_RAW(content, 'AL32UTF8'));
@@ -2087,6 +2122,7 @@ AS
     l_params       JSON_OBJECT_T;
     credential_name VARCHAR2(256);
     namespace       VARCHAR2(256);
+    compartment_id  VARCHAR2(256);
   BEGIN
     -- Load credential
     l_cfg_json := get_agent_config(l_current_user, 'OCI_AGENT_CONFIG', 'OCI_OBJECT_STORAGE');
@@ -2096,17 +2132,7 @@ AS
       credential_name := l_params.get_string('CREDENTIAL_NAME');
     END IF;
 
-    -- Resolve namespace
-    DECLARE
-      l_ns_resp DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE_GET_NAMESPACE_RESPONSE_T;
-    BEGIN
-      l_ns_resp := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.GET_NAMESPACE(
-        compartment_id  => NULL,
-        region          => region,
-        credential_name => credential_name
-      );
-      namespace := l_ns_resp.response_body;
-    EXCEPTION WHEN OTHERS THEN NULL; END;
+    resolve_metadata(region => region, namespace => namespace, compartment_id => compartment_id);
 
     -- Call API
     l_resp := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.LIST_PREAUTHENTICATED_REQUESTS(
@@ -2183,6 +2209,7 @@ AS
     l_params       JSON_OBJECT_T;
     credential_name VARCHAR2(256);
     namespace       VARCHAR2(256);
+    compartment_id  VARCHAR2(256);
   BEGIN
     l_cfg_json := get_agent_config(l_current_user, 'OCI_AGENT_CONFIG', 'OCI_OBJECT_STORAGE');
     l_cfg := JSON_OBJECT_T.parse(l_cfg_json);
@@ -2191,13 +2218,7 @@ AS
       credential_name := l_params.get_string('CREDENTIAL_NAME');
     END IF;
 
-    DECLARE
-      l_ns DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE_GET_NAMESPACE_RESPONSE_T;
-    BEGIN
-      l_ns := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.GET_NAMESPACE(
-        compartment_id=>NULL, region=>region, credential_name=>credential_name);
-      namespace := l_ns.response_body;
-    EXCEPTION WHEN OTHERS THEN NULL; END;
+    resolve_metadata(region => region, namespace => namespace, compartment_id => compartment_id);
 
     l_resp := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.LIST_REPLICATION_POLICIES(
       namespace_name=>namespace, bucket_name=>bucket_name, region=>region, credential_name=>credential_name
@@ -2259,6 +2280,7 @@ AS
     l_params       JSON_OBJECT_T;
     credential_name VARCHAR2(256);
     namespace       VARCHAR2(256);
+    compartment_id  VARCHAR2(256);
   BEGIN
     -- Load credential
     l_cfg_json := get_agent_config(l_current_user,'OCI_AGENT_CONFIG','OCI_OBJECT_STORAGE');
@@ -2269,13 +2291,7 @@ AS
     END IF;
 
     -- Namespace
-    DECLARE
-      l_ns DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE_GET_NAMESPACE_RESPONSE_T;
-    BEGIN
-      l_ns := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.GET_NAMESPACE(
-        compartment_id=>NULL, region=>region, credential_name=>credential_name);
-      namespace := l_ns.response_body;
-    EXCEPTION WHEN OTHERS THEN NULL; END;
+    resolve_metadata(region => region, namespace => namespace, compartment_id => compartment_id);
 
     -- Call API
     l_resp := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.GET_REPLICATION_POLICY(
@@ -2336,6 +2352,7 @@ AS
     l_params       JSON_OBJECT_T;
     credential_name VARCHAR2(256);
     namespace       VARCHAR2(256);
+    compartment_id  VARCHAR2(256);
   BEGIN
     l_cfg_json := get_agent_config(l_current_user,'OCI_AGENT_CONFIG','OCI_OBJECT_STORAGE');
     l_cfg := JSON_OBJECT_T.parse(l_cfg_json);
@@ -2344,13 +2361,7 @@ AS
       credential_name := l_params.get_string('CREDENTIAL_NAME');
     END IF;
 
-    DECLARE
-      l_ns DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE_GET_NAMESPACE_RESPONSE_T;
-    BEGIN
-      l_ns := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.GET_NAMESPACE(
-        compartment_id=>NULL, region=>region, credential_name=>credential_name);
-      namespace := l_ns.response_body;
-    EXCEPTION WHEN OTHERS THEN NULL; END;
+    resolve_metadata(region => region, namespace => namespace, compartment_id => compartment_id);
 
     l_resp := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.LIST_REPLICATION_SOURCES(
       namespace_name=>namespace,
@@ -2401,6 +2412,7 @@ AS
     l_params       JSON_OBJECT_T;
     credential_name VARCHAR2(256);
     namespace       VARCHAR2(256);
+    compartment_id  VARCHAR2(256);
   BEGIN
     l_cfg_json := get_agent_config(l_current_user,'OCI_AGENT_CONFIG','OCI_OBJECT_STORAGE');
     l_cfg := JSON_OBJECT_T.parse(l_cfg_json);
@@ -2409,13 +2421,7 @@ AS
       credential_name := l_params.get_string('CREDENTIAL_NAME');
     END IF;
 
-    DECLARE
-      l_ns DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE_GET_NAMESPACE_RESPONSE_T;
-    BEGIN
-      l_ns := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.GET_NAMESPACE(
-        compartment_id=>NULL, region=>region, credential_name=>credential_name);
-      namespace := l_ns.response_body;
-    EXCEPTION WHEN OTHERS THEN NULL; END;
+    resolve_metadata(region => region, namespace => namespace, compartment_id => compartment_id);
 
     l_resp := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.REENCRYPT_BUCKET(
       namespace_name=>namespace,
@@ -2468,6 +2474,7 @@ AS
     l_params       JSON_OBJECT_T;
     credential_name VARCHAR2(256);
     namespace       VARCHAR2(256);
+    compartment_id  VARCHAR2(256);
     l_dummy_key     DBMS_CLOUD_OCI_OBJECT_STORAGE_SSE_CUSTOMER_KEY_DETAILS_T := NULL;
   BEGIN
     l_cfg_json := get_agent_config(l_current_user,'OCI_AGENT_CONFIG','OCI_OBJECT_STORAGE');
@@ -2477,13 +2484,7 @@ AS
       credential_name := l_params.get_string('CREDENTIAL_NAME');
     END IF;
 
-    DECLARE
-      l_ns DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE_GET_NAMESPACE_RESPONSE_T;
-    BEGIN
-      l_ns := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.GET_NAMESPACE(
-        compartment_id=>NULL, region=>region, credential_name=>credential_name);
-      namespace := l_ns.response_body;
-    EXCEPTION WHEN OTHERS THEN NULL; END;
+    resolve_metadata(region => region, namespace => namespace, compartment_id => compartment_id);
 
     l_details := DBMS_CLOUD_OCI_OBJECT_STORAGE_REENCRYPT_OBJECT_DETAILS_T(
       kms_key_id, l_dummy_key, l_dummy_key
@@ -2548,6 +2549,7 @@ AS
     l_params       JSON_OBJECT_T;
     credential_name VARCHAR2(256);
     namespace       VARCHAR2(256);
+    compartment_id  VARCHAR2(256);
   BEGIN
     l_cfg_json := get_agent_config(l_current_user,'OCI_AGENT_CONFIG','OCI_OBJECT_STORAGE');
     l_cfg := JSON_OBJECT_T.parse(l_cfg_json);
@@ -2556,13 +2558,7 @@ AS
       credential_name := l_params.get_string('CREDENTIAL_NAME');
     END IF;
 
-    DECLARE
-      l_ns DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE_GET_NAMESPACE_RESPONSE_T;
-    BEGIN
-      l_ns := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.GET_NAMESPACE(
-        compartment_id=>NULL, region=>region, credential_name=>credential_name);
-      namespace := l_ns.response_body;
-    EXCEPTION WHEN OTHERS THEN NULL; END;
+    resolve_metadata(region => region, namespace => namespace, compartment_id => compartment_id);
 
     l_details := DBMS_CLOUD_OCI_OBJECT_STORAGE_RENAME_OBJECT_DETAILS_T(
       source_name => source_object,
@@ -2629,6 +2625,7 @@ AS
     l_params       JSON_OBJECT_T;
     credential_name VARCHAR2(256);
     namespace       VARCHAR2(256);
+    compartment_id  VARCHAR2(256);
   BEGIN
     l_cfg_json := get_agent_config(l_current_user,'OCI_AGENT_CONFIG','OCI_OBJECT_STORAGE');
     l_cfg := JSON_OBJECT_T.parse(l_cfg_json);
@@ -2637,13 +2634,7 @@ AS
       credential_name := l_params.get_string('CREDENTIAL_NAME');
     END IF;
 
-    DECLARE
-      l_ns DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE_GET_NAMESPACE_RESPONSE_T;
-    BEGIN
-      l_ns := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.GET_NAMESPACE(
-        compartment_id=>NULL, region=>region, credential_name=>credential_name);
-      namespace := l_ns.response_body;
-    EXCEPTION WHEN OTHERS THEN NULL; END;
+    resolve_metadata(region => region, namespace => namespace, compartment_id => compartment_id);
 
     l_details := DBMS_CLOUD_OCI_OBJECT_STORAGE_RESTORE_OBJECTS_DETAILS_T(
       object_name => object_name,
@@ -2704,6 +2695,7 @@ AS
     l_params       JSON_OBJECT_T;
     credential_name VARCHAR2(256);
     namespace       VARCHAR2(256);
+    compartment_id  VARCHAR2(256);
   BEGIN
     l_cfg_json := get_agent_config(l_current_user,'OCI_AGENT_CONFIG','OCI_OBJECT_STORAGE');
     l_cfg := JSON_OBJECT_T.parse(l_cfg_json);
@@ -2712,13 +2704,7 @@ AS
       credential_name := l_params.get_string('CREDENTIAL_NAME');
     END IF;
 
-    DECLARE
-      l_ns DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE_GET_NAMESPACE_RESPONSE_T;
-    BEGIN
-      l_ns := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.GET_NAMESPACE(
-        compartment_id=>NULL, region=>region, credential_name=>credential_name);
-      namespace := l_ns.response_body;
-    EXCEPTION WHEN OTHERS THEN NULL; END;
+    resolve_metadata(region => region, namespace => namespace, compartment_id => compartment_id);
 
     l_resp := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.UPLOAD_PART(
       namespace_name              => namespace,
@@ -2764,7 +2750,6 @@ AS
   -- update_namespace_metadata: Set default S3/Swift compartments for namespace
   ----------------------------------------------------------------------
   FUNCTION update_namespace_metadata(
-    compartment_name IN VARCHAR2,
     region           IN VARCHAR2
   ) RETURN CLOB
   AS
@@ -2789,13 +2774,7 @@ AS
     END IF;
 
     -- Resolve namespace
-    DECLARE
-      l_ns DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE_GET_NAMESPACE_RESPONSE_T;
-    BEGIN
-      l_ns := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.GET_NAMESPACE(
-        compartment_id=>NULL, region=>region, credential_name=>credential_name);
-      namespace := l_ns.response_body;
-    EXCEPTION WHEN OTHERS THEN NULL; END;
+    resolve_metadata(region => region, namespace => namespace, compartment_id => compartment_id);
 
     -- Prepare details (use COMPARTMENT_OCID from config)
     l_details := DBMS_CLOUD_OCI_OBJECT_STORAGE_UPDATE_NAMESPACE_METADATA_DETAILS_T(
@@ -2855,6 +2834,7 @@ AS
     l_params       JSON_OBJECT_T;
     credential_name VARCHAR2(256);
     namespace       VARCHAR2(256);
+    compartment_id  VARCHAR2(256);
   BEGIN
     l_cfg_json := get_agent_config(l_current_user,'OCI_AGENT_CONFIG','OCI_OBJECT_STORAGE');
     l_cfg := JSON_OBJECT_T.parse(l_cfg_json);
@@ -2863,13 +2843,7 @@ AS
       credential_name := l_params.get_string('CREDENTIAL_NAME');
     END IF;
 
-    DECLARE
-      l_ns DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE_GET_NAMESPACE_RESPONSE_T;
-    BEGIN
-      l_ns := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.GET_NAMESPACE(
-        compartment_id=>NULL, region=>region, credential_name=>credential_name);
-      namespace := l_ns.response_body;
-    EXCEPTION WHEN OTHERS THEN NULL; END;
+    resolve_metadata(region => region, namespace => namespace, compartment_id => compartment_id);
 
     l_duration := DBMS_CLOUD_OCI_OBJECT_STORAGE_DURATION_T(
       time_amount => duration_amount,
@@ -2931,7 +2905,6 @@ AS
   -- list_work_requests: List work requests in a compartment
   ----------------------------------------------------------------------
   FUNCTION list_work_requests(
-    compartment_name IN VARCHAR2,
     region           IN VARCHAR2
   ) RETURN CLOB
   AS
@@ -3194,7 +3167,6 @@ AS
   -- create_bucket: Create a new bucket
   ----------------------------------------------------------------------
   FUNCTION create_bucket(
-    compartment_name  IN VARCHAR2,
     bucket_name       IN VARCHAR2,
     region            IN VARCHAR2
   ) RETURN CLOB
@@ -3207,8 +3179,8 @@ AS
     l_cfg            JSON_OBJECT_T;
     l_params         JSON_OBJECT_T;
     credential_name  VARCHAR2(256);
-    compartment_id   VARCHAR2(256);
     namespace        VARCHAR2(256);
+    compartment_id  VARCHAR2(256);
   BEGIN
     l_cfg_json := get_agent_config(l_current_user,'OCI_AGENT_CONFIG','OCI_OBJECT_STORAGE');
     l_cfg := JSON_OBJECT_T.parse(l_cfg_json);
@@ -3219,13 +3191,7 @@ AS
     END IF;
 
     -- resolve namespace
-    DECLARE
-      l_ns DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE_GET_NAMESPACE_RESPONSE_T;
-    BEGIN
-      l_ns := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.GET_NAMESPACE(
-        compartment_id=>NULL, region=>region, credential_name=>credential_name);
-      namespace := l_ns.response_body;
-    EXCEPTION WHEN OTHERS THEN NULL; END;
+    resolve_metadata(region => region, namespace => namespace, compartment_id => compartment_id);
 
     -- details
     l_details := DBMS_CLOUD_OCI_OBJECT_STORAGE_CREATE_BUCKET_DETAILS_T(
@@ -3283,7 +3249,6 @@ AS
   -- delete_bucket: Delete bucket (must be empty)
   ----------------------------------------------------------------------
   FUNCTION delete_bucket(
-    compartment_name  IN VARCHAR2,
     bucket_name       IN VARCHAR2,
     region            IN VARCHAR2
   ) RETURN CLOB
@@ -3292,7 +3257,9 @@ AS
     result_json     JSON_OBJECT_T := JSON_OBJECT_T();
     l_current_user  VARCHAR2(128):= SYS_CONTEXT('USERENV','CURRENT_USER');
     l_cfg_json      CLOB; l_cfg JSON_OBJECT_T; l_params JSON_OBJECT_T;
-    credential_name VARCHAR2(256); namespace VARCHAR2(256);
+    credential_name VARCHAR2(256);
+    namespace VARCHAR2(256);
+    compartment_id  VARCHAR2(256);
   BEGIN
     l_cfg_json := get_agent_config(l_current_user,'OCI_AGENT_CONFIG','OCI_OBJECT_STORAGE');
     l_cfg := JSON_OBJECT_T.parse(l_cfg_json);
@@ -3300,11 +3267,7 @@ AS
       l_params := l_cfg.get_object('config_params'); credential_name := l_params.get_string('CREDENTIAL_NAME');
     END IF;
 
-    DECLARE l_ns DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE_GET_NAMESPACE_RESPONSE_T;
-    BEGIN
-      l_ns := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.GET_NAMESPACE(NULL,region,credential_name);
-      namespace := l_ns.response_body;
-    EXCEPTION WHEN OTHERS THEN NULL; END;
+    resolve_metadata(region => region, namespace => namespace, compartment_id => compartment_id);
 
     l_resp := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.DELETE_BUCKET(
       namespace_name=>namespace, bucket_name=>bucket_name, credential_name=>credential_name, region=>region
@@ -3326,7 +3289,6 @@ AS
   -- delete_object: Delete an object
   ----------------------------------------------------------------------
   FUNCTION delete_object(
-    compartment_name  IN VARCHAR2,
     region            IN VARCHAR2,
     bucket_name       IN VARCHAR2,
     object_name       IN VARCHAR2
@@ -3336,7 +3298,9 @@ AS
     result_json     JSON_OBJECT_T := JSON_OBJECT_T();
     l_current_user  VARCHAR2(128):= SYS_CONTEXT('USERENV','CURRENT_USER');
     l_cfg_json      CLOB; l_cfg JSON_OBJECT_T; l_params JSON_OBJECT_T;
-    credential_name VARCHAR2(256); namespace VARCHAR2(256);
+    credential_name VARCHAR2(256);
+    namespace VARCHAR2(256);
+    compartment_id  VARCHAR2(256);
   BEGIN
     l_cfg_json := get_agent_config(l_current_user,'OCI_AGENT_CONFIG','OCI_OBJECT_STORAGE');
     l_cfg := JSON_OBJECT_T.parse(l_cfg_json);
@@ -3344,11 +3308,7 @@ AS
       l_params := l_cfg.get_object('config_params'); credential_name := l_params.get_string('CREDENTIAL_NAME');
     END IF;
 
-    DECLARE l_ns DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE_GET_NAMESPACE_RESPONSE_T;
-    BEGIN
-      l_ns := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.GET_NAMESPACE(NULL,region,credential_name);
-      namespace := l_ns.response_body;
-    EXCEPTION WHEN OTHERS THEN NULL; END;
+    resolve_metadata(region => region, namespace => namespace, compartment_id => compartment_id);
 
     l_resp := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.DELETE_OBJECT(
       namespace_name=>namespace, bucket_name=>bucket_name, object_name=>object_name,
@@ -3384,7 +3344,9 @@ AS
     result_json     JSON_OBJECT_T := JSON_OBJECT_T();
     l_current_user  VARCHAR2(128):= SYS_CONTEXT('USERENV','CURRENT_USER');
     l_cfg_json      CLOB; l_cfg JSON_OBJECT_T; l_params JSON_OBJECT_T;
-    credential_name VARCHAR2(256); namespace VARCHAR2(256);
+    credential_name VARCHAR2(256);
+    namespace VARCHAR2(256);
+    compartment_id  VARCHAR2(256);
   BEGIN
     l_cfg_json := get_agent_config(l_current_user,'OCI_AGENT_CONFIG','OCI_OBJECT_STORAGE');
     l_cfg := JSON_OBJECT_T.parse(l_cfg_json);
@@ -3393,11 +3355,7 @@ AS
     END IF;
 
     -- source namespace
-    DECLARE l_ns DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE_GET_NAMESPACE_RESPONSE_T;
-    BEGIN
-      l_ns := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.GET_NAMESPACE(NULL,region,credential_name);
-      namespace := l_ns.response_body;
-    EXCEPTION WHEN OTHERS THEN NULL; END;
+    resolve_metadata(region => region, namespace => namespace, compartment_id => compartment_id);
 
     l_details := DBMS_CLOUD_OCI_OBJECT_STORAGE_COPY_OBJECT_DETAILS_T(
       source_object_name                     => source_object_name,
@@ -3461,6 +3419,7 @@ AS
     l_current_user VARCHAR2(128):= SYS_CONTEXT('USERENV','CURRENT_USER');
     l_cfg_json     CLOB; l_cfg JSON_OBJECT_T; l_params JSON_OBJECT_T;
     credential_name VARCHAR2(256); namespace VARCHAR2(256);
+    compartment_id  VARCHAR2(256);
   BEGIN
     l_cfg_json := get_agent_config(l_current_user,'OCI_AGENT_CONFIG','OCI_OBJECT_STORAGE');
     l_cfg := JSON_OBJECT_T.parse(l_cfg_json);
@@ -3468,11 +3427,7 @@ AS
       l_params := l_cfg.get_object('config_params'); credential_name := l_params.get_string('CREDENTIAL_NAME');
     END IF;
 
-    DECLARE l_ns DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE_GET_NAMESPACE_RESPONSE_T;
-    BEGIN
-      l_ns := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.GET_NAMESPACE(NULL,region,credential_name);
-      namespace := l_ns.response_body;
-    EXCEPTION WHEN OTHERS THEN NULL; END;
+    resolve_metadata(region => region, namespace => namespace, compartment_id => compartment_id);
 
     l_req := DBMS_CLOUD_OCI_OBJECT_STORAGE_CREATE_MULTIPART_UPLOAD_DETAILS_T(
       object=>object_name, content_type=>content_type, content_language=>NULL,
@@ -3523,7 +3478,9 @@ AS
     result_json JSON_OBJECT_T := JSON_OBJECT_T();
     l_current_user VARCHAR2(128):= SYS_CONTEXT('USERENV','CURRENT_USER');
     l_cfg_json CLOB; l_cfg JSON_OBJECT_T; l_params JSON_OBJECT_T;
-    credential_name VARCHAR2(256); namespace VARCHAR2(256);
+    credential_name VARCHAR2(256);
+    namespace VARCHAR2(256);
+    compartment_id  VARCHAR2(256);
   BEGIN
     l_cfg_json := get_agent_config(l_current_user,'OCI_AGENT_CONFIG','OCI_OBJECT_STORAGE');
     l_cfg := JSON_OBJECT_T.parse(l_cfg_json);
@@ -3531,11 +3488,7 @@ AS
       l_params := l_cfg.get_object('config_params'); credential_name := l_params.get_string('CREDENTIAL_NAME');
     END IF;
 
-    DECLARE l_ns DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE_GET_NAMESPACE_RESPONSE_T;
-    BEGIN
-      l_ns := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.GET_NAMESPACE(NULL,region,credential_name);
-      namespace := l_ns.response_body;
-    EXCEPTION WHEN OTHERS THEN NULL; END;
+    resolve_metadata(region => region, namespace => namespace, compartment_id => compartment_id);
 
     FOR i IN 1 .. part_num_arr.COUNT LOOP
       l_parts.EXTEND;
@@ -3577,7 +3530,9 @@ AS
     result_json     JSON_OBJECT_T := JSON_OBJECT_T();
     l_current_user  VARCHAR2(128):= SYS_CONTEXT('USERENV','CURRENT_USER');
     l_cfg_json CLOB; l_cfg JSON_OBJECT_T; l_params JSON_OBJECT_T;
-    credential_name VARCHAR2(256); namespace VARCHAR2(256);
+    credential_name VARCHAR2(256);
+    namespace VARCHAR2(256);
+    compartment_id  VARCHAR2(256);
   BEGIN
     l_cfg_json := get_agent_config(l_current_user,'OCI_AGENT_CONFIG','OCI_OBJECT_STORAGE');
     l_cfg := JSON_OBJECT_T.parse(l_cfg_json);
@@ -3585,11 +3540,7 @@ AS
       l_params := l_cfg.get_object('config_params'); credential_name := l_params.get_string('CREDENTIAL_NAME');
     END IF;
 
-    DECLARE l_ns DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE_GET_NAMESPACE_RESPONSE_T;
-    BEGIN
-      l_ns := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.GET_NAMESPACE(NULL,region,credential_name);
-      namespace := l_ns.response_body;
-    EXCEPTION WHEN OTHERS THEN NULL; END;
+    resolve_metadata(region => region, namespace => namespace, compartment_id => compartment_id);
 
     l_resp := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.ABORT_MULTIPART_UPLOAD(
       namespace_name=>namespace, bucket_name=>bucket_name, object_name=>object_name,
@@ -3623,7 +3574,9 @@ AS
     result_json    JSON_OBJECT_T := JSON_OBJECT_T();
     l_current_user VARCHAR2(128):= SYS_CONTEXT('USERENV','CURRENT_USER');
     l_cfg_json CLOB; l_cfg JSON_OBJECT_T; l_params JSON_OBJECT_T;
-    credential_name VARCHAR2(256); namespace VARCHAR2(256);
+    credential_name VARCHAR2(256);
+    namespace VARCHAR2(256);
+    compartment_id  VARCHAR2(256);
   BEGIN
     IF access_type NOT IN (
       'ObjectRead','ObjectWrite','ObjectReadWrite','AnyObjectRead','AnyObjectWrite','AnyObjectReadWrite'
@@ -3637,11 +3590,7 @@ AS
       l_params := l_cfg.get_object('config_params'); credential_name := l_params.get_string('CREDENTIAL_NAME');
     END IF;
 
-    DECLARE l_ns DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE_GET_NAMESPACE_RESPONSE_T;
-    BEGIN
-      l_ns := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.GET_NAMESPACE(NULL,region,credential_name);
-      namespace := l_ns.response_body;
-    EXCEPTION WHEN OTHERS THEN NULL; END;
+    resolve_metadata(region => region, namespace => namespace, compartment_id => compartment_id);
 
     l_details := DBMS_CLOUD_OCI_OBJECT_STORAGE_CREATE_PREAUTHENTICATED_REQUEST_DETAILS_T(
       name=>name, bucket_listing_action=>listing_action, object_name=>object_name,
@@ -3701,7 +3650,9 @@ AS
     result_json    JSON_OBJECT_T := JSON_OBJECT_T();
     l_current_user VARCHAR2(128):= SYS_CONTEXT('USERENV','CURRENT_USER');
     l_cfg_json CLOB; l_cfg JSON_OBJECT_T; l_params JSON_OBJECT_T;
-    credential_name VARCHAR2(256); namespace VARCHAR2(256);
+    credential_name VARCHAR2(256);
+    namespace VARCHAR2(256);
+    compartment_id  VARCHAR2(256);
   BEGIN
     l_cfg_json := get_agent_config(l_current_user,'OCI_AGENT_CONFIG','OCI_OBJECT_STORAGE');
     l_cfg := JSON_OBJECT_T.parse(l_cfg_json);
@@ -3709,11 +3660,7 @@ AS
       l_params := l_cfg.get_object('config_params'); credential_name := l_params.get_string('CREDENTIAL_NAME');
     END IF;
 
-    DECLARE l_ns DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE_GET_NAMESPACE_RESPONSE_T;
-    BEGIN
-      l_ns := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.GET_NAMESPACE(NULL,region,credential_name);
-      namespace := l_ns.response_body;
-    EXCEPTION WHEN OTHERS THEN NULL; END;
+    resolve_metadata(region => region, namespace => namespace, compartment_id => compartment_id);
 
     l_resp := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.GET_PREAUTHENTICATED_REQUEST(
       namespace_name=>namespace, bucket_name=>bucket_name, par_id=>par_id,
@@ -3768,7 +3715,9 @@ AS
     result_json     JSON_OBJECT_T := JSON_OBJECT_T();
     l_current_user  VARCHAR2(128):= SYS_CONTEXT('USERENV','CURRENT_USER');
     l_cfg_json CLOB; l_cfg JSON_OBJECT_T; l_params JSON_OBJECT_T;
-    credential_name VARCHAR2(256); namespace VARCHAR2(256);
+    credential_name VARCHAR2(256);
+    namespace VARCHAR2(256);
+    compartment_id  VARCHAR2(256);
   BEGIN
     l_cfg_json := get_agent_config(l_current_user,'OCI_AGENT_CONFIG','OCI_OBJECT_STORAGE');
     l_cfg := JSON_OBJECT_T.parse(l_cfg_json);
@@ -3776,11 +3725,7 @@ AS
       l_params := l_cfg.get_object('config_params'); credential_name := l_params.get_string('CREDENTIAL_NAME');
     END IF;
 
-    DECLARE l_ns DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE_GET_NAMESPACE_RESPONSE_T;
-    BEGIN
-      l_ns := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.GET_NAMESPACE(NULL,region,credential_name);
-      namespace := l_ns.response_body;
-    EXCEPTION WHEN OTHERS THEN NULL; END;
+    resolve_metadata(region => region, namespace => namespace, compartment_id => compartment_id);
 
     l_resp := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.DELETE_PREAUTHENTICATED_REQUEST(
       namespace_name=>namespace, bucket_name=>bucket_name, par_id=>par_id,
@@ -3814,7 +3759,9 @@ AS
     result_json    JSON_OBJECT_T := JSON_OBJECT_T();
     l_current_user VARCHAR2(128):= SYS_CONTEXT('USERENV','CURRENT_USER');
     l_cfg_json CLOB; l_cfg JSON_OBJECT_T; l_params JSON_OBJECT_T;
-    credential_name VARCHAR2(256); namespace VARCHAR2(256);
+    credential_name VARCHAR2(256);
+    namespace VARCHAR2(256);
+    compartment_id  VARCHAR2(256);
   BEGIN
     l_cfg_json := get_agent_config(l_current_user,'OCI_AGENT_CONFIG','OCI_OBJECT_STORAGE');
     l_cfg := JSON_OBJECT_T.parse(l_cfg_json);
@@ -3822,11 +3769,7 @@ AS
       l_params := l_cfg.get_object('config_params'); credential_name := l_params.get_string('CREDENTIAL_NAME');
     END IF;
 
-    DECLARE l_ns DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE_GET_NAMESPACE_RESPONSE_T;
-    BEGIN
-      l_ns := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.GET_NAMESPACE(NULL,region,credential_name);
-      namespace := l_ns.response_body;
-    EXCEPTION WHEN OTHERS THEN NULL; END;
+    resolve_metadata(region => region, namespace => namespace, compartment_id => compartment_id);
 
     l_details := DBMS_CLOUD_OCI_OBJECT_STORAGE_CREATE_REPLICATION_POLICY_DETAILS_T(
       name=>policy_name, destination_region_name=>destination_region_name,
@@ -3881,7 +3824,9 @@ AS
     result_json     JSON_OBJECT_T := JSON_OBJECT_T();
     l_current_user  VARCHAR2(128):= SYS_CONTEXT('USERENV','CURRENT_USER');
     l_cfg_json CLOB; l_cfg JSON_OBJECT_T; l_params JSON_OBJECT_T;
-    credential_name VARCHAR2(256); namespace VARCHAR2(256);
+    credential_name VARCHAR2(256);
+    namespace VARCHAR2(256);
+    compartment_id  VARCHAR2(256);
   BEGIN
     l_cfg_json := get_agent_config(l_current_user,'OCI_AGENT_CONFIG','OCI_OBJECT_STORAGE');
     l_cfg := JSON_OBJECT_T.parse(l_cfg_json);
@@ -3889,11 +3834,7 @@ AS
       l_params := l_cfg.get_object('config_params'); credential_name := l_params.get_string('CREDENTIAL_NAME');
     END IF;
 
-    DECLARE l_ns DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE_GET_NAMESPACE_RESPONSE_T;
-    BEGIN
-      l_ns := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.GET_NAMESPACE(NULL,region,credential_name);
-      namespace := l_ns.response_body;
-    EXCEPTION WHEN OTHERS THEN NULL; END;
+    resolve_metadata(region => region, namespace => namespace, compartment_id => compartment_id);
 
     l_resp := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.DELETE_REPLICATION_POLICY(
       namespace_name=>namespace, bucket_name=>bucket_name, replication_id=>replication_id,
@@ -3928,7 +3869,9 @@ AS
     result_json   JSON_OBJECT_T := JSON_OBJECT_T();
     l_current_user VARCHAR2(128):= SYS_CONTEXT('USERENV','CURRENT_USER');
     l_cfg_json CLOB; l_cfg JSON_OBJECT_T; l_params JSON_OBJECT_T;
-    credential_name VARCHAR2(256); namespace VARCHAR2(256);
+    credential_name VARCHAR2(256);
+    namespace VARCHAR2(256);
+    compartment_id  VARCHAR2(256);
   BEGIN
     l_cfg_json := get_agent_config(l_current_user,'OCI_AGENT_CONFIG','OCI_OBJECT_STORAGE');
     l_cfg := JSON_OBJECT_T.parse(l_cfg_json);
@@ -3936,9 +3879,7 @@ AS
       l_params := l_cfg.get_object('config_params'); credential_name := l_params.get_string('CREDENTIAL_NAME');
     END IF;
 
-    DECLARE l_ns DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE_GET_NAMESPACE_RESPONSE_T; BEGIN
-      l_ns := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.GET_NAMESPACE(NULL,region,credential_name);
-      namespace := l_ns.response_body; EXCEPTION WHEN OTHERS THEN NULL; END;
+    resolve_metadata(region => region, namespace => namespace, compartment_id => compartment_id);
 
     l_duration := DBMS_CLOUD_OCI_OBJECT_STORAGE_DURATION_T(duration_amount, time_unit);
     l_details  := DBMS_CLOUD_OCI_OBJECT_STORAGE_CREATE_RETENTION_RULE_DETAILS_T(
@@ -3993,16 +3934,16 @@ AS
     result_json     JSON_OBJECT_T := JSON_OBJECT_T();
     l_current_user  VARCHAR2(128):= SYS_CONTEXT('USERENV','CURRENT_USER');
     l_cfg_json CLOB; l_cfg JSON_OBJECT_T; l_params JSON_OBJECT_T;
-    credential_name VARCHAR2(256); namespace VARCHAR2(256);
+    credential_name VARCHAR2(256);
+    namespace VARCHAR2(256);
+    compartment_id  VARCHAR2(256);
   BEGIN
     l_cfg_json := get_agent_config(l_current_user,'OCI_AGENT_CONFIG','OCI_OBJECT_STORAGE');
     l_cfg := JSON_OBJECT_T.parse(l_cfg_json);
     IF l_cfg.get_string('status')='success' THEN
       l_params := l_cfg.get_object('config_params'); credential_name := l_params.get_string('CREDENTIAL_NAME');
     END IF;
-    DECLARE l_ns DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE_GET_NAMESPACE_RESPONSE_T; BEGIN
-      l_ns := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.GET_NAMESPACE(NULL,region,credential_name);
-      namespace := l_ns.response_body; EXCEPTION WHEN OTHERS THEN NULL; END;
+    resolve_metadata(region => region, namespace => namespace, compartment_id => compartment_id);
 
     l_resp := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.DELETE_RETENTION_RULE(
       namespace_name=>namespace, bucket_name=>bucket_name, retention_rule_id=>retention_rule_id,
@@ -4032,16 +3973,16 @@ AS
     result_json     JSON_OBJECT_T := JSON_OBJECT_T();
     l_current_user  VARCHAR2(128):= SYS_CONTEXT('USERENV','CURRENT_USER');
     l_cfg_json CLOB; l_cfg JSON_OBJECT_T; l_params JSON_OBJECT_T;
-    credential_name VARCHAR2(256); namespace VARCHAR2(256);
+    credential_name VARCHAR2(256);
+    namespace VARCHAR2(256);
+    compartment_id  VARCHAR2(256);
   BEGIN
     l_cfg_json := get_agent_config(l_current_user,'OCI_AGENT_CONFIG','OCI_OBJECT_STORAGE');
     l_cfg := JSON_OBJECT_T.parse(l_cfg_json);
     IF l_cfg.get_string('status')='success' THEN
       l_params := l_cfg.get_object('config_params'); credential_name := l_params.get_string('CREDENTIAL_NAME');
     END IF;
-    DECLARE l_ns DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE_GET_NAMESPACE_RESPONSE_T; BEGIN
-      l_ns := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.GET_NAMESPACE(NULL,region,credential_name);
-      namespace := l_ns.response_body; EXCEPTION WHEN OTHERS THEN NULL; END;
+    resolve_metadata(region => region, namespace => namespace, compartment_id => compartment_id);
 
     l_resp := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.DELETE_OBJECT_LIFECYCLE_POLICY(
       namespace_name=>namespace, bucket_name=>bucket_name,
@@ -4096,51 +4037,7 @@ AS
     RETURN result_json.to_clob();
   END cancel_work_request;
 
-  ----------------------------------------------------------------------
-  -- get_namespace: Retrieve namespace metadata
-  ----------------------------------------------------------------------
-  FUNCTION get_namespace(
-    compartment_name IN VARCHAR2,
-    region           IN VARCHAR2
-  ) RETURN CLOB
-  AS
-    l_resp          DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE_GET_NAMESPACE_RESPONSE_T;
-    result_json     JSON_OBJECT_T := JSON_OBJECT_T();
-    l_current_user  VARCHAR2(128):= SYS_CONTEXT('USERENV','CURRENT_USER');
-    l_cfg_json      CLOB; l_cfg JSON_OBJECT_T; l_params JSON_OBJECT_T;
-    credential_name VARCHAR2(256); compartment_id VARCHAR2(256);
-  BEGIN
-    l_cfg_json := get_agent_config(l_current_user,'OCI_AGENT_CONFIG','OCI_OBJECT_STORAGE');
-    l_cfg := JSON_OBJECT_T.parse(l_cfg_json);
-    IF l_cfg.get_string('status')='success' THEN
-      l_params      := l_cfg.get_object('config_params');
-      credential_name := l_params.get_string('CREDENTIAL_NAME');
-      compartment_id  := l_params.get_string('COMPARTMENT_OCID');
-    END IF;
-
-    l_resp := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.GET_NAMESPACE(
-      opc_client_request_id => NULL,
-      compartment_id        => compartment_id,
-      region                => region,
-      endpoint              => NULL,
-      credential_name       => credential_name
-    );
-
-    result_json.put('namespace', TRIM(BOTH CHR(34) FROM l_resp.response_body));
-    result_json.put('region',    region);
-    result_json.put('compartment_id', compartment_id);
-    result_json.put('status_code', l_resp.status_code);
-    IF l_resp.headers IS NOT NULL AND l_resp.headers.has('opc-request-id') THEN
-      result_json.put('opc_request_id', l_resp.headers.get_string('opc-request-id'));
-    END IF;
-
-    RETURN result_json.to_clob();
-  EXCEPTION WHEN OTHERS THEN
-    result_json := JSON_OBJECT_T(); result_json.put('status','error'); result_json.put('message', SQLERRM);
-    result_json.put('region', region); RETURN result_json.to_clob();
-  END get_namespace;
-
-END &&INSTALL_SCHEMA.oci_object_storage_agents;
+END oci_object_storage_agents;
 /
 
 -------------------------------------------------------------------------------
@@ -4749,7 +4646,7 @@ BEGIN
   DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
     tool_name => 'GET_NAMESPACE_TOOL',
     attributes => '{
-      "instruction": "Retrieve the Object Storage namespace for the tenancy. Provide compartment name (informational) and region. Returns JSON with namespace and status_code.",
+      "instruction": "Retrieve the Object Storage namespace for the tenancy. Provide region. Returns JSON with namespace and status_code.",
       "function": "&&INSTALL_SCHEMA.oci_object_storage_agents.get_namespace"
     }',
     description => 'Tool to retrieve Object Storage namespace'
@@ -4766,4 +4663,4 @@ BEGIN
 END;
 /
 
-
+alter session set current_schema = ADMIN;

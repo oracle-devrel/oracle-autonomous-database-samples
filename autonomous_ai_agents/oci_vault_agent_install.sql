@@ -29,11 +29,11 @@ SET SERVEROUTPUT ON
 SET VERIFY OFF
 
 -- First argument: schema
-DEFINE INSTALL_SCHEMA = '<SCHEMA_NAME>'
+DEFINE INSTALL_SCHEMA = 'ADB_APP_STORE_USER'
 
 -- Second argument: JSON config (optional)
 -- If not passed, default to empty string
-DEFINE INSTALL_CONFIG_JSON = '{"use_resource_principal": <true/false>, "credential_name": "<cred_name>", "compartment_name": "<comp_name>", "compartment_ocid": "<comp_ocid>"}'
+DEFINE INSTALL_CONFIG_JSON = '{"use_resource_principal": true, "credential_name": "<cred_name>", "compartment_name": "<comp_name>", "compartment_ocid": "<comp_ocid>"}'
 
 -------------------------------------------------------------------------------
 -- Initializes the OCI Vault AI Agent. This procedure:
@@ -58,6 +58,8 @@ IS
 
   TYPE priv_list_t IS VARRAY(100) OF VARCHAR2(4000);
   l_priv_list CONSTANT priv_list_t := priv_list_t(
+    'DBMS_CLOUD_ADMIN',
+    'DBMS_CLOUD_OCI_VT_VAULTS',
     'DBMS_CLOUD_OCI_VT_VAULTS_CREATE_SECRET_RESPONSE_T',
     'DBMS_CLOUD_OCI_VAULT_SECRET_T',
     'DBMS_CLOUD_OCI_VAULT_CREATE_SECRET_DETAILS_T',
@@ -87,6 +89,7 @@ IS
   ----------------------------------------------------------------------------
   PROCEDURE execute_grants(p_schema IN VARCHAR2, p_objects IN priv_list_t) IS
   BEGIN
+    EXECUTE IMMEDIATE 'GRANT SELECT ON SYS.V_$PDBS TO ' || p_schema;
     FOR i IN 1 .. p_objects.COUNT LOOP
       BEGIN
         EXECUTE IMMEDIATE 'GRANT EXECUTE ON ' || p_objects(i) || ' TO ' || p_schema;
@@ -295,11 +298,12 @@ END;
 /
 
 
+alter session set current_schema = &&INSTALL_SCHEMA;
 
 ------------------------------------------------------------------------
 -- Package specification
 ------------------------------------------------------------------------
-CREATE OR REPLACE PACKAGE &&INSTALL_SCHEMA.oci_vault_agents
+CREATE OR REPLACE PACKAGE oci_vault_agents
 AS
   /*
     Package: oci_vault_agents
@@ -379,13 +383,13 @@ AS
       region            IN VARCHAR2
   ) RETURN CLOB;
 
-END &&INSTALL_SCHEMA.oci_vault_agents;
+END oci_vault_agents;
 /
 
 ------------------------------------------------------------------------
 -- Package body
 ------------------------------------------------------------------------
-CREATE OR REPLACE PACKAGE BODY &&INSTALL_SCHEMA.oci_vault_agents
+CREATE OR REPLACE PACKAGE BODY oci_vault_agents
 AS
 
   -- Helper function to get configuration parameters
@@ -435,6 +439,257 @@ AS
           RETURN l_result_json.to_clob();
   END get_agent_config;
 
+    -- Helper: gets the list of compartments
+  FUNCTION list_compartments(credential_name VARCHAR2)
+  RETURN CLOB
+  IS
+      l_response        CLOB;
+      l_endpoint        VARCHAR2(1000);
+      l_result_json     JSON_OBJECT_T := JSON_OBJECT_T();
+      l_compartments    JSON_ARRAY_T := JSON_ARRAY_T();
+      l_comp_data       JSON_ARRAY_T;
+      l_comp_obj        JSON_OBJECT_T;
+      l_name            VARCHAR2(200);
+      l_ocid            VARCHAR2(200);
+      l_description     VARCHAR2(500);
+      l_lifecycle_state VARCHAR2(50);
+      l_time_created    VARCHAR2(100);
+      tenancy_id        VARCHAR2(128);
+      l_region          VARCHAR2(128);
+
+  BEGIN
+
+      SELECT
+        JSON_VALUE(cloud_identity, '$.TENANT_OCID') AS tenant_ocid,
+        JSON_VALUE(cloud_identity, '$.REGION') AS region
+      into tenancy_id,l_region
+      FROM v$pdbs;
+
+      -- Construct endpoint to list compartments in tenancy
+      l_endpoint := 'https://identity.'||l_region||'.oci.oraclecloud.com/20160918/compartments?compartmentId='
+                    || tenancy_id ;
+
+      BEGIN
+          -- Call OCI REST API
+          l_response := DBMS_CLOUD.get_response_text(
+              DBMS_CLOUD.send_request(
+                  credential_name => credential_name,
+                  uri             => l_endpoint,
+                  method          => DBMS_CLOUD.METHOD_GET
+              )
+          );
+
+          -- Parse response JSON as array
+          l_comp_data := JSON_ARRAY_T.parse(l_response);
+
+          IF l_comp_data.get_size() > 0 THEN
+              FOR i IN 0 .. l_comp_data.get_size() - 1 LOOP
+                  l_comp_obj := JSON_OBJECT_T(l_comp_data.get(i));
+                  l_name := l_comp_obj.get_string('name');
+                  l_ocid := l_comp_obj.get_string('id');
+                  l_description := l_comp_obj.get_string('description');
+                  l_lifecycle_state := l_comp_obj.get_string('lifecycleState');
+                  l_time_created := l_comp_obj.get_string('timeCreated');
+
+              IF l_name in ('COMP_STABLE','COMP_PUBLIC') then
+                  
+                  IF l_name = 'COMP_STABLE' THEN 
+                  l_name := 'COMP_AI_AGENT';
+                  ELSE
+                  l_name := 'COMP_DB';
+                  END IF;
+                  
+                  l_compartments.append(
+                      JSON_OBJECT(
+                          'name' VALUE l_name,
+                          'id' VALUE l_ocid,
+                          'description' VALUE l_description,
+                          'lifecycle_state' VALUE l_lifecycle_state,
+                          'time_created' VALUE l_time_created
+                      )
+                  );
+              END IF;
+
+              END LOOP;
+
+              l_result_json.put('status', 'success');
+              l_result_json.put('message', 'Successfully retrieved compartments');
+              l_result_json.put('total_compartments', l_compartments.get_size());
+              l_result_json.put('compartments', l_compartments);
+          ELSE
+              l_result_json.put('status', 'error');
+              l_result_json.put('message', 'No compartments found in response');
+          END IF;
+
+      EXCEPTION
+          WHEN OTHERS THEN
+              l_result_json.put('status', 'error');
+              l_result_json.put('message', 'Failed to retrieve compartments: ' || SQLERRM);
+              l_result_json.put('endpoint_used', l_endpoint);
+      END;
+
+      RETURN l_result_json.to_clob();
+  END list_compartments;
+
+  -- Helper: gets the compartment ocid with the given compatment name
+  FUNCTION get_compartment_ocid_by_name(
+    compartment_name IN VARCHAR2
+  ) RETURN CLOB
+  IS
+    l_comp_json_clob    CLOB;
+    l_result_json       JSON_OBJECT_T := JSON_OBJECT_T();
+    l_compartments      JSON_ARRAY_T;
+    l_compartment_str   VARCHAR2(32767);
+    l_comp_obj          JSON_OBJECT_T;
+    l_ocid              VARCHAR2(200);
+    found               BOOLEAN := FALSE;
+    l_compartment_name  VARCHAR2(256);
+    credential_name     VARCHAR2(256);
+    l_current_user      VARCHAR2(128):= SYS_CONTEXT('USERENV','CURRENT_USER');
+    l_cfg_json          CLOB;
+    l_cfg               JSON_OBJECT_T;
+    l_params            JSON_OBJECT_T;
+  BEGIN
+    l_cfg_json := get_agent_config(l_current_user,'OCI_AGENT_CONFIG','OCI_OBJECT_STORAGE');
+    l_cfg := JSON_OBJECT_T.parse(l_cfg_json);
+    IF l_cfg.get_string('status')='success' THEN
+      l_params      := l_cfg.get_object('config_params');
+      credential_name := l_params.get_string('CREDENTIAL_NAME');
+    END IF;
+
+    -- Call existing list_compartments function
+    l_comp_json_clob := list_compartments(credential_name);
+
+    -- Parse returned JSON object
+    l_result_json := JSON_OBJECT_T.parse(l_comp_json_clob);
+
+    IF l_result_json.get('status').to_string() = '"success"' THEN
+        -- Get compartments array (array of JSON strings)
+        l_compartments := l_result_json.get_array('compartments');
+
+        FOR i IN 0 .. l_compartments.get_size() - 1 LOOP
+            -- Each element is a JSON string, parse it to JSON object
+            l_compartment_str := l_compartments.get_string(i);
+            l_comp_obj := JSON_OBJECT_T.parse(l_compartment_str);
+
+            IF l_comp_obj.get_string('name') = compartment_name THEN
+                l_ocid := l_comp_obj.get_string('id');
+                found := TRUE;
+                EXIT;
+            END IF;
+        END LOOP;
+
+        IF found THEN
+            l_result_json := JSON_OBJECT_T();
+            l_result_json.put('status', 'success');
+            l_result_json.put('compartment_name', compartment_name);
+            l_result_json.put('compartment_ocid', l_ocid);
+        ELSE
+            l_result_json := JSON_OBJECT_T();
+            l_result_json.put('status', 'error');
+            l_result_json.put('message', 'Compartment "' || compartment_name || '" not found');
+        END IF;
+
+    ELSE
+        -- Forward error from list_compartments
+        RETURN l_comp_json_clob;
+    END IF;
+
+    RETURN l_result_json.to_clob();
+
+  EXCEPTION
+    WHEN OTHERS THEN
+        l_result_json := JSON_OBJECT_T();
+        l_result_json.put('status', 'error');
+        l_result_json.put('message', 'Unexpected error: ' || SQLERRM);
+        RETURN l_result_json.to_clob();
+  END get_compartment_ocid_by_name;
+
+  ----------------------------------------------------------------------
+  -- get_namespace: Retrieve namespace metadata
+  ----------------------------------------------------------------------
+  FUNCTION get_namespace(
+    region           IN VARCHAR2
+  ) RETURN CLOB
+  AS
+    l_resp           DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE_GET_NAMESPACE_RESPONSE_T;
+    result_json      JSON_OBJECT_T := JSON_OBJECT_T();
+    l_current_user   VARCHAR2(128):= SYS_CONTEXT('USERENV','CURRENT_USER');
+    l_cfg_json       CLOB;
+    l_cfg            JSON_OBJECT_T;
+    l_params         JSON_OBJECT_T;
+    credential_name  VARCHAR2(256);
+    compartment_name VARCHAR2(256);
+    compartment_id   VARCHAR2(256);
+    l_json           CLOB;
+    l_obj            JSON_OBJECT_T;
+  BEGIN
+    l_cfg_json := get_agent_config(l_current_user,'OCI_AGENT_CONFIG','OCI_OBJECT_STORAGE');
+    l_cfg := JSON_OBJECT_T.parse(l_cfg_json);
+    IF l_cfg.get_string('status')='success' THEN
+      l_params         := l_cfg.get_object('config_params');
+      credential_name  := l_params.get_string('CREDENTIAL_NAME');
+      compartment_name := l_params.get_string('COMPARTMENT_NAME');
+      compartment_id   := l_params.get_string('COMPARTMENT_OCID');
+    END IF;
+
+    IF compartment_id IS NULL THEN
+      l_json := get_compartment_ocid_by_name(compartment_name => compartment_name);
+      l_obj := JSON_OBJECT_T.parse(l_json);
+      IF l_obj.has('compartment_ocid') THEN
+        compartment_id := l_obj.get_string('compartment_ocid');
+      END IF;
+    END IF;
+
+    l_resp := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.GET_NAMESPACE(
+      opc_client_request_id => NULL,
+      compartment_id        => compartment_id,
+      region                => region,
+      endpoint              => NULL,
+      credential_name       => credential_name
+    );
+
+    result_json.put('namespace', TRIM(BOTH CHR(34) FROM l_resp.response_body));
+    result_json.put('region',    region);
+    result_json.put('compartment_id', compartment_id);
+    result_json.put('status_code', l_resp.status_code);
+    IF l_resp.headers IS NOT NULL AND l_resp.headers.has('opc-request-id') THEN
+      result_json.put('opc_request_id', l_resp.headers.get_string('opc-request-id'));
+    END IF;
+
+    RETURN result_json.to_clob();
+  EXCEPTION WHEN OTHERS THEN
+    result_json := JSON_OBJECT_T(); result_json.put('status','error'); result_json.put('message', SQLERRM);
+    result_json.put('region', region); RETURN result_json.to_clob();
+  END get_namespace;
+
+  -- Helper: resolve metadata (namespace and compartment_id) using local get_namespace
+  PROCEDURE resolve_metadata(
+    region          IN  VARCHAR2,
+    namespace       OUT VARCHAR2,
+    compartment_id  OUT VARCHAR2
+  )
+  IS
+    l_json     CLOB;
+    l_obj      JSON_OBJECT_T;
+    l_ns       VARCHAR2(256);
+    l_com_id   VARCHAR2(256);
+  BEGIN
+    l_json := get_namespace(region => region);
+    l_obj := JSON_OBJECT_T.parse(l_json);
+    IF l_obj.has('namespace') THEN
+      l_ns := l_obj.get_string('namespace');
+    END IF;
+    IF l_obj.has('compartment_id') THEN
+      l_com_id := l_obj.get_string('compartment_id');
+    END IF;
+    namespace := l_ns;
+    compartment_id := l_com_id;
+  EXCEPTION
+    WHEN OTHERS THEN
+    NULL;
+  END resolve_metadata;
+
   ----------------------------------------------------------------------
   -- create_secret
   ----------------------------------------------------------------------
@@ -452,7 +707,6 @@ AS
       l_content       DBMS_CLOUD_OCI_VAULT_BASE64_SECRET_CONTENT_DETAILS_T;
       l_encoded       VARCHAR2(32767);
       l_output        CLOB;
-      compartment_id  VARCHAR2(256);
       credential_name VARCHAR2(256);
       l_json          JSON_OBJECT_T := JSON_OBJECT_T();
       l_secret_obj    JSON_OBJECT_T := JSON_OBJECT_T();
@@ -460,7 +714,8 @@ AS
       l_config_json  CLOB;
       l_config_obj   JSON_OBJECT_T;
       l_config_params JSON_OBJECT_T;
-      
+      namespace             VARCHAR2(256);
+      compartment_id        VARCHAR2(256);
   BEGIN
       -- Resolve compartment OCID (uses persisted config or provided name)
       l_config_json := get_agent_config(l_current_user, 'OCI_AGENT_CONFIG', 'OCI_VAULT');
@@ -468,12 +723,12 @@ AS
       
       IF l_config_obj.get_string('status') = 'success' THEN
           l_config_params := l_config_obj.get_object('config_params');
-
-          compartment_id  := l_config_params.get_string('COMPARTMENT_OCID');
           credential_name := l_config_params.get_string('CREDENTIAL_NAME');
       ELSE
           DBMS_OUTPUT.PUT_LINE('Error: ' || l_config_obj.get_string('message'));
       END IF;
+
+      resolve_metadata(region => region, namespace => namespace, compartment_id => compartment_id);
 
       -- Encode plain text as Base64
       l_encoded := UTL_RAW.cast_to_varchar2(
@@ -658,6 +913,7 @@ AS
       l_cfg           JSON_OBJECT_T;
       l_params        JSON_OBJECT_T;
       credential_name VARCHAR2(256);
+      namespace       VARCHAR2(256);
       compartment_id  VARCHAR2(256);
   BEGIN
       l_config_json := get_agent_config(l_current_user, 'OCI_AGENT_CONFIG', 'OCI_VAULT');
@@ -665,8 +921,9 @@ AS
       IF l_cfg.get_string('status') = 'success' THEN
           l_params := l_cfg.get_object('config_params');
           credential_name := l_params.get_string('CREDENTIAL_NAME');
-          compartment_id  := l_params.get_string('COMPARTMENT_OCID');
       END IF;
+
+      resolve_metadata(region => region, namespace => namespace, compartment_id => compartment_id);
 
       l_response := DBMS_CLOUD_OCI_VT_VAULTS.LIST_SECRETS(
           compartment_id   => compartment_id,
@@ -1247,20 +1504,22 @@ AS
       l_details      DBMS_CLOUD_OCI_VAULT_CHANGE_SECRET_COMPARTMENT_DETAILS_T;
       l_output       CLOB;
       l_json         JSON_OBJECT_T := JSON_OBJECT_T();
-      compartment_id VARCHAR2(256);
       l_current_user  VARCHAR2(128):= SYS_CONTEXT('USERENV', 'CURRENT_USER');
       l_config_json   CLOB;
       l_cfg           JSON_OBJECT_T;
       l_params        JSON_OBJECT_T;
       credential_name VARCHAR2(256);
+      namespace       VARCHAR2(256);
+      compartment_id  VARCHAR2(256);
   BEGIN
       l_config_json := get_agent_config(l_current_user, 'OCI_AGENT_CONFIG', 'OCI_VAULT');
       l_cfg := JSON_OBJECT_T.parse(l_config_json);
       IF l_cfg.get_string('status') = 'success' THEN
           l_params := l_cfg.get_object('config_params');
           credential_name := l_params.get_string('CREDENTIAL_NAME');
-          compartment_id  := l_params.get_string('COMPARTMENT_OCID');
       END IF;
+     
+     resolve_metadata(region => region, namespace => namespace, compartment_id => compartment_id);
 
       l_details := DBMS_CLOUD_OCI_VAULT_CHANGE_SECRET_COMPARTMENT_DETAILS_T(
                      compartment_id => compartment_id
@@ -1291,7 +1550,7 @@ AS
           RETURN l_json.to_clob;
   END change_secret_compartment;
 
-END &&INSTALL_SCHEMA.oci_vault_agents;
+END oci_vault_agents;
 /
 
 
@@ -1302,20 +1561,15 @@ END &&INSTALL_SCHEMA.oci_vault_agents;
 -------------------------------------------------------------------------------
 CREATE OR REPLACE PROCEDURE initilize_vault_tools
 IS
-    PROCEDURE drop_tool_if_exists (
-        tool_name         IN VARCHAR2
-    )
-    IS
-        l_tool_count NUMBER;
+    PROCEDURE drop_tool_if_exists (tool_name IN VARCHAR2) IS
+      l_tool_count NUMBER;
+      l_sql        CLOB;
     BEGIN
-        SELECT COUNT(*)
-          INTO l_tool_count
-          FROM USER_AI_AGENT_TOOLS
-         WHERE TOOL_NAME = tool_name;
-
-        IF l_tool_count > 0 THEN
-            DBMS_CLOUD_AI_AGENT.DROP_TOOL(tool_name);
-        END IF;
+      l_sql := 'SELECT COUNT(*) FROM USER_AI_AGENT_TOOLS WHERE TOOL_NAME = :1';
+      execute immediate l_sql into l_tool_count using tool_name;
+      IF l_tool_count > 0 THEN
+        DBMS_CLOUD_AI_AGENT.DROP_TOOL(tool_name);
+      END IF;
     END drop_tool_if_exists;
 BEGIN
     ------------------------------------------------------------------------
@@ -1486,3 +1740,6 @@ BEGIN
     initilize_vault_tools;
 END;
 /
+
+alter session set current_schema = ADMIN;
+
