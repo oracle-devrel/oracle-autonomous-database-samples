@@ -8,7 +8,7 @@
 --   to automate OCI Object Storage operations via Select AI Agent (Oracle AI Database).
 --
 -- Script Structure
---   1) Initialization: grants, configuration setup, and resource-principal handling.
+--   1) Initialization: grants, configuration setup.
 --   2) Package deployment: &&INSTALL_SCHEMA.oci_object_storage_agents (spec and body).
 --   3) AI tool setup: creation of all Object Storage agent tools.
 --
@@ -19,27 +19,25 @@
 --
 -- Notes:
 --   - Optional CONFIG_JSON keys:
---       * use_resource_principal (true/false)   -- default: true when omitted
---       * credential_name (string)              -- used if not using resource principal
---       * compartment_ocid (string)             -- optional default compartment OCID
---   - You may also store or update config in OCI_AGENT_CONFIG after install.
+--       * credential_name (string)              
+--       * compartment_ocid (string)
+--   - You may also update config in OCI_AGENT_CONFIG after install.
 --
 SET SERVEROUTPUT ON
 SET VERIFY OFF
 
--- First argument: schema
-DEFINE INSTALL_SCHEMA = '<SCHEMA_NAME>'
+-- First argument: Schema Name (Required)
+DEFINE INSTALL_SCHEMA = '<schema_name>'
 
 -- Second argument: JSON config (optional)
--- If not passed, default to empty string
-DEFINE INSTALL_CONFIG_JSON = '{"use_resource_principal": <true/false>, "credential_name": "<cred_name>", "compartment_name": "<comp_name>", "compartment_ocid": "<comp_ocid>"}'
+-- DEFINE INSTALL_CONFIG_JSON = q'({"credential_name": "MY_CRED", "compartment_name": "MY_COMP"})'
+DEFINE INSTALL_CONFIG_JSON = NULL
 
 -------------------------------------------------------------------------------
 -- Initializes the OCI Object Storage AI Agent. This procedure:
 --   • Grants all required DBMS_CLOUD_OCI Object Storage type privileges.
 --   • Creates the OCI_AGENT_CONFIG table.
---   • Parses the JSON config and persists credential, compartment, and RP flags.
---   • Enables resource principal if configured.
+--   • Parses the JSON config and persists credential, compartment.
 -- Ensures the Object Storage agent is fully ready for tool execution.
 -------------------------------------------------------------------------------
 CREATE OR REPLACE PROCEDURE initilize_object_storage_agent(
@@ -57,7 +55,9 @@ IS
 
   TYPE priv_list_t IS VARRAY(300) OF VARCHAR2(4000);
   l_priv_list CONSTANT priv_list_t := priv_list_t(
-    -- Common JSON/Cloud types for Object Storage (expand as needed; warns on non-existent)
+    'DBMS_CLOUD',
+    'DBMS_CLOUD_ADMIN',
+    'DBMS_CLOUD_AI_AGENT',
     'DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE_LIST_OBJECTS_RESPONSE_T',
     'DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE_LIST_OBJECT_VERSIONS_RESPONSE_T',
     'DBMS_CLOUD_OCI_OBJECT_STORAGE_LIST_OBJECTS_T',
@@ -158,6 +158,7 @@ IS
   ----------------------------------------------------------------------------
   PROCEDURE execute_grants(p_schema IN VARCHAR2, p_objects IN priv_list_t) IS
   BEGIN
+    EXECUTE IMMEDIATE 'GRANT SELECT ON SYS.V_$PDBS TO ' || p_schema;
     FOR i IN 1 .. p_objects.COUNT LOOP
       BEGIN
         EXECUTE IMMEDIATE 'GRANT EXECUTE ON ' || p_objects(i) || ' TO ' || p_schema;
@@ -269,10 +270,6 @@ IS
       merge_config_key(p_schema, 'CREDENTIAL_NAME', p_credential_name, c_obs_agent);
     END IF;
 
-    IF p_compartment_ocid IS NOT NULL THEN
-      merge_config_key(p_schema, 'COMPARTMENT_OCID', p_compartment_ocid, c_obs_agent);
-    END IF;
-
     IF p_compartment_name IS NOT NULL THEN
       merge_config_key(p_schema, 'COMPARTMENT_NAME', p_compartment_name, c_obs_agent);
     END IF;
@@ -302,7 +299,16 @@ BEGIN
   -- Grants
   execute_grants(l_schema_name, l_priv_list);
 
-  -- Config table (idempotent) in target schema
+  -- Parse config JSON
+  get_config(
+    p_config_json       => p_config_json,
+    o_use_rp            => l_use_rp,
+    o_credential_name   => l_credential_name,
+    o_compartment_name  => l_compartment_name,
+    o_compartment_ocid  => l_compartment_ocid
+  );
+
+    -- Config table (idempotent) in target schema
   BEGIN
     EXECUTE IMMEDIATE
       'CREATE TABLE ' || l_schema_name || '.OCI_AGENT_CONFIG (
@@ -321,15 +327,6 @@ BEGIN
         RAISE;
       END IF;
   END;
-
-  -- Parse config JSON
-  get_config(
-    p_config_json       => p_config_json,
-    o_use_rp            => l_use_rp,
-    o_credential_name   => l_credential_name,
-    o_compartment_name  => l_compartment_name,
-    o_compartment_ocid  => l_compartment_ocid
-  );
 
   -- Persist config (into <schema>.OCI_AGENT_CONFIG)
   apply_config(
@@ -357,16 +354,16 @@ END initilize_object_storage_agent;
 BEGIN
   initilize_object_storage_agent(
     p_install_schema_name => '&&INSTALL_SCHEMA',
-    p_config_json         => '&&INSTALL_CONFIG_JSON'
+    p_config_json         => &&INSTALL_CONFIG_JSON
   );
 END;
 /
 
-
+alter session set current_schema = &&INSTALL_SCHEMA;
 ------------------------------------------------------------------------
 -- Package specification
 ------------------------------------------------------------------------
-CREATE OR REPLACE PACKAGE &&INSTALL_SCHEMA.oci_object_storage_agents
+CREATE OR REPLACE PACKAGE oci_object_storage_agents
 AS
   /*
     Package: oci_object_storage_agents
@@ -374,20 +371,17 @@ AS
   */
 
   FUNCTION list_objects(
-    compartment_name  IN VARCHAR2,
     region            IN VARCHAR2,
     bucket_name       IN VARCHAR2
   ) RETURN CLOB;
 
   FUNCTION get_object(
-    compartment_name  IN VARCHAR2,
     region            IN VARCHAR2,
     bucket_name       IN VARCHAR2,
     object_name       IN VARCHAR2
   ) RETURN CLOB;
 
   FUNCTION list_buckets(
-    compartment_name  IN VARCHAR2,
     region            IN VARCHAR2
   ) RETURN CLOB;
 
@@ -400,19 +394,16 @@ AS
   ) RETURN CLOB;
 
   FUNCTION get_bucket(
-    compartment_name  IN VARCHAR2,
     bucket_name       IN VARCHAR2,
     region            IN VARCHAR2
   ) RETURN CLOB;
 
   FUNCTION head_bucket(
-    compartment_name  IN VARCHAR2,
     bucket_name       IN VARCHAR2,
     region            IN VARCHAR2
   ) RETURN CLOB;
 
   FUNCTION head_object(
-    compartment_name  IN VARCHAR2,
     region            IN VARCHAR2,
     bucket_name       IN VARCHAR2,
     object_name       IN VARCHAR2
@@ -528,7 +519,6 @@ AS
   ) RETURN CLOB;
 
   FUNCTION update_namespace_metadata(
-    compartment_name IN VARCHAR2,
     region           IN VARCHAR2
   ) RETURN CLOB;
 
@@ -542,7 +532,6 @@ AS
   ) RETURN CLOB;
 
   FUNCTION list_work_requests(
-    compartment_name IN VARCHAR2,
     region           IN VARCHAR2
   ) RETURN CLOB;
 
@@ -562,19 +551,16 @@ AS
   ) RETURN CLOB;
 
   FUNCTION create_bucket(
-    compartment_name  IN VARCHAR2,
     bucket_name       IN VARCHAR2,
     region            IN VARCHAR2
   ) RETURN CLOB;
 
   FUNCTION delete_bucket(
-    compartment_name  IN VARCHAR2,
     bucket_name       IN VARCHAR2,
     region            IN VARCHAR2
   ) RETURN CLOB;
 
   FUNCTION delete_object(
-    compartment_name  IN VARCHAR2,
     region            IN VARCHAR2,
     bucket_name       IN VARCHAR2,
     object_name       IN VARCHAR2
@@ -673,18 +659,16 @@ AS
   ) RETURN CLOB;
 
   FUNCTION get_namespace(
-    compartment_name IN VARCHAR2,
     region           IN VARCHAR2
   ) RETURN CLOB;
 
 
-
-END &&INSTALL_SCHEMA.oci_object_storage_agents;
+END oci_object_storage_agents;
 /
 ------------------------------------------------------------------------
 -- Package body
 ------------------------------------------------------------------------
-CREATE OR REPLACE PACKAGE BODY &&INSTALL_SCHEMA.oci_object_storage_agents
+CREATE OR REPLACE PACKAGE BODY oci_object_storage_agents
 AS
   -- Helper function to get configuration parameters
   FUNCTION get_agent_config(
@@ -724,11 +708,258 @@ AS
           RETURN l_result_json.to_clob();
   END get_agent_config;
 
+  -- Helper: gets the list of compartments
+  FUNCTION list_compartments(credential_name VARCHAR2)
+  RETURN CLOB
+  IS
+      l_response        CLOB;
+      l_endpoint        VARCHAR2(1000);
+      l_result_json     JSON_OBJECT_T := JSON_OBJECT_T();
+      l_compartments    JSON_ARRAY_T := JSON_ARRAY_T();
+      l_comp_data       JSON_ARRAY_T;
+      l_comp_obj        JSON_OBJECT_T;
+      l_name            VARCHAR2(200);
+      l_ocid            VARCHAR2(200);
+      l_description     VARCHAR2(500);
+      l_lifecycle_state VARCHAR2(50);
+      l_time_created    VARCHAR2(100);
+      tenancy_id        VARCHAR2(128);
+      l_region          VARCHAR2(128);
+
+  BEGIN
+
+      SELECT
+        JSON_VALUE(cloud_identity, '$.TENANT_OCID') AS tenant_ocid,
+        JSON_VALUE(cloud_identity, '$.REGION') AS region
+      into tenancy_id,l_region
+      FROM v$pdbs;
+
+      -- Construct endpoint to list compartments in tenancy
+      l_endpoint := 'https://identity.'||l_region||'.oci.oraclecloud.com/20160918/compartments?compartmentId='
+                    || tenancy_id ;
+
+      BEGIN
+          -- Call OCI REST API
+          l_response := DBMS_CLOUD.get_response_text(
+              DBMS_CLOUD.send_request(
+                  credential_name => credential_name,
+                  uri             => l_endpoint,
+                  method          => DBMS_CLOUD.METHOD_GET
+              )
+          );
+
+          -- Parse response JSON as array
+          l_comp_data := JSON_ARRAY_T.parse(l_response);
+
+          IF l_comp_data.get_size() > 0 THEN
+              FOR i IN 0 .. l_comp_data.get_size() - 1 LOOP
+                  l_comp_obj := JSON_OBJECT_T(l_comp_data.get(i));
+                  l_name := l_comp_obj.get_string('name');
+                  l_ocid := l_comp_obj.get_string('id');
+                  l_description := l_comp_obj.get_string('description');
+                  l_lifecycle_state := l_comp_obj.get_string('lifecycleState');
+                  l_time_created := l_comp_obj.get_string('timeCreated');
+
+              IF l_name in ('COMP_STABLE','COMP_PUBLIC') then
+                  
+                  IF l_name = 'COMP_STABLE' THEN 
+                  l_name := 'COMP_AI_AGENT';
+                  ELSE
+                  l_name := 'COMP_DB';
+                  END IF;
+                  
+                  l_compartments.append(
+                      JSON_OBJECT(
+                          'name' VALUE l_name,
+                          'id' VALUE l_ocid,
+                          'description' VALUE l_description,
+                          'lifecycle_state' VALUE l_lifecycle_state,
+                          'time_created' VALUE l_time_created
+                      )
+                  );
+              END IF;
+
+              END LOOP;
+
+              l_result_json.put('status', 'success');
+              l_result_json.put('message', 'Successfully retrieved compartments');
+              l_result_json.put('total_compartments', l_compartments.get_size());
+              l_result_json.put('compartments', l_compartments);
+          ELSE
+              l_result_json.put('status', 'error');
+              l_result_json.put('message', 'No compartments found in response');
+          END IF;
+
+      EXCEPTION
+          WHEN OTHERS THEN
+              l_result_json.put('status', 'error');
+              l_result_json.put('message', 'Failed to retrieve compartments: ' || SQLERRM);
+              l_result_json.put('endpoint_used', l_endpoint);
+      END;
+
+      RETURN l_result_json.to_clob();
+  END list_compartments;
+
+  -- Helper: gets the compartment ocid with the given compatment name
+  FUNCTION get_compartment_ocid_by_name(
+    compartment_name IN VARCHAR2
+  ) RETURN CLOB
+  IS
+    l_comp_json_clob    CLOB;
+    l_result_json       JSON_OBJECT_T := JSON_OBJECT_T();
+    l_compartments      JSON_ARRAY_T;
+    l_compartment_str   VARCHAR2(32767);
+    l_comp_obj          JSON_OBJECT_T;
+    l_ocid              VARCHAR2(200);
+    found               BOOLEAN := FALSE;
+    l_compartment_name  VARCHAR2(256);
+    credential_name     VARCHAR2(256);
+    l_current_user      VARCHAR2(128):= SYS_CONTEXT('USERENV','CURRENT_USER');
+    l_cfg_json          CLOB;
+    l_cfg               JSON_OBJECT_T;
+    l_params            JSON_OBJECT_T;
+  BEGIN
+    l_cfg_json := get_agent_config(l_current_user,'OCI_AGENT_CONFIG','OCI_OBJECT_STORAGE');
+    l_cfg := JSON_OBJECT_T.parse(l_cfg_json);
+    IF l_cfg.get_string('status')='success' THEN
+      l_params      := l_cfg.get_object('config_params');
+      credential_name := l_params.get_string('CREDENTIAL_NAME');
+    END IF;
+
+    -- Call existing list_compartments function
+    l_comp_json_clob := list_compartments(credential_name);
+
+    -- Parse returned JSON object
+    l_result_json := JSON_OBJECT_T.parse(l_comp_json_clob);
+
+    IF l_result_json.get('status').to_string() = '"success"' THEN
+        -- Get compartments array (array of JSON strings)
+        l_compartments := l_result_json.get_array('compartments');
+
+        FOR i IN 0 .. l_compartments.get_size() - 1 LOOP
+            -- Each element is a JSON string, parse it to JSON object
+            l_compartment_str := l_compartments.get_string(i);
+            l_comp_obj := JSON_OBJECT_T.parse(l_compartment_str);
+
+            IF l_comp_obj.get_string('name') = compartment_name THEN
+                l_ocid := l_comp_obj.get_string('id');
+                found := TRUE;
+                EXIT;
+            END IF;
+        END LOOP;
+
+        IF found THEN
+            l_result_json := JSON_OBJECT_T();
+            l_result_json.put('status', 'success');
+            l_result_json.put('compartment_name', compartment_name);
+            l_result_json.put('compartment_ocid', l_ocid);
+        ELSE
+            l_result_json := JSON_OBJECT_T();
+            l_result_json.put('status', 'error');
+            l_result_json.put('message', 'Compartment "' || compartment_name || '" not found');
+        END IF;
+
+    ELSE
+        -- Forward error from list_compartments
+        RETURN l_comp_json_clob;
+    END IF;
+
+    RETURN l_result_json.to_clob();
+
+  EXCEPTION
+    WHEN OTHERS THEN
+        l_result_json := JSON_OBJECT_T();
+        l_result_json.put('status', 'error');
+        l_result_json.put('message', 'Unexpected error: ' || SQLERRM);
+        RETURN l_result_json.to_clob();
+  END get_compartment_ocid_by_name;
+
+  ----------------------------------------------------------------------
+  -- get_namespace: Retrieve namespace metadata
+  ----------------------------------------------------------------------
+  FUNCTION get_namespace(
+    region           IN VARCHAR2
+  ) RETURN CLOB
+  AS
+    l_resp           DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE_GET_NAMESPACE_RESPONSE_T;
+    result_json      JSON_OBJECT_T := JSON_OBJECT_T();
+    l_current_user   VARCHAR2(128):= SYS_CONTEXT('USERENV','CURRENT_USER');
+    l_cfg_json       CLOB;
+    l_cfg            JSON_OBJECT_T;
+    l_params         JSON_OBJECT_T;
+    credential_name  VARCHAR2(256);
+    compartment_name VARCHAR2(256);
+    compartment_id   VARCHAR2(256);
+    l_json           CLOB;
+    l_obj            JSON_OBJECT_T;
+  BEGIN
+    l_cfg_json := get_agent_config(l_current_user,'OCI_AGENT_CONFIG','OCI_OBJECT_STORAGE');
+    l_cfg := JSON_OBJECT_T.parse(l_cfg_json);
+    IF l_cfg.get_string('status')='success' THEN
+      l_params         := l_cfg.get_object('config_params');
+      credential_name  := l_params.get_string('CREDENTIAL_NAME');
+      compartment_name := l_params.get_string('COMPARTMENT_NAME');
+    END IF;
+
+    l_json := get_compartment_ocid_by_name(compartment_name => compartment_name);
+    l_obj := JSON_OBJECT_T.parse(l_json);
+    IF l_obj.has('compartment_ocid') THEN
+      compartment_id := l_obj.get_string('compartment_ocid');
+    END IF;
+
+    l_resp := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.GET_NAMESPACE(
+      opc_client_request_id => NULL,
+      compartment_id        => compartment_id,
+      region                => region,
+      endpoint              => NULL,
+      credential_name       => credential_name
+    );
+
+    result_json.put('namespace', TRIM(BOTH CHR(34) FROM l_resp.response_body));
+    result_json.put('region',    region);
+    result_json.put('compartment_id', compartment_id);
+    result_json.put('status_code', l_resp.status_code);
+    IF l_resp.headers IS NOT NULL AND l_resp.headers.has('opc-request-id') THEN
+      result_json.put('opc_request_id', l_resp.headers.get_string('opc-request-id'));
+    END IF;
+
+    RETURN result_json.to_clob();
+  EXCEPTION WHEN OTHERS THEN
+    result_json := JSON_OBJECT_T(); result_json.put('status','error'); result_json.put('message', SQLERRM);
+    result_json.put('region', region); RETURN result_json.to_clob();
+  END get_namespace;
+
+  -- Helper: resolve metadata (namespace and compartment_id) using local get_namespace
+  PROCEDURE resolve_metadata(
+    region          IN  VARCHAR2,
+    namespace       OUT VARCHAR2,
+    compartment_id  OUT VARCHAR2
+  )
+  IS
+    l_json     CLOB;
+    l_obj      JSON_OBJECT_T;
+    l_ns       VARCHAR2(256);
+    l_com_id   VARCHAR2(256);
+  BEGIN
+    l_json := get_namespace(region => region);
+    l_obj := JSON_OBJECT_T.parse(l_json);
+    IF l_obj.has('namespace') THEN
+      l_ns := l_obj.get_string('namespace');
+    END IF;
+    IF l_obj.has('compartment_id') THEN
+      l_com_id := l_obj.get_string('compartment_id');
+    END IF;
+    namespace := l_ns;
+    compartment_id := l_com_id;
+  EXCEPTION
+    WHEN OTHERS THEN
+    NULL;
+  END resolve_metadata;
+
   ----------------------------------------------------------------------
   -- list_objects: List all objects in a bucket (uses namespace lookup API)
   ----------------------------------------------------------------------
   FUNCTION list_objects(
-    compartment_name  IN VARCHAR2,
     region            IN VARCHAR2,
     bucket_name       IN VARCHAR2
   ) RETURN CLOB
@@ -744,6 +975,7 @@ AS
     l_params              JSON_OBJECT_T;
     credential_name       VARCHAR2(256);
     namespace             VARCHAR2(256);
+    compartment_id        VARCHAR2(256);
   BEGIN
     -- Load credential from config
     l_cfg_json := get_agent_config(l_current_user, 'OCI_AGENT_CONFIG', 'OCI_OBJECT_STORAGE');
@@ -753,23 +985,7 @@ AS
       credential_name := l_params.get_string('CREDENTIAL_NAME');
     END IF;
 
-    -- Resolve namespace via Object Storage API (uses compartment context)
-    -- Prefer GET_NAMESPACE API that derives or returns current tenancy namespace
-    DECLARE
-      l_ns_resp  DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE_GET_NAMESPACE_RESPONSE_T;
-    BEGIN
-      l_ns_resp := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.GET_NAMESPACE(
-        compartment_id  => NULL,       -- if available, can pass OCID; otherwise returns default
-        region          => region,
-        credential_name => credential_name
-      );
-      IF l_ns_resp.response_body IS NOT NULL THEN
-        namespace := l_ns_resp.response_body;
-      END IF;
-    EXCEPTION WHEN OTHERS THEN
-      -- Fallback: leave namespace null and let LIST_OBJECTS error out with clear message
-      NULL;
-    END;
+    resolve_metadata(region => region, namespace => namespace, compartment_id => compartment_id);
 
     -- Call LIST_OBJECTS API
     l_resp := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.LIST_OBJECTS(
@@ -820,7 +1036,6 @@ AS
   -- list_buckets: List all buckets in a compartment
   ----------------------------------------------------------------------
   FUNCTION list_buckets(
-    compartment_name  IN VARCHAR2,
     region            IN VARCHAR2
   ) RETURN CLOB
   AS
@@ -842,24 +1057,9 @@ AS
     IF l_cfg.get_string('status') = 'success' THEN
       l_params := l_cfg.get_object('config_params');
       credential_name := l_params.get_string('CREDENTIAL_NAME');
-      compartment_id  := l_params.get_string('COMPARTMENT_OCID');
     END IF;
 
-    -- Resolve namespace via GET_NAMESPACE
-    DECLARE
-      l_ns_resp  DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE_GET_NAMESPACE_RESPONSE_T;
-    BEGIN
-      l_ns_resp := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.GET_NAMESPACE(
-        compartment_id  => NULL,
-        region          => region,
-        credential_name => credential_name
-      );
-      IF l_ns_resp.response_body IS NOT NULL THEN
-        namespace := l_ns_resp.response_body;
-      END IF;
-    EXCEPTION WHEN OTHERS THEN
-      NULL;
-    END;
+    resolve_metadata(region => region, namespace => namespace, compartment_id => compartment_id);
 
     -- Call LIST_BUCKETS API
     resp := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.LIST_BUCKETS(
@@ -902,7 +1102,6 @@ AS
   -- get_bucket: Retrieve bucket metadata (summary)
   ----------------------------------------------------------------------
   FUNCTION get_bucket(
-    compartment_name  IN VARCHAR2,
     bucket_name       IN VARCHAR2,
     region            IN VARCHAR2
   ) RETURN CLOB
@@ -916,6 +1115,7 @@ AS
     l_params        JSON_OBJECT_T;
     credential_name VARCHAR2(256);
     namespace       VARCHAR2(256);
+    compartment_id  VARCHAR2(256);
   BEGIN
     -- Load credential from config
     l_cfg_json := get_agent_config(l_current_user, 'OCI_AGENT_CONFIG', 'OCI_OBJECT_STORAGE');
@@ -925,21 +1125,7 @@ AS
       credential_name := l_params.get_string('CREDENTIAL_NAME');
     END IF;
 
-    -- Resolve namespace via GET_NAMESPACE
-    DECLARE
-      l_ns_resp  DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE_GET_NAMESPACE_RESPONSE_T;
-    BEGIN
-      l_ns_resp := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.GET_NAMESPACE(
-        compartment_id  => NULL,
-        region          => region,
-        credential_name => credential_name
-      );
-      IF l_ns_resp.response_body IS NOT NULL THEN
-        namespace := l_ns_resp.response_body;
-      END IF;
-    EXCEPTION WHEN OTHERS THEN
-      NULL;
-    END;
+    resolve_metadata(region => region, namespace => namespace, compartment_id => compartment_id);
 
     -- Call GET_BUCKET with selected fields
     l_resp := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.GET_BUCKET(
@@ -996,7 +1182,6 @@ AS
   -- head_bucket: Retrieve bucket metadata headers (HEAD_BUCKET)
   ----------------------------------------------------------------------
   FUNCTION head_bucket(
-    compartment_name  IN VARCHAR2,
     bucket_name       IN VARCHAR2,
     region            IN VARCHAR2
   ) RETURN CLOB
@@ -1009,6 +1194,7 @@ AS
     l_params       JSON_OBJECT_T;
     credential_name VARCHAR2(256);
     namespace       VARCHAR2(256);
+    compartment_id  VARCHAR2(256);
   BEGIN
     -- Load credential from config
     l_cfg_json := get_agent_config(l_current_user, 'OCI_AGENT_CONFIG', 'OCI_OBJECT_STORAGE');
@@ -1018,21 +1204,7 @@ AS
       credential_name := l_params.get_string('CREDENTIAL_NAME');
     END IF;
 
-    -- Resolve namespace via GET_NAMESPACE
-    DECLARE
-      l_ns_resp  DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE_GET_NAMESPACE_RESPONSE_T;
-    BEGIN
-      l_ns_resp := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.GET_NAMESPACE(
-        compartment_id  => NULL,
-        region          => region,
-        credential_name => credential_name
-      );
-      IF l_ns_resp.response_body IS NOT NULL THEN
-        namespace := l_ns_resp.response_body;
-      END IF;
-    EXCEPTION WHEN OTHERS THEN
-      NULL;
-    END;
+    resolve_metadata(region => region, namespace => namespace, compartment_id => compartment_id);
 
     -- Call HEAD_BUCKET API
     l_response := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.HEAD_BUCKET(
@@ -1067,7 +1239,6 @@ AS
   -- head_object: Retrieve object metadata headers (HEAD_OBJECT)
   ----------------------------------------------------------------------
   FUNCTION head_object(
-    compartment_name  IN VARCHAR2,
     region            IN VARCHAR2,
     bucket_name       IN VARCHAR2,
     object_name       IN VARCHAR2
@@ -1081,6 +1252,7 @@ AS
     l_params       JSON_OBJECT_T;
     credential_name VARCHAR2(256);
     namespace       VARCHAR2(256);
+    compartment_id  VARCHAR2(256);
   BEGIN
     -- Load credential from config
     l_cfg_json := get_agent_config(l_current_user, 'OCI_AGENT_CONFIG', 'OCI_OBJECT_STORAGE');
@@ -1090,21 +1262,7 @@ AS
       credential_name := l_params.get_string('CREDENTIAL_NAME');
     END IF;
 
-    -- Resolve namespace via GET_NAMESPACE
-    DECLARE
-      l_ns_resp  DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE_GET_NAMESPACE_RESPONSE_T;
-    BEGIN
-      l_ns_resp := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.GET_NAMESPACE(
-        compartment_id  => NULL,
-        region          => region,
-        credential_name => credential_name
-      );
-      IF l_ns_resp.response_body IS NOT NULL THEN
-        namespace := l_ns_resp.response_body;
-      END IF;
-    EXCEPTION WHEN OTHERS THEN
-      NULL;
-    END;
+    resolve_metadata(region => region, namespace => namespace, compartment_id => compartment_id);
 
     -- Call HEAD_OBJECT API
     l_response := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.HEAD_OBJECT(
@@ -1150,6 +1308,7 @@ AS
     l_params       JSON_OBJECT_T;
     credential_name VARCHAR2(256);
     namespace       VARCHAR2(256);
+    compartment_id  VARCHAR2(256);
   BEGIN
     -- Load credential from config
     l_cfg_json := get_agent_config(l_current_user, 'OCI_AGENT_CONFIG', 'OCI_OBJECT_STORAGE');
@@ -1159,21 +1318,7 @@ AS
       credential_name := l_params.get_string('CREDENTIAL_NAME');
     END IF;
 
-    -- Resolve namespace via GET_NAMESPACE
-    DECLARE
-      l_ns_resp  DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE_GET_NAMESPACE_RESPONSE_T;
-    BEGIN
-      l_ns_resp := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.GET_NAMESPACE(
-        compartment_id  => NULL,
-        region          => region,
-        credential_name => credential_name
-      );
-      IF l_ns_resp.response_body IS NOT NULL THEN
-        namespace := l_ns_resp.response_body;
-      END IF;
-    EXCEPTION WHEN OTHERS THEN
-      NULL;
-    END;
+    resolve_metadata(region => region, namespace => namespace, compartment_id => compartment_id);
 
     -- Call LIST_OBJECT_VERSIONS API
     l_response := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.LIST_OBJECT_VERSIONS(
@@ -1240,6 +1385,7 @@ AS
     l_params       JSON_OBJECT_T;
     credential_name VARCHAR2(256);
     namespace       VARCHAR2(256);
+    compartment_id  VARCHAR2(256);
   BEGIN
     -- Load credential from config
     l_cfg_json := get_agent_config(l_current_user, 'OCI_AGENT_CONFIG', 'OCI_OBJECT_STORAGE');
@@ -1249,21 +1395,7 @@ AS
       credential_name := l_params.get_string('CREDENTIAL_NAME');
     END IF;
 
-    -- Resolve namespace via GET_NAMESPACE
-    DECLARE
-      l_ns_resp  DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE_GET_NAMESPACE_RESPONSE_T;
-    BEGIN
-      l_ns_resp := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.GET_NAMESPACE(
-        compartment_id  => NULL,
-        region          => region,
-        credential_name => credential_name
-      );
-      IF l_ns_resp.response_body IS NOT NULL THEN
-        namespace := l_ns_resp.response_body;
-      END IF;
-    EXCEPTION WHEN OTHERS THEN
-      NULL;
-    END;
+    resolve_metadata(region => region, namespace => namespace, compartment_id => compartment_id);
 
     -- Call LIST_MULTIPART_UPLOADS API
     l_response := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.LIST_MULTIPART_UPLOADS(
@@ -1327,6 +1459,7 @@ AS
     l_params       JSON_OBJECT_T;
     credential_name VARCHAR2(256);
     namespace       VARCHAR2(256);
+    compartment_id  VARCHAR2(256);
   BEGIN
     -- Load credential from config
     l_cfg_json := get_agent_config(l_current_user, 'OCI_AGENT_CONFIG', 'OCI_OBJECT_STORAGE');
@@ -1336,21 +1469,7 @@ AS
       credential_name := l_params.get_string('CREDENTIAL_NAME');
     END IF;
 
-    -- Resolve namespace via GET_NAMESPACE
-    DECLARE
-      l_ns_resp  DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE_GET_NAMESPACE_RESPONSE_T;
-    BEGIN
-      l_ns_resp := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.GET_NAMESPACE(
-        compartment_id  => NULL,
-        region          => region,
-        credential_name => credential_name
-      );
-      IF l_ns_resp.response_body IS NOT NULL THEN
-        namespace := l_ns_resp.response_body;
-      END IF;
-    EXCEPTION WHEN OTHERS THEN
-      NULL;
-    END;
+    resolve_metadata(region => region, namespace => namespace, compartment_id => compartment_id);
 
     -- Call LIST_MULTIPART_UPLOAD_PARTS API
     l_response := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.LIST_MULTIPART_UPLOAD_PARTS(
@@ -1426,21 +1545,7 @@ AS
       compartment_id  := l_params.get_string('COMPARTMENT_OCID');
     END IF;
 
-    -- Resolve namespace
-    DECLARE
-      l_ns_resp DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE_GET_NAMESPACE_RESPONSE_T;
-    BEGIN
-      l_ns_resp := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.GET_NAMESPACE(
-        compartment_id  => NULL,
-        region          => region,
-        credential_name => credential_name
-      );
-      IF l_ns_resp.response_body IS NOT NULL THEN
-        namespace := l_ns_resp.response_body;
-      END IF;
-    EXCEPTION WHEN OTHERS THEN
-      NULL;
-    END;
+    resolve_metadata(region => region, namespace => namespace, compartment_id => compartment_id);
 
     -- Build update details
     l_details := DBMS_CLOUD_OCI_OBJECT_STORAGE_UPDATE_BUCKET_DETAILS_T(
@@ -1507,6 +1612,7 @@ AS
     l_params       JSON_OBJECT_T;
     credential_name VARCHAR2(256);
     namespace       VARCHAR2(256);
+    compartment_id  VARCHAR2(256);
   BEGIN
     -- Load credential from config
     l_cfg_json := get_agent_config(l_current_user, 'OCI_AGENT_CONFIG', 'OCI_OBJECT_STORAGE');
@@ -1516,21 +1622,7 @@ AS
       credential_name := l_params.get_string('CREDENTIAL_NAME');
     END IF;
 
-    -- Resolve namespace via GET_NAMESPACE
-    DECLARE
-      l_ns_resp DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE_GET_NAMESPACE_RESPONSE_T;
-    BEGIN
-      l_ns_resp := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.GET_NAMESPACE(
-        compartment_id  => NULL,
-        region          => region,
-        credential_name => credential_name
-      );
-      IF l_ns_resp.response_body IS NOT NULL THEN
-        namespace := l_ns_resp.response_body;
-      END IF;
-    EXCEPTION WHEN OTHERS THEN
-      NULL;
-    END;
+    resolve_metadata(region => region, namespace => namespace, compartment_id => compartment_id);
 
     -- Call MAKE_BUCKET_WRITABLE API
     l_response := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.MAKE_BUCKET_WRITABLE(
@@ -1590,6 +1682,7 @@ AS
     l_params       JSON_OBJECT_T;
     credential_name VARCHAR2(256);
     namespace       VARCHAR2(256);
+    compartment_id  VARCHAR2(256);
   BEGIN
     -- Load credential from config
     l_cfg_json := get_agent_config(l_current_user, 'OCI_AGENT_CONFIG', 'OCI_OBJECT_STORAGE');
@@ -1599,21 +1692,7 @@ AS
       credential_name := l_params.get_string('CREDENTIAL_NAME');
     END IF;
 
-    -- Resolve namespace via GET_NAMESPACE
-    DECLARE
-      l_ns_resp DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE_GET_NAMESPACE_RESPONSE_T;
-    BEGIN
-      l_ns_resp := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.GET_NAMESPACE(
-        compartment_id  => NULL,
-        region          => region,
-        credential_name => credential_name
-      );
-      IF l_ns_resp.response_body IS NOT NULL THEN
-        namespace := l_ns_resp.response_body;
-      END IF;
-    EXCEPTION WHEN OTHERS THEN
-      NULL;
-    END;
+    resolve_metadata(region => region, namespace => namespace, compartment_id => compartment_id);
 
     -- Construct object name filter with empty include/exclude lists
     l_filter := DBMS_CLOUD_OCI_OBJECT_STORAGE_OBJECT_NAME_FILTER_T(
@@ -1679,6 +1758,7 @@ AS
     l_params       JSON_OBJECT_T;
     credential_name VARCHAR2(256);
     namespace       VARCHAR2(256);
+    compartment_id  VARCHAR2(256);
   BEGIN
     -- Load credential from config
     l_cfg_json := get_agent_config(l_current_user, 'OCI_AGENT_CONFIG', 'OCI_OBJECT_STORAGE');
@@ -1688,21 +1768,7 @@ AS
       credential_name := l_params.get_string('CREDENTIAL_NAME');
     END IF;
 
-    -- Resolve namespace via GET_NAMESPACE
-    DECLARE
-      l_ns_resp DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE_GET_NAMESPACE_RESPONSE_T;
-    BEGIN
-      l_ns_resp := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.GET_NAMESPACE(
-        compartment_id  => NULL,
-        region          => region,
-        credential_name => credential_name
-      );
-      IF l_ns_resp.response_body IS NOT NULL THEN
-        namespace := l_ns_resp.response_body;
-      END IF;
-    EXCEPTION WHEN OTHERS THEN
-      NULL;
-    END;
+    resolve_metadata(region => region, namespace => namespace, compartment_id => compartment_id);
 
     -- Call LIST_RETENTION_RULES API
     l_resp := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.LIST_RETENTION_RULES(
@@ -1798,6 +1864,7 @@ AS
     l_params       JSON_OBJECT_T;
     credential_name VARCHAR2(256);
     namespace       VARCHAR2(256);
+    compartment_id  VARCHAR2(256);
   BEGIN
     -- Load credential
     l_cfg_json := get_agent_config(l_current_user, 'OCI_AGENT_CONFIG', 'OCI_OBJECT_STORAGE');
@@ -1807,21 +1874,7 @@ AS
       credential_name := l_params.get_string('CREDENTIAL_NAME');
     END IF;
 
-    -- Resolve namespace
-    DECLARE
-      l_ns_resp DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE_GET_NAMESPACE_RESPONSE_T;
-    BEGIN
-      l_ns_resp := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.GET_NAMESPACE(
-        compartment_id  => NULL,
-        region          => region,
-        credential_name => credential_name
-      );
-      IF l_ns_resp.response_body IS NOT NULL THEN
-        namespace := l_ns_resp.response_body;
-      END IF;
-    EXCEPTION WHEN OTHERS THEN
-      NULL;
-    END;
+    resolve_metadata(region => region, namespace => namespace, compartment_id => compartment_id);
 
     -- Call GET_RETENTION_RULE
     l_resp := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.GET_RETENTION_RULE(
@@ -1896,7 +1949,6 @@ AS
   -- get_object: Retrieve object metadata (headers/summary, not payload)
   ----------------------------------------------------------------------
   FUNCTION get_object(
-    compartment_name  IN VARCHAR2,
     region            IN VARCHAR2,
     bucket_name       IN VARCHAR2,
     object_name       IN VARCHAR2
@@ -1911,6 +1963,7 @@ AS
     l_params        JSON_OBJECT_T;
     credential_name VARCHAR2(256);
     namespace       VARCHAR2(256);
+    compartment_id  VARCHAR2(256);
   BEGIN
     -- Load credential from config
     l_cfg_json := get_agent_config(l_current_user, 'OCI_AGENT_CONFIG', 'OCI_OBJECT_STORAGE');
@@ -1920,21 +1973,7 @@ AS
       credential_name := l_params.get_string('CREDENTIAL_NAME');
     END IF;
 
-    -- Resolve namespace via GET_NAMESPACE
-    DECLARE
-      l_ns_resp  DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE_GET_NAMESPACE_RESPONSE_T;
-    BEGIN
-      l_ns_resp := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.GET_NAMESPACE(
-        compartment_id  => NULL,
-        region          => region,
-        credential_name => credential_name
-      );
-      IF l_ns_resp.response_body IS NOT NULL THEN
-        namespace := l_ns_resp.response_body;
-      END IF;
-    EXCEPTION WHEN OTHERS THEN
-      NULL;
-    END;
+    resolve_metadata(region => region, namespace => namespace, compartment_id => compartment_id);
 
     -- Call OCI GET_OBJECT API (metadata only)
     l_resp := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.GET_OBJECT(
@@ -2002,6 +2041,7 @@ AS
     l_params       JSON_OBJECT_T;
     credential_name VARCHAR2(256);
     namespace       VARCHAR2(256);
+    compartment_id  VARCHAR2(256);
   BEGIN
     -- Load credential from config
     l_cfg_json := get_agent_config(l_current_user, 'OCI_AGENT_CONFIG', 'OCI_OBJECT_STORAGE');
@@ -2011,21 +2051,7 @@ AS
       credential_name := l_params.get_string('CREDENTIAL_NAME');
     END IF;
 
-    -- Resolve namespace
-    DECLARE
-      l_ns_resp  DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE_GET_NAMESPACE_RESPONSE_T;
-    BEGIN
-      l_ns_resp := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.GET_NAMESPACE(
-        compartment_id  => NULL,
-        region          => region,
-        credential_name => credential_name
-      );
-      IF l_ns_resp.response_body IS NOT NULL THEN
-        namespace := l_ns_resp.response_body;
-      END IF;
-    EXCEPTION WHEN OTHERS THEN
-      NULL;
-    END;
+    resolve_metadata(region => region, namespace => namespace, compartment_id => compartment_id);
 
     -- Convert CLOB content to BLOB (UTF-8)
     l_blob := TO_BLOB(UTL_I18N.STRING_TO_RAW(content, 'AL32UTF8'));
@@ -2087,6 +2113,7 @@ AS
     l_params       JSON_OBJECT_T;
     credential_name VARCHAR2(256);
     namespace       VARCHAR2(256);
+    compartment_id  VARCHAR2(256);
   BEGIN
     -- Load credential
     l_cfg_json := get_agent_config(l_current_user, 'OCI_AGENT_CONFIG', 'OCI_OBJECT_STORAGE');
@@ -2096,17 +2123,7 @@ AS
       credential_name := l_params.get_string('CREDENTIAL_NAME');
     END IF;
 
-    -- Resolve namespace
-    DECLARE
-      l_ns_resp DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE_GET_NAMESPACE_RESPONSE_T;
-    BEGIN
-      l_ns_resp := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.GET_NAMESPACE(
-        compartment_id  => NULL,
-        region          => region,
-        credential_name => credential_name
-      );
-      namespace := l_ns_resp.response_body;
-    EXCEPTION WHEN OTHERS THEN NULL; END;
+    resolve_metadata(region => region, namespace => namespace, compartment_id => compartment_id);
 
     -- Call API
     l_resp := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.LIST_PREAUTHENTICATED_REQUESTS(
@@ -2183,6 +2200,7 @@ AS
     l_params       JSON_OBJECT_T;
     credential_name VARCHAR2(256);
     namespace       VARCHAR2(256);
+    compartment_id  VARCHAR2(256);
   BEGIN
     l_cfg_json := get_agent_config(l_current_user, 'OCI_AGENT_CONFIG', 'OCI_OBJECT_STORAGE');
     l_cfg := JSON_OBJECT_T.parse(l_cfg_json);
@@ -2191,13 +2209,7 @@ AS
       credential_name := l_params.get_string('CREDENTIAL_NAME');
     END IF;
 
-    DECLARE
-      l_ns DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE_GET_NAMESPACE_RESPONSE_T;
-    BEGIN
-      l_ns := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.GET_NAMESPACE(
-        compartment_id=>NULL, region=>region, credential_name=>credential_name);
-      namespace := l_ns.response_body;
-    EXCEPTION WHEN OTHERS THEN NULL; END;
+    resolve_metadata(region => region, namespace => namespace, compartment_id => compartment_id);
 
     l_resp := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.LIST_REPLICATION_POLICIES(
       namespace_name=>namespace, bucket_name=>bucket_name, region=>region, credential_name=>credential_name
@@ -2259,6 +2271,7 @@ AS
     l_params       JSON_OBJECT_T;
     credential_name VARCHAR2(256);
     namespace       VARCHAR2(256);
+    compartment_id  VARCHAR2(256);
   BEGIN
     -- Load credential
     l_cfg_json := get_agent_config(l_current_user,'OCI_AGENT_CONFIG','OCI_OBJECT_STORAGE');
@@ -2269,13 +2282,7 @@ AS
     END IF;
 
     -- Namespace
-    DECLARE
-      l_ns DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE_GET_NAMESPACE_RESPONSE_T;
-    BEGIN
-      l_ns := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.GET_NAMESPACE(
-        compartment_id=>NULL, region=>region, credential_name=>credential_name);
-      namespace := l_ns.response_body;
-    EXCEPTION WHEN OTHERS THEN NULL; END;
+    resolve_metadata(region => region, namespace => namespace, compartment_id => compartment_id);
 
     -- Call API
     l_resp := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.GET_REPLICATION_POLICY(
@@ -2336,6 +2343,7 @@ AS
     l_params       JSON_OBJECT_T;
     credential_name VARCHAR2(256);
     namespace       VARCHAR2(256);
+    compartment_id  VARCHAR2(256);
   BEGIN
     l_cfg_json := get_agent_config(l_current_user,'OCI_AGENT_CONFIG','OCI_OBJECT_STORAGE');
     l_cfg := JSON_OBJECT_T.parse(l_cfg_json);
@@ -2344,13 +2352,7 @@ AS
       credential_name := l_params.get_string('CREDENTIAL_NAME');
     END IF;
 
-    DECLARE
-      l_ns DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE_GET_NAMESPACE_RESPONSE_T;
-    BEGIN
-      l_ns := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.GET_NAMESPACE(
-        compartment_id=>NULL, region=>region, credential_name=>credential_name);
-      namespace := l_ns.response_body;
-    EXCEPTION WHEN OTHERS THEN NULL; END;
+    resolve_metadata(region => region, namespace => namespace, compartment_id => compartment_id);
 
     l_resp := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.LIST_REPLICATION_SOURCES(
       namespace_name=>namespace,
@@ -2401,6 +2403,7 @@ AS
     l_params       JSON_OBJECT_T;
     credential_name VARCHAR2(256);
     namespace       VARCHAR2(256);
+    compartment_id  VARCHAR2(256);
   BEGIN
     l_cfg_json := get_agent_config(l_current_user,'OCI_AGENT_CONFIG','OCI_OBJECT_STORAGE');
     l_cfg := JSON_OBJECT_T.parse(l_cfg_json);
@@ -2409,13 +2412,7 @@ AS
       credential_name := l_params.get_string('CREDENTIAL_NAME');
     END IF;
 
-    DECLARE
-      l_ns DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE_GET_NAMESPACE_RESPONSE_T;
-    BEGIN
-      l_ns := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.GET_NAMESPACE(
-        compartment_id=>NULL, region=>region, credential_name=>credential_name);
-      namespace := l_ns.response_body;
-    EXCEPTION WHEN OTHERS THEN NULL; END;
+    resolve_metadata(region => region, namespace => namespace, compartment_id => compartment_id);
 
     l_resp := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.REENCRYPT_BUCKET(
       namespace_name=>namespace,
@@ -2468,6 +2465,7 @@ AS
     l_params       JSON_OBJECT_T;
     credential_name VARCHAR2(256);
     namespace       VARCHAR2(256);
+    compartment_id  VARCHAR2(256);
     l_dummy_key     DBMS_CLOUD_OCI_OBJECT_STORAGE_SSE_CUSTOMER_KEY_DETAILS_T := NULL;
   BEGIN
     l_cfg_json := get_agent_config(l_current_user,'OCI_AGENT_CONFIG','OCI_OBJECT_STORAGE');
@@ -2477,13 +2475,7 @@ AS
       credential_name := l_params.get_string('CREDENTIAL_NAME');
     END IF;
 
-    DECLARE
-      l_ns DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE_GET_NAMESPACE_RESPONSE_T;
-    BEGIN
-      l_ns := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.GET_NAMESPACE(
-        compartment_id=>NULL, region=>region, credential_name=>credential_name);
-      namespace := l_ns.response_body;
-    EXCEPTION WHEN OTHERS THEN NULL; END;
+    resolve_metadata(region => region, namespace => namespace, compartment_id => compartment_id);
 
     l_details := DBMS_CLOUD_OCI_OBJECT_STORAGE_REENCRYPT_OBJECT_DETAILS_T(
       kms_key_id, l_dummy_key, l_dummy_key
@@ -2548,6 +2540,7 @@ AS
     l_params       JSON_OBJECT_T;
     credential_name VARCHAR2(256);
     namespace       VARCHAR2(256);
+    compartment_id  VARCHAR2(256);
   BEGIN
     l_cfg_json := get_agent_config(l_current_user,'OCI_AGENT_CONFIG','OCI_OBJECT_STORAGE');
     l_cfg := JSON_OBJECT_T.parse(l_cfg_json);
@@ -2556,13 +2549,7 @@ AS
       credential_name := l_params.get_string('CREDENTIAL_NAME');
     END IF;
 
-    DECLARE
-      l_ns DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE_GET_NAMESPACE_RESPONSE_T;
-    BEGIN
-      l_ns := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.GET_NAMESPACE(
-        compartment_id=>NULL, region=>region, credential_name=>credential_name);
-      namespace := l_ns.response_body;
-    EXCEPTION WHEN OTHERS THEN NULL; END;
+    resolve_metadata(region => region, namespace => namespace, compartment_id => compartment_id);
 
     l_details := DBMS_CLOUD_OCI_OBJECT_STORAGE_RENAME_OBJECT_DETAILS_T(
       source_name => source_object,
@@ -2629,6 +2616,7 @@ AS
     l_params       JSON_OBJECT_T;
     credential_name VARCHAR2(256);
     namespace       VARCHAR2(256);
+    compartment_id  VARCHAR2(256);
   BEGIN
     l_cfg_json := get_agent_config(l_current_user,'OCI_AGENT_CONFIG','OCI_OBJECT_STORAGE');
     l_cfg := JSON_OBJECT_T.parse(l_cfg_json);
@@ -2637,13 +2625,7 @@ AS
       credential_name := l_params.get_string('CREDENTIAL_NAME');
     END IF;
 
-    DECLARE
-      l_ns DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE_GET_NAMESPACE_RESPONSE_T;
-    BEGIN
-      l_ns := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.GET_NAMESPACE(
-        compartment_id=>NULL, region=>region, credential_name=>credential_name);
-      namespace := l_ns.response_body;
-    EXCEPTION WHEN OTHERS THEN NULL; END;
+    resolve_metadata(region => region, namespace => namespace, compartment_id => compartment_id);
 
     l_details := DBMS_CLOUD_OCI_OBJECT_STORAGE_RESTORE_OBJECTS_DETAILS_T(
       object_name => object_name,
@@ -2704,6 +2686,7 @@ AS
     l_params       JSON_OBJECT_T;
     credential_name VARCHAR2(256);
     namespace       VARCHAR2(256);
+    compartment_id  VARCHAR2(256);
   BEGIN
     l_cfg_json := get_agent_config(l_current_user,'OCI_AGENT_CONFIG','OCI_OBJECT_STORAGE');
     l_cfg := JSON_OBJECT_T.parse(l_cfg_json);
@@ -2712,13 +2695,7 @@ AS
       credential_name := l_params.get_string('CREDENTIAL_NAME');
     END IF;
 
-    DECLARE
-      l_ns DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE_GET_NAMESPACE_RESPONSE_T;
-    BEGIN
-      l_ns := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.GET_NAMESPACE(
-        compartment_id=>NULL, region=>region, credential_name=>credential_name);
-      namespace := l_ns.response_body;
-    EXCEPTION WHEN OTHERS THEN NULL; END;
+    resolve_metadata(region => region, namespace => namespace, compartment_id => compartment_id);
 
     l_resp := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.UPLOAD_PART(
       namespace_name              => namespace,
@@ -2764,7 +2741,6 @@ AS
   -- update_namespace_metadata: Set default S3/Swift compartments for namespace
   ----------------------------------------------------------------------
   FUNCTION update_namespace_metadata(
-    compartment_name IN VARCHAR2,
     region           IN VARCHAR2
   ) RETURN CLOB
   AS
@@ -2789,13 +2765,7 @@ AS
     END IF;
 
     -- Resolve namespace
-    DECLARE
-      l_ns DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE_GET_NAMESPACE_RESPONSE_T;
-    BEGIN
-      l_ns := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.GET_NAMESPACE(
-        compartment_id=>NULL, region=>region, credential_name=>credential_name);
-      namespace := l_ns.response_body;
-    EXCEPTION WHEN OTHERS THEN NULL; END;
+    resolve_metadata(region => region, namespace => namespace, compartment_id => compartment_id);
 
     -- Prepare details (use COMPARTMENT_OCID from config)
     l_details := DBMS_CLOUD_OCI_OBJECT_STORAGE_UPDATE_NAMESPACE_METADATA_DETAILS_T(
@@ -2855,6 +2825,7 @@ AS
     l_params       JSON_OBJECT_T;
     credential_name VARCHAR2(256);
     namespace       VARCHAR2(256);
+    compartment_id  VARCHAR2(256);
   BEGIN
     l_cfg_json := get_agent_config(l_current_user,'OCI_AGENT_CONFIG','OCI_OBJECT_STORAGE');
     l_cfg := JSON_OBJECT_T.parse(l_cfg_json);
@@ -2863,13 +2834,7 @@ AS
       credential_name := l_params.get_string('CREDENTIAL_NAME');
     END IF;
 
-    DECLARE
-      l_ns DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE_GET_NAMESPACE_RESPONSE_T;
-    BEGIN
-      l_ns := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.GET_NAMESPACE(
-        compartment_id=>NULL, region=>region, credential_name=>credential_name);
-      namespace := l_ns.response_body;
-    EXCEPTION WHEN OTHERS THEN NULL; END;
+    resolve_metadata(region => region, namespace => namespace, compartment_id => compartment_id);
 
     l_duration := DBMS_CLOUD_OCI_OBJECT_STORAGE_DURATION_T(
       time_amount => duration_amount,
@@ -2931,7 +2896,6 @@ AS
   -- list_work_requests: List work requests in a compartment
   ----------------------------------------------------------------------
   FUNCTION list_work_requests(
-    compartment_name IN VARCHAR2,
     region           IN VARCHAR2
   ) RETURN CLOB
   AS
@@ -3194,7 +3158,6 @@ AS
   -- create_bucket: Create a new bucket
   ----------------------------------------------------------------------
   FUNCTION create_bucket(
-    compartment_name  IN VARCHAR2,
     bucket_name       IN VARCHAR2,
     region            IN VARCHAR2
   ) RETURN CLOB
@@ -3207,8 +3170,8 @@ AS
     l_cfg            JSON_OBJECT_T;
     l_params         JSON_OBJECT_T;
     credential_name  VARCHAR2(256);
-    compartment_id   VARCHAR2(256);
     namespace        VARCHAR2(256);
+    compartment_id  VARCHAR2(256);
   BEGIN
     l_cfg_json := get_agent_config(l_current_user,'OCI_AGENT_CONFIG','OCI_OBJECT_STORAGE');
     l_cfg := JSON_OBJECT_T.parse(l_cfg_json);
@@ -3219,13 +3182,7 @@ AS
     END IF;
 
     -- resolve namespace
-    DECLARE
-      l_ns DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE_GET_NAMESPACE_RESPONSE_T;
-    BEGIN
-      l_ns := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.GET_NAMESPACE(
-        compartment_id=>NULL, region=>region, credential_name=>credential_name);
-      namespace := l_ns.response_body;
-    EXCEPTION WHEN OTHERS THEN NULL; END;
+    resolve_metadata(region => region, namespace => namespace, compartment_id => compartment_id);
 
     -- details
     l_details := DBMS_CLOUD_OCI_OBJECT_STORAGE_CREATE_BUCKET_DETAILS_T(
@@ -3283,7 +3240,6 @@ AS
   -- delete_bucket: Delete bucket (must be empty)
   ----------------------------------------------------------------------
   FUNCTION delete_bucket(
-    compartment_name  IN VARCHAR2,
     bucket_name       IN VARCHAR2,
     region            IN VARCHAR2
   ) RETURN CLOB
@@ -3292,7 +3248,9 @@ AS
     result_json     JSON_OBJECT_T := JSON_OBJECT_T();
     l_current_user  VARCHAR2(128):= SYS_CONTEXT('USERENV','CURRENT_USER');
     l_cfg_json      CLOB; l_cfg JSON_OBJECT_T; l_params JSON_OBJECT_T;
-    credential_name VARCHAR2(256); namespace VARCHAR2(256);
+    credential_name VARCHAR2(256);
+    namespace VARCHAR2(256);
+    compartment_id  VARCHAR2(256);
   BEGIN
     l_cfg_json := get_agent_config(l_current_user,'OCI_AGENT_CONFIG','OCI_OBJECT_STORAGE');
     l_cfg := JSON_OBJECT_T.parse(l_cfg_json);
@@ -3300,11 +3258,7 @@ AS
       l_params := l_cfg.get_object('config_params'); credential_name := l_params.get_string('CREDENTIAL_NAME');
     END IF;
 
-    DECLARE l_ns DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE_GET_NAMESPACE_RESPONSE_T;
-    BEGIN
-      l_ns := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.GET_NAMESPACE(NULL,region,credential_name);
-      namespace := l_ns.response_body;
-    EXCEPTION WHEN OTHERS THEN NULL; END;
+    resolve_metadata(region => region, namespace => namespace, compartment_id => compartment_id);
 
     l_resp := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.DELETE_BUCKET(
       namespace_name=>namespace, bucket_name=>bucket_name, credential_name=>credential_name, region=>region
@@ -3326,7 +3280,6 @@ AS
   -- delete_object: Delete an object
   ----------------------------------------------------------------------
   FUNCTION delete_object(
-    compartment_name  IN VARCHAR2,
     region            IN VARCHAR2,
     bucket_name       IN VARCHAR2,
     object_name       IN VARCHAR2
@@ -3336,7 +3289,9 @@ AS
     result_json     JSON_OBJECT_T := JSON_OBJECT_T();
     l_current_user  VARCHAR2(128):= SYS_CONTEXT('USERENV','CURRENT_USER');
     l_cfg_json      CLOB; l_cfg JSON_OBJECT_T; l_params JSON_OBJECT_T;
-    credential_name VARCHAR2(256); namespace VARCHAR2(256);
+    credential_name VARCHAR2(256);
+    namespace VARCHAR2(256);
+    compartment_id  VARCHAR2(256);
   BEGIN
     l_cfg_json := get_agent_config(l_current_user,'OCI_AGENT_CONFIG','OCI_OBJECT_STORAGE');
     l_cfg := JSON_OBJECT_T.parse(l_cfg_json);
@@ -3344,11 +3299,7 @@ AS
       l_params := l_cfg.get_object('config_params'); credential_name := l_params.get_string('CREDENTIAL_NAME');
     END IF;
 
-    DECLARE l_ns DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE_GET_NAMESPACE_RESPONSE_T;
-    BEGIN
-      l_ns := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.GET_NAMESPACE(NULL,region,credential_name);
-      namespace := l_ns.response_body;
-    EXCEPTION WHEN OTHERS THEN NULL; END;
+    resolve_metadata(region => region, namespace => namespace, compartment_id => compartment_id);
 
     l_resp := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.DELETE_OBJECT(
       namespace_name=>namespace, bucket_name=>bucket_name, object_name=>object_name,
@@ -3384,7 +3335,9 @@ AS
     result_json     JSON_OBJECT_T := JSON_OBJECT_T();
     l_current_user  VARCHAR2(128):= SYS_CONTEXT('USERENV','CURRENT_USER');
     l_cfg_json      CLOB; l_cfg JSON_OBJECT_T; l_params JSON_OBJECT_T;
-    credential_name VARCHAR2(256); namespace VARCHAR2(256);
+    credential_name VARCHAR2(256);
+    namespace VARCHAR2(256);
+    compartment_id  VARCHAR2(256);
   BEGIN
     l_cfg_json := get_agent_config(l_current_user,'OCI_AGENT_CONFIG','OCI_OBJECT_STORAGE');
     l_cfg := JSON_OBJECT_T.parse(l_cfg_json);
@@ -3393,11 +3346,7 @@ AS
     END IF;
 
     -- source namespace
-    DECLARE l_ns DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE_GET_NAMESPACE_RESPONSE_T;
-    BEGIN
-      l_ns := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.GET_NAMESPACE(NULL,region,credential_name);
-      namespace := l_ns.response_body;
-    EXCEPTION WHEN OTHERS THEN NULL; END;
+    resolve_metadata(region => region, namespace => namespace, compartment_id => compartment_id);
 
     l_details := DBMS_CLOUD_OCI_OBJECT_STORAGE_COPY_OBJECT_DETAILS_T(
       source_object_name                     => source_object_name,
@@ -3461,6 +3410,7 @@ AS
     l_current_user VARCHAR2(128):= SYS_CONTEXT('USERENV','CURRENT_USER');
     l_cfg_json     CLOB; l_cfg JSON_OBJECT_T; l_params JSON_OBJECT_T;
     credential_name VARCHAR2(256); namespace VARCHAR2(256);
+    compartment_id  VARCHAR2(256);
   BEGIN
     l_cfg_json := get_agent_config(l_current_user,'OCI_AGENT_CONFIG','OCI_OBJECT_STORAGE');
     l_cfg := JSON_OBJECT_T.parse(l_cfg_json);
@@ -3468,11 +3418,7 @@ AS
       l_params := l_cfg.get_object('config_params'); credential_name := l_params.get_string('CREDENTIAL_NAME');
     END IF;
 
-    DECLARE l_ns DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE_GET_NAMESPACE_RESPONSE_T;
-    BEGIN
-      l_ns := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.GET_NAMESPACE(NULL,region,credential_name);
-      namespace := l_ns.response_body;
-    EXCEPTION WHEN OTHERS THEN NULL; END;
+    resolve_metadata(region => region, namespace => namespace, compartment_id => compartment_id);
 
     l_req := DBMS_CLOUD_OCI_OBJECT_STORAGE_CREATE_MULTIPART_UPLOAD_DETAILS_T(
       object=>object_name, content_type=>content_type, content_language=>NULL,
@@ -3523,7 +3469,9 @@ AS
     result_json JSON_OBJECT_T := JSON_OBJECT_T();
     l_current_user VARCHAR2(128):= SYS_CONTEXT('USERENV','CURRENT_USER');
     l_cfg_json CLOB; l_cfg JSON_OBJECT_T; l_params JSON_OBJECT_T;
-    credential_name VARCHAR2(256); namespace VARCHAR2(256);
+    credential_name VARCHAR2(256);
+    namespace VARCHAR2(256);
+    compartment_id  VARCHAR2(256);
   BEGIN
     l_cfg_json := get_agent_config(l_current_user,'OCI_AGENT_CONFIG','OCI_OBJECT_STORAGE');
     l_cfg := JSON_OBJECT_T.parse(l_cfg_json);
@@ -3531,11 +3479,7 @@ AS
       l_params := l_cfg.get_object('config_params'); credential_name := l_params.get_string('CREDENTIAL_NAME');
     END IF;
 
-    DECLARE l_ns DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE_GET_NAMESPACE_RESPONSE_T;
-    BEGIN
-      l_ns := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.GET_NAMESPACE(NULL,region,credential_name);
-      namespace := l_ns.response_body;
-    EXCEPTION WHEN OTHERS THEN NULL; END;
+    resolve_metadata(region => region, namespace => namespace, compartment_id => compartment_id);
 
     FOR i IN 1 .. part_num_arr.COUNT LOOP
       l_parts.EXTEND;
@@ -3577,7 +3521,9 @@ AS
     result_json     JSON_OBJECT_T := JSON_OBJECT_T();
     l_current_user  VARCHAR2(128):= SYS_CONTEXT('USERENV','CURRENT_USER');
     l_cfg_json CLOB; l_cfg JSON_OBJECT_T; l_params JSON_OBJECT_T;
-    credential_name VARCHAR2(256); namespace VARCHAR2(256);
+    credential_name VARCHAR2(256);
+    namespace VARCHAR2(256);
+    compartment_id  VARCHAR2(256);
   BEGIN
     l_cfg_json := get_agent_config(l_current_user,'OCI_AGENT_CONFIG','OCI_OBJECT_STORAGE');
     l_cfg := JSON_OBJECT_T.parse(l_cfg_json);
@@ -3585,11 +3531,7 @@ AS
       l_params := l_cfg.get_object('config_params'); credential_name := l_params.get_string('CREDENTIAL_NAME');
     END IF;
 
-    DECLARE l_ns DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE_GET_NAMESPACE_RESPONSE_T;
-    BEGIN
-      l_ns := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.GET_NAMESPACE(NULL,region,credential_name);
-      namespace := l_ns.response_body;
-    EXCEPTION WHEN OTHERS THEN NULL; END;
+    resolve_metadata(region => region, namespace => namespace, compartment_id => compartment_id);
 
     l_resp := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.ABORT_MULTIPART_UPLOAD(
       namespace_name=>namespace, bucket_name=>bucket_name, object_name=>object_name,
@@ -3623,7 +3565,9 @@ AS
     result_json    JSON_OBJECT_T := JSON_OBJECT_T();
     l_current_user VARCHAR2(128):= SYS_CONTEXT('USERENV','CURRENT_USER');
     l_cfg_json CLOB; l_cfg JSON_OBJECT_T; l_params JSON_OBJECT_T;
-    credential_name VARCHAR2(256); namespace VARCHAR2(256);
+    credential_name VARCHAR2(256);
+    namespace VARCHAR2(256);
+    compartment_id  VARCHAR2(256);
   BEGIN
     IF access_type NOT IN (
       'ObjectRead','ObjectWrite','ObjectReadWrite','AnyObjectRead','AnyObjectWrite','AnyObjectReadWrite'
@@ -3637,11 +3581,7 @@ AS
       l_params := l_cfg.get_object('config_params'); credential_name := l_params.get_string('CREDENTIAL_NAME');
     END IF;
 
-    DECLARE l_ns DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE_GET_NAMESPACE_RESPONSE_T;
-    BEGIN
-      l_ns := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.GET_NAMESPACE(NULL,region,credential_name);
-      namespace := l_ns.response_body;
-    EXCEPTION WHEN OTHERS THEN NULL; END;
+    resolve_metadata(region => region, namespace => namespace, compartment_id => compartment_id);
 
     l_details := DBMS_CLOUD_OCI_OBJECT_STORAGE_CREATE_PREAUTHENTICATED_REQUEST_DETAILS_T(
       name=>name, bucket_listing_action=>listing_action, object_name=>object_name,
@@ -3701,7 +3641,9 @@ AS
     result_json    JSON_OBJECT_T := JSON_OBJECT_T();
     l_current_user VARCHAR2(128):= SYS_CONTEXT('USERENV','CURRENT_USER');
     l_cfg_json CLOB; l_cfg JSON_OBJECT_T; l_params JSON_OBJECT_T;
-    credential_name VARCHAR2(256); namespace VARCHAR2(256);
+    credential_name VARCHAR2(256);
+    namespace VARCHAR2(256);
+    compartment_id  VARCHAR2(256);
   BEGIN
     l_cfg_json := get_agent_config(l_current_user,'OCI_AGENT_CONFIG','OCI_OBJECT_STORAGE');
     l_cfg := JSON_OBJECT_T.parse(l_cfg_json);
@@ -3709,11 +3651,7 @@ AS
       l_params := l_cfg.get_object('config_params'); credential_name := l_params.get_string('CREDENTIAL_NAME');
     END IF;
 
-    DECLARE l_ns DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE_GET_NAMESPACE_RESPONSE_T;
-    BEGIN
-      l_ns := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.GET_NAMESPACE(NULL,region,credential_name);
-      namespace := l_ns.response_body;
-    EXCEPTION WHEN OTHERS THEN NULL; END;
+    resolve_metadata(region => region, namespace => namespace, compartment_id => compartment_id);
 
     l_resp := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.GET_PREAUTHENTICATED_REQUEST(
       namespace_name=>namespace, bucket_name=>bucket_name, par_id=>par_id,
@@ -3768,7 +3706,9 @@ AS
     result_json     JSON_OBJECT_T := JSON_OBJECT_T();
     l_current_user  VARCHAR2(128):= SYS_CONTEXT('USERENV','CURRENT_USER');
     l_cfg_json CLOB; l_cfg JSON_OBJECT_T; l_params JSON_OBJECT_T;
-    credential_name VARCHAR2(256); namespace VARCHAR2(256);
+    credential_name VARCHAR2(256);
+    namespace VARCHAR2(256);
+    compartment_id  VARCHAR2(256);
   BEGIN
     l_cfg_json := get_agent_config(l_current_user,'OCI_AGENT_CONFIG','OCI_OBJECT_STORAGE');
     l_cfg := JSON_OBJECT_T.parse(l_cfg_json);
@@ -3776,11 +3716,7 @@ AS
       l_params := l_cfg.get_object('config_params'); credential_name := l_params.get_string('CREDENTIAL_NAME');
     END IF;
 
-    DECLARE l_ns DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE_GET_NAMESPACE_RESPONSE_T;
-    BEGIN
-      l_ns := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.GET_NAMESPACE(NULL,region,credential_name);
-      namespace := l_ns.response_body;
-    EXCEPTION WHEN OTHERS THEN NULL; END;
+    resolve_metadata(region => region, namespace => namespace, compartment_id => compartment_id);
 
     l_resp := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.DELETE_PREAUTHENTICATED_REQUEST(
       namespace_name=>namespace, bucket_name=>bucket_name, par_id=>par_id,
@@ -3814,7 +3750,9 @@ AS
     result_json    JSON_OBJECT_T := JSON_OBJECT_T();
     l_current_user VARCHAR2(128):= SYS_CONTEXT('USERENV','CURRENT_USER');
     l_cfg_json CLOB; l_cfg JSON_OBJECT_T; l_params JSON_OBJECT_T;
-    credential_name VARCHAR2(256); namespace VARCHAR2(256);
+    credential_name VARCHAR2(256);
+    namespace VARCHAR2(256);
+    compartment_id  VARCHAR2(256);
   BEGIN
     l_cfg_json := get_agent_config(l_current_user,'OCI_AGENT_CONFIG','OCI_OBJECT_STORAGE');
     l_cfg := JSON_OBJECT_T.parse(l_cfg_json);
@@ -3822,11 +3760,7 @@ AS
       l_params := l_cfg.get_object('config_params'); credential_name := l_params.get_string('CREDENTIAL_NAME');
     END IF;
 
-    DECLARE l_ns DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE_GET_NAMESPACE_RESPONSE_T;
-    BEGIN
-      l_ns := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.GET_NAMESPACE(NULL,region,credential_name);
-      namespace := l_ns.response_body;
-    EXCEPTION WHEN OTHERS THEN NULL; END;
+    resolve_metadata(region => region, namespace => namespace, compartment_id => compartment_id);
 
     l_details := DBMS_CLOUD_OCI_OBJECT_STORAGE_CREATE_REPLICATION_POLICY_DETAILS_T(
       name=>policy_name, destination_region_name=>destination_region_name,
@@ -3881,7 +3815,9 @@ AS
     result_json     JSON_OBJECT_T := JSON_OBJECT_T();
     l_current_user  VARCHAR2(128):= SYS_CONTEXT('USERENV','CURRENT_USER');
     l_cfg_json CLOB; l_cfg JSON_OBJECT_T; l_params JSON_OBJECT_T;
-    credential_name VARCHAR2(256); namespace VARCHAR2(256);
+    credential_name VARCHAR2(256);
+    namespace VARCHAR2(256);
+    compartment_id  VARCHAR2(256);
   BEGIN
     l_cfg_json := get_agent_config(l_current_user,'OCI_AGENT_CONFIG','OCI_OBJECT_STORAGE');
     l_cfg := JSON_OBJECT_T.parse(l_cfg_json);
@@ -3889,11 +3825,7 @@ AS
       l_params := l_cfg.get_object('config_params'); credential_name := l_params.get_string('CREDENTIAL_NAME');
     END IF;
 
-    DECLARE l_ns DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE_GET_NAMESPACE_RESPONSE_T;
-    BEGIN
-      l_ns := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.GET_NAMESPACE(NULL,region,credential_name);
-      namespace := l_ns.response_body;
-    EXCEPTION WHEN OTHERS THEN NULL; END;
+    resolve_metadata(region => region, namespace => namespace, compartment_id => compartment_id);
 
     l_resp := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.DELETE_REPLICATION_POLICY(
       namespace_name=>namespace, bucket_name=>bucket_name, replication_id=>replication_id,
@@ -3928,7 +3860,9 @@ AS
     result_json   JSON_OBJECT_T := JSON_OBJECT_T();
     l_current_user VARCHAR2(128):= SYS_CONTEXT('USERENV','CURRENT_USER');
     l_cfg_json CLOB; l_cfg JSON_OBJECT_T; l_params JSON_OBJECT_T;
-    credential_name VARCHAR2(256); namespace VARCHAR2(256);
+    credential_name VARCHAR2(256);
+    namespace VARCHAR2(256);
+    compartment_id  VARCHAR2(256);
   BEGIN
     l_cfg_json := get_agent_config(l_current_user,'OCI_AGENT_CONFIG','OCI_OBJECT_STORAGE');
     l_cfg := JSON_OBJECT_T.parse(l_cfg_json);
@@ -3936,9 +3870,7 @@ AS
       l_params := l_cfg.get_object('config_params'); credential_name := l_params.get_string('CREDENTIAL_NAME');
     END IF;
 
-    DECLARE l_ns DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE_GET_NAMESPACE_RESPONSE_T; BEGIN
-      l_ns := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.GET_NAMESPACE(NULL,region,credential_name);
-      namespace := l_ns.response_body; EXCEPTION WHEN OTHERS THEN NULL; END;
+    resolve_metadata(region => region, namespace => namespace, compartment_id => compartment_id);
 
     l_duration := DBMS_CLOUD_OCI_OBJECT_STORAGE_DURATION_T(duration_amount, time_unit);
     l_details  := DBMS_CLOUD_OCI_OBJECT_STORAGE_CREATE_RETENTION_RULE_DETAILS_T(
@@ -3993,16 +3925,16 @@ AS
     result_json     JSON_OBJECT_T := JSON_OBJECT_T();
     l_current_user  VARCHAR2(128):= SYS_CONTEXT('USERENV','CURRENT_USER');
     l_cfg_json CLOB; l_cfg JSON_OBJECT_T; l_params JSON_OBJECT_T;
-    credential_name VARCHAR2(256); namespace VARCHAR2(256);
+    credential_name VARCHAR2(256);
+    namespace VARCHAR2(256);
+    compartment_id  VARCHAR2(256);
   BEGIN
     l_cfg_json := get_agent_config(l_current_user,'OCI_AGENT_CONFIG','OCI_OBJECT_STORAGE');
     l_cfg := JSON_OBJECT_T.parse(l_cfg_json);
     IF l_cfg.get_string('status')='success' THEN
       l_params := l_cfg.get_object('config_params'); credential_name := l_params.get_string('CREDENTIAL_NAME');
     END IF;
-    DECLARE l_ns DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE_GET_NAMESPACE_RESPONSE_T; BEGIN
-      l_ns := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.GET_NAMESPACE(NULL,region,credential_name);
-      namespace := l_ns.response_body; EXCEPTION WHEN OTHERS THEN NULL; END;
+    resolve_metadata(region => region, namespace => namespace, compartment_id => compartment_id);
 
     l_resp := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.DELETE_RETENTION_RULE(
       namespace_name=>namespace, bucket_name=>bucket_name, retention_rule_id=>retention_rule_id,
@@ -4032,16 +3964,16 @@ AS
     result_json     JSON_OBJECT_T := JSON_OBJECT_T();
     l_current_user  VARCHAR2(128):= SYS_CONTEXT('USERENV','CURRENT_USER');
     l_cfg_json CLOB; l_cfg JSON_OBJECT_T; l_params JSON_OBJECT_T;
-    credential_name VARCHAR2(256); namespace VARCHAR2(256);
+    credential_name VARCHAR2(256);
+    namespace VARCHAR2(256);
+    compartment_id  VARCHAR2(256);
   BEGIN
     l_cfg_json := get_agent_config(l_current_user,'OCI_AGENT_CONFIG','OCI_OBJECT_STORAGE');
     l_cfg := JSON_OBJECT_T.parse(l_cfg_json);
     IF l_cfg.get_string('status')='success' THEN
       l_params := l_cfg.get_object('config_params'); credential_name := l_params.get_string('CREDENTIAL_NAME');
     END IF;
-    DECLARE l_ns DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE_GET_NAMESPACE_RESPONSE_T; BEGIN
-      l_ns := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.GET_NAMESPACE(NULL,region,credential_name);
-      namespace := l_ns.response_body; EXCEPTION WHEN OTHERS THEN NULL; END;
+    resolve_metadata(region => region, namespace => namespace, compartment_id => compartment_id);
 
     l_resp := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.DELETE_OBJECT_LIFECYCLE_POLICY(
       namespace_name=>namespace, bucket_name=>bucket_name,
@@ -4096,51 +4028,7 @@ AS
     RETURN result_json.to_clob();
   END cancel_work_request;
 
-  ----------------------------------------------------------------------
-  -- get_namespace: Retrieve namespace metadata
-  ----------------------------------------------------------------------
-  FUNCTION get_namespace(
-    compartment_name IN VARCHAR2,
-    region           IN VARCHAR2
-  ) RETURN CLOB
-  AS
-    l_resp          DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE_GET_NAMESPACE_RESPONSE_T;
-    result_json     JSON_OBJECT_T := JSON_OBJECT_T();
-    l_current_user  VARCHAR2(128):= SYS_CONTEXT('USERENV','CURRENT_USER');
-    l_cfg_json      CLOB; l_cfg JSON_OBJECT_T; l_params JSON_OBJECT_T;
-    credential_name VARCHAR2(256); compartment_id VARCHAR2(256);
-  BEGIN
-    l_cfg_json := get_agent_config(l_current_user,'OCI_AGENT_CONFIG','OCI_OBJECT_STORAGE');
-    l_cfg := JSON_OBJECT_T.parse(l_cfg_json);
-    IF l_cfg.get_string('status')='success' THEN
-      l_params      := l_cfg.get_object('config_params');
-      credential_name := l_params.get_string('CREDENTIAL_NAME');
-      compartment_id  := l_params.get_string('COMPARTMENT_OCID');
-    END IF;
-
-    l_resp := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.GET_NAMESPACE(
-      opc_client_request_id => NULL,
-      compartment_id        => compartment_id,
-      region                => region,
-      endpoint              => NULL,
-      credential_name       => credential_name
-    );
-
-    result_json.put('namespace', TRIM(BOTH CHR(34) FROM l_resp.response_body));
-    result_json.put('region',    region);
-    result_json.put('compartment_id', compartment_id);
-    result_json.put('status_code', l_resp.status_code);
-    IF l_resp.headers IS NOT NULL AND l_resp.headers.has('opc-request-id') THEN
-      result_json.put('opc_request_id', l_resp.headers.get_string('opc-request-id'));
-    END IF;
-
-    RETURN result_json.to_clob();
-  EXCEPTION WHEN OTHERS THEN
-    result_json := JSON_OBJECT_T(); result_json.put('status','error'); result_json.put('message', SQLERRM);
-    result_json.put('region', region); RETURN result_json.to_clob();
-  END get_namespace;
-
-END &&INSTALL_SCHEMA.oci_object_storage_agents;
+END oci_object_storage_agents;
 /
 
 -------------------------------------------------------------------------------
@@ -4170,7 +4058,7 @@ BEGIN
   DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
     tool_name => 'LIST_OBJECTS_TOOL',
     attributes => '{
-      "instruction": "List all objects in a bucket. Provide compartment name, region, and bucket name. Returns JSON including name, size, ETag, storage tier, creation timestamp, object_count, and HTTP status.",
+      "instruction": "List all objects in a bucket using resolved namespace and configured credentials; surfaces per-object metadata for inventory, audit, and pre/post operation workflows.",
       "function": "&&INSTALL_SCHEMA.oci_object_storage_agents.list_objects"
     }',
     description => 'Tool for listing objects in OCI Object Storage'
@@ -4184,7 +4072,7 @@ BEGIN
   DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
     tool_name => 'LIST_BUCKETS_TOOL',
     attributes => '{
-      "instruction": "List all buckets in a compartment. Provide compartment name and region. Returns JSON with total_buckets and array of buckets (name, compartment, time_created).",
+      "instruction": "List all Object Storage buckets visible to the configured compartment scope in the given region; useful for navigation, selection, and governance views.",
       "function": "&&INSTALL_SCHEMA.oci_object_storage_agents.list_buckets"
     }',
     description => 'Tool for listing Object Storage buckets'
@@ -4198,7 +4086,7 @@ BEGIN
   DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
     tool_name => 'GET_BUCKET_TOOL',
     attributes => '{
-      "instruction": "Retrieve metadata for an Object Storage bucket in a region. Provide compartment name (informational), bucket name, and region. Returns structured JSON with bucket properties and status_code.",
+      "instruction": "Fetches a bucket’s configuration and summary properties in the given region to support governance, diagnostics, and detail panes.",
       "function": "&&INSTALL_SCHEMA.oci_object_storage_agents.get_bucket"
     }',
     description => 'Tool for retrieving Object Storage bucket metadata'
@@ -4212,7 +4100,7 @@ BEGIN
   DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
     tool_name => 'HEAD_BUCKET_TOOL',
     attributes => '{
-      "instruction": "Retrieve metadata headers for a bucket. Provide compartment name, bucket name, and region. Returns JSON with headers and status_code.",
+      "instruction": "Performs a lightweight metadata probe (HEAD) on a bucket to validate existence and inspect headers without retrieving content.",
       "function": "&&INSTALL_SCHEMA.oci_object_storage_agents.head_bucket"
     }',
     description => 'Tool for retrieving Object Storage bucket metadata headers'
@@ -4226,7 +4114,7 @@ BEGIN
   DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
     tool_name => 'HEAD_OBJECT_TOOL',
     attributes => '{
-      "instruction": "Retrieve metadata headers for an object. Provide compartment name, region, bucket name, and object name. Returns JSON with headers and status_code.",
+      "instruction": "Performs an object metadata probe (HEAD) to validate existence and inspect headers such as etag and content-type without downloading payload.",
       "function": "&&INSTALL_SCHEMA.oci_object_storage_agents.head_object"
     }',
     description => 'Tool for retrieving Object Storage object metadata headers'
@@ -4240,7 +4128,7 @@ BEGIN
   DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
     tool_name => 'LIST_MULTIPART_UPLOADS_TOOL',
     attributes => '{
-      "instruction": "List all multipart uploads in a bucket. Provide region and bucket name. Returns JSON with multipart_uploads (object, upload_id, storage_tier, time_created), headers, and status_code.",
+      "instruction": "List all in-progress multipart uploads for a bucket to help resume, commit, or clean up unfinished large-object transfers.",
       "function": "&&INSTALL_SCHEMA.oci_object_storage_agents.list_multipart_uploads"
     }',
     description => 'Tool for listing multipart uploads in Object Storage'
@@ -4254,7 +4142,7 @@ BEGIN
   DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
     tool_name => 'LIST_MULTIPART_UPLOAD_PARTS_TOOL',
     attributes => '{
-      "instruction": "List all parts of a multipart upload for an object. Provide region, bucket name, object name, and upload_id. Returns JSON with multipart_upload_parts (part_number, etag, md5, size) and status_code.",
+      "instruction": "Inspects the parts uploaded for a given multipart session, enabling validation and completion logic for large transfers.",
       "function": "&&INSTALL_SCHEMA.oci_object_storage_agents.list_multipart_upload_parts"
     }',
     description => 'Tool for listing multipart upload parts in Object Storage'
@@ -4268,7 +4156,7 @@ BEGIN
   DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
     tool_name => 'MAKE_BUCKET_WRITABLE_TOOL',
     attributes => '{
-      "instruction": "Make a specified bucket writable. Provide region and bucket name. Returns JSON with status_code and optional headers (opc_request_id, etag).",
+      "instruction": "Transitions a bucket to a writable state when it is read-only; use before performing write operations.",
       "function": "&&INSTALL_SCHEMA.oci_object_storage_agents.make_bucket_writable"
     }',
     description => 'Tool to set an OCI Object Storage bucket as writable'
@@ -4282,7 +4170,7 @@ BEGIN
   DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
     tool_name => 'PUT_OBJECT_LIFECYCLE_POLICY_TOOL',
     attributes => '{
-      "instruction": "Apply an object lifecycle policy to a bucket. Provide region, bucket name, action (DELETE/ARCHIVE), time_amount, time_unit (DAYS/HOURS/etc), and optional rule_name. Returns JSON with status_code.",
+      "instruction": "Defines lifecycle management rules on a bucket to transition or delete objects based on age or criteria.",
       "function": "&&INSTALL_SCHEMA.oci_object_storage_agents.put_object_lifecycle_policy"
     }',
     description => 'Tool to set lifecycle policies for OCI Object Storage buckets'
@@ -4296,7 +4184,7 @@ BEGIN
   DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
     tool_name => 'LIST_RETENTION_RULES_TOOL',
     attributes => '{
-      "instruction": "List retention rules for a bucket. Provide region and bucket name. Returns JSON including rule id, display_name, duration, timestamps, etag/opc_request_id (if present), and status_code.",
+      "instruction": "List retention rules on a bucket to assess compliance posture and cleanup eligibility.",
       "function": "&&INSTALL_SCHEMA.oci_object_storage_agents.list_retention_rules"
     }',
     description => 'Tool for listing OCI Object Storage retention rules'
@@ -4310,7 +4198,7 @@ BEGIN
   DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
     tool_name => 'GET_RETENTION_RULE_TOOL',
     attributes => '{
-      "instruction": "Retrieve details for a retention rule. Provide region, bucket name, and retention_rule_id. Returns JSON with rule metadata (duration, timestamps), optional headers, and status_code.",
+      "instruction": "Retrieves the full definition of a specific retention rule for review or update workflows.",
       "function": "&&INSTALL_SCHEMA.oci_object_storage_agents.get_retention_rule"
     }',
     description => 'Tool for retrieving Object Storage retention rule details'
@@ -4324,7 +4212,7 @@ BEGIN
   DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
     tool_name => 'GET_OBJECT_TOOL',
     attributes => '{
-      "instruction": "Retrieve metadata for an Object Storage object (not payload). Provide compartment name, region, bucket name, and object name. Returns structured JSON with status_code and selected headers (etag, last_modified, content_length, content_type).",
+      "instruction": "Retrieves object metadata (not payload) to inform downstream decisions such as conditional reads, cache validation, or UI displays.",
       "function": "&&INSTALL_SCHEMA.oci_object_storage_agents.get_object"
     }',
     description => 'Tool for retrieving Object Storage object metadata (summary)'
@@ -4338,7 +4226,7 @@ BEGIN
   DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
     tool_name => 'PUT_OBJECT_TOOL',
     attributes => '{
-      "instruction": "Upload an object to OCI Object Storage. Provide region, bucket name, object name, content (CLOB), and content_type (MIME). Returns JSON with status_code, etag and opc_request_id when available.",
+      "instruction": "Upload object content to a bucket with an explicit MIME type; use for uploads and content updates.",
       "function": "&&INSTALL_SCHEMA.oci_object_storage_agents.put_object"
     }',
     description => 'Tool to upload objects to OCI Object Storage'
@@ -4352,7 +4240,7 @@ BEGIN
   DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
     tool_name => 'LIST_PREAUTHENTICATED_REQUESTS_TOOL',
     attributes => '{
-      "instruction": "List all preauthenticated requests (PARs) for a bucket. Provide region and bucket name. Returns JSON including PAR details and status_code.",
+      "instruction": "Lists existing Preauthenticated Requests (PARs) for a bucket to audit access links and manage sharing.",
       "function": "&&INSTALL_SCHEMA.oci_object_storage_agents.list_preauthenticated_requests"
     }',
     description => 'Tool for listing preauthenticated requests (PARs)'
@@ -4366,7 +4254,7 @@ BEGIN
   DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
     tool_name => 'LIST_REPLICATION_POLICIES_TOOL',
     attributes => '{
-      "instruction": "List replication policies for a bucket. Provide region and bucket name. Returns JSON with policy summaries and status_code.",
+      "instruction": "Lists replication policies configured on a bucket to understand cross-region replication posture.",
       "function": "&&INSTALL_SCHEMA.oci_object_storage_agents.list_replication_policies"
     }',
     description => 'Tool for listing Object Storage replication policies'
@@ -4380,7 +4268,7 @@ BEGIN
   DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
     tool_name => 'GET_REPLICATION_POLICY_TOOL',
     attributes => '{
-      "instruction": "Retrieve details for a replication policy. Provide region, bucket name, and replication_id. Returns JSON with policy details and status_code.",
+      "instruction": "Retrieves details of a specific replication policy for status and configuration inspection.",
       "function": "&&INSTALL_SCHEMA.oci_object_storage_agents.get_replication_policy"
     }',
     description => 'Tool for retrieving replication policy details'
@@ -4394,7 +4282,7 @@ BEGIN
   DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
     tool_name => 'LIST_REPLICATION_SOURCES_TOOL',
     attributes => '{
-      "instruction": "List replication sources for a bucket. Provide region and bucket name. Returns JSON with sources and status_code.",
+      "instruction": "Lists upstream replication sources associated with a bucket to understand replication topology.",
       "function": "&&INSTALL_SCHEMA.oci_object_storage_agents.list_replication_sources"
     }',
     description => 'Tool for listing replication sources'
@@ -4408,7 +4296,7 @@ BEGIN
   DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
     tool_name => 'REENCRYPT_BUCKET_TOOL',
     attributes => '{
-      "instruction": "Trigger re-encryption of a bucket. Provide region and bucket name. Returns JSON with status_code and headers (opc_request_id, etag) when present.",
+      "instruction": "Initiates a bucket-level re-encryption operation, typically after KMS rotation or encryption policy changes.",
       "function": "&&INSTALL_SCHEMA.oci_object_storage_agents.reencrypt_bucket"
     }',
     description => 'Tool to re-encrypt buckets'
@@ -4422,7 +4310,7 @@ BEGIN
   DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
     tool_name => 'REENCRYPT_OBJECT_TOOL',
     attributes => '{
-      "instruction": "Trigger re-encryption of an object. Provide region, bucket name, object name, and kms_key_id. Returns JSON with status_code and headers.",
+      "instruction": "Initiates re-encryption for a specific object, typically after KMS or encryption policy changes.",
       "function": "&&INSTALL_SCHEMA.oci_object_storage_agents.reencrypt_object"
     }',
     description => 'Tool to re-encrypt objects'
@@ -4436,7 +4324,7 @@ BEGIN
   DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
     tool_name => 'RENAME_OBJECT_TOOL',
     attributes => '{
-      "instruction": "Rename an object in a bucket. Provide region, bucket name, source_object, and new_object. Returns JSON with status_code and headers.",
+      "instruction": "Renames or moves an object within a bucket by changing its key name.",
       "function": "&&INSTALL_SCHEMA.oci_object_storage_agents.rename_object"
     }',
     description => 'Tool to rename objects'
@@ -4450,7 +4338,7 @@ BEGIN
   DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
     tool_name => 'RESTORE_OBJECTS_TOOL',
     attributes => '{
-      "instruction": "Restore an object (optionally by version) for a specified number of hours. Provide region, bucket name, object name, hours, and optional version_id. Returns JSON with status_code and opc_request_id.",
+      "instruction": "Restores archived or versioned content for a limited duration to enable reads or rehydration.",
       "function": "&&INSTALL_SCHEMA.oci_object_storage_agents.restore_objects"
     }',
     description => 'Tool to restore objects from Object Storage'
@@ -4464,7 +4352,7 @@ BEGIN
   DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
     tool_name => 'UPLOAD_PART_TOOL',
     attributes => '{
-      "instruction": "Upload a part in a multipart upload. Provide region, bucket name, object name, upload_id, upload_part_num, upload_part_body (BLOB), and content_length. Returns JSON with status_code and headers.",
+      "instruction": "Uploads a single part for an ongoing multipart transfer; repeat to assemble large objects.",
       "function": "&&INSTALL_SCHEMA.oci_object_storage_agents.upload_part"
     }',
     description => 'Tool for multipart upload parts'
@@ -4478,7 +4366,7 @@ BEGIN
   DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
     tool_name => 'UPDATE_NAMESPACE_METADATA_TOOL',
     attributes => '{
-      "instruction": "Update default S3/Swift compartments for a namespace. Provide compartment name (informational) and region. Returns JSON with defaults and status_code.",
+      "instruction": "Sets default namespace metadata such as default compartments for S3/Swift interoperability.",
       "function": "&&INSTALL_SCHEMA.oci_object_storage_agents.update_namespace_metadata"
     }',
     description => 'Tool to update namespace metadata'
@@ -4492,7 +4380,7 @@ BEGIN
   DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
     tool_name => 'UPDATE_RETENTION_RULE_TOOL',
     attributes => '{
-      "instruction": "Update a retention rule for a bucket. Provide region, bucket name, rule_id, new_display_name, duration_amount, and time_unit. Returns JSON with updated fields and status_code.",
+      "instruction": "Modifies an existing retention rule on a bucket to change display name or retention duration.",
       "function": "&&INSTALL_SCHEMA.oci_object_storage_agents.update_retention_rule"
     }',
     description => 'Tool to update retention rules'
@@ -4506,7 +4394,7 @@ BEGIN
   DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
     tool_name => 'LIST_WORK_REQUESTS_TOOL',
     attributes => '{
-      "instruction": "List work requests in a compartment. Provide compartment name (informational) and region. Returns JSON array of work requests and status_code.",
+      "instruction": "Lists Object Storage work requests for the configured compartment to monitor asynchronous operations.",
       "function": "&&INSTALL_SCHEMA.oci_object_storage_agents.list_work_requests"
     }',
     description => 'Tool for listing work requests'
@@ -4520,7 +4408,7 @@ BEGIN
   DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
     tool_name => 'LIST_WORK_REQUEST_ERRORS_TOOL',
     attributes => '{
-      "instruction": "List errors for a work request. Provide work_request_id and region. Returns JSON with errors and status_code.",
+      "instruction": "Retrieves error items associated with a work request to aid troubleshooting.",
       "function": "&&INSTALL_SCHEMA.oci_object_storage_agents.list_work_request_errors"
     }',
     description => 'Tool for listing work request errors'
@@ -4534,7 +4422,7 @@ BEGIN
   DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
     tool_name => 'LIST_WORK_REQUEST_LOGS_TOOL',
     attributes => '{
-      "instruction": "List logs for a work request. Provide work_request_id and region. Returns JSON with logs, next_page (if present), and status_code.",
+      "instruction": "Retrieves log messages for a work request to track progress and diagnose issues.",
       "function": "&&INSTALL_SCHEMA.oci_object_storage_agents.list_work_request_logs"
     }',
     description => 'Tool for listing work request logs'
@@ -4548,7 +4436,7 @@ BEGIN
   DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
     tool_name => 'GET_WORK_REQUEST_TOOL',
     attributes => '{
-      "instruction": "Retrieve details for a work request. Provide work_request_id and region. Returns JSON with status, operation_type, percent_complete, timestamps, and status_code.",
+      "instruction": "Retrieves the current status and key attributes of a specific work request for monitoring.",
       "function": "&&INSTALL_SCHEMA.oci_object_storage_agents.get_work_request"
     }',
     description => 'Tool for retrieving work request details'
@@ -4562,7 +4450,7 @@ BEGIN
   DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
       tool_name => 'UPDATE_BUCKET_TOOL',
       attributes => '{
-          "instruction": "This tool updates an existing OCI Object Storage bucket with new display name, versioning, public access type, and object event settings.",
+          "instruction": "Updates bucket configuration such as display name, versioning state, public access, and object event settings.",
           "function": "&&INSTALL_SCHEMA.oci_object_storage_agents.update_bucket"
       }',
       description => 'Tool to update OCI Object Storage buckets'
@@ -4573,7 +4461,7 @@ BEGIN
   DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
     tool_name => 'CREATE_BUCKET_TOOL',
     attributes => '{
-      "instruction": "Create a new Object Storage bucket. Provide compartment name (informational), bucket name, and region. Returns JSON identifiers and status_code.",
+      "instruction": "Creates a new Object Storage bucket in the specified region under the configured compartment scope.",
       "function": "&&INSTALL_SCHEMA.oci_object_storage_agents.create_bucket"
     }',
     description => 'Tool to create Object Storage buckets'
@@ -4584,7 +4472,7 @@ BEGIN
   DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
     tool_name => 'DELETE_BUCKET_TOOL',
     attributes => '{
-      "instruction": "Delete an Object Storage bucket (must be empty). Provide compartment name (informational), bucket name, and region. Returns JSON with status_code.",
+      "instruction": "Removes an Object Storage bucket that is already empty; use for deprovisioning.",
       "function": "&&INSTALL_SCHEMA.oci_object_storage_agents.delete_bucket"
     }',
     description => 'Tool to delete Object Storage buckets'
@@ -4595,7 +4483,7 @@ BEGIN
   DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
     tool_name => 'DELETE_OBJECT_TOOL',
     attributes => '{
-      "instruction": "Delete an object. Provide compartment name (informational), region, bucket name, and object name. Returns JSON with status_code.",
+      "instruction": "Removes an object from a bucket; use for cleanup, archival workflows, or version management.",
       "function": "&&INSTALL_SCHEMA.oci_object_storage_agents.delete_object"
     }',
     description => 'Tool to delete objects from Object Storage'
@@ -4606,7 +4494,7 @@ BEGIN
   DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
     tool_name => 'COPY_OBJECT_TOOL',
     attributes => '{
-      "instruction": "Copy an object to another bucket/region. Provide region, bucket_name, source_object_name, destination_region, destination_bucket_name, destination_object_name.",
+      "instruction": "Copies an object to a destination bucket and region, enabling cross-bucket or cross-region duplication.",
       "function": "&&INSTALL_SCHEMA.oci_object_storage_agents.copy_object"
     }',
     description => 'Tool to copy objects between buckets/regions'
@@ -4617,7 +4505,7 @@ BEGIN
   DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
     tool_name => 'CREATE_MULTIPART_UPLOAD_TOOL',
     attributes => '{
-      "instruction": "Start a multipart upload. Provide region, bucket_name, object_name, and optional content_type. Returns JSON with upload_id and status_code.",
+      "instruction": "Initiates a multipart upload session for large object transfers.",
       "function": "&&INSTALL_SCHEMA.oci_object_storage_agents.create_multipart_upload"
     }',
     description => 'Tool to start multipart uploads'
@@ -4628,7 +4516,7 @@ BEGIN
   DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
     tool_name => 'COMMIT_MULTIPART_UPLOAD_TOOL',
     attributes => '{
-      "instruction": "Commit a multipart upload. Provide region, bucket_name, object_name, upload_id, part_num_arr, etag_arr. Returns JSON with status_code.",
+      "instruction": "Finalizes a multipart upload by committing the selected parts.",
       "function": "&&INSTALL_SCHEMA.oci_object_storage_agents.commit_multipart_upload"
     }',
     description => 'Tool to finalize multipart uploads'
@@ -4639,7 +4527,7 @@ BEGIN
   DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
     tool_name => 'ABORT_MULTIPART_UPLOAD_TOOL',
     attributes => '{
-      "instruction": "Abort a multipart upload. Provide region, bucket_name, object_name, and upload_id. Returns JSON with status_code.",
+      "instruction": "Cancels an in-progress multipart upload and cleans up partial state.",
       "function": "&&INSTALL_SCHEMA.oci_object_storage_agents.abort_multipart_upload"
     }',
     description => 'Tool to abort multipart uploads'
@@ -4650,7 +4538,7 @@ BEGIN
   DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
     tool_name => 'CREATE_PREAUTHENTICATED_REQUEST_TOOL',
     attributes => '{
-      "instruction": "Create a Preauthenticated Request (PAR). Provide region, bucket_name, name, object_name, access_type, listing_action, and time_expires. Returns JSON with PAR id and status_code.",
+      "instruction": "Creates a Preauthenticated Request (PAR) to grant time‑bound access to a bucket or object via a signed URL.",
       "function": "&&INSTALL_SCHEMA.oci_object_storage_agents.create_preauthenticated_request"
     }',
     description => 'Tool to create PARs for Object Storage'
@@ -4661,7 +4549,7 @@ BEGIN
   DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
     tool_name => 'GET_PREAUTHENTICATED_REQUEST_TOOL',
     attributes => '{
-      "instruction": "Get a Preauthenticated Request (PAR). Provide region, bucket_name, and par_id. Returns JSON with PAR details and status_code.",
+      "instruction": "Retrieves details of a Preauthenticated Request (PAR) for review, auditing, or client presentation.",
       "function": "&&INSTALL_SCHEMA.oci_object_storage_agents.get_preauthenticated_request"
     }',
     description => 'Tool to get PAR details'
@@ -4672,7 +4560,7 @@ BEGIN
   DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
     tool_name => 'DELETE_PREAUTHENTICATED_REQUEST_TOOL',
     attributes => '{
-      "instruction": "Delete a Preauthenticated Request (PAR). Provide region, bucket_name, and par_id. Returns JSON with status_code.",
+      "instruction": "Revokes a Preauthenticated Request (PAR) to immediately disable the shared link.",
       "function": "&&INSTALL_SCHEMA.oci_object_storage_agents.delete_preauthenticated_request"
     }',
     description => 'Tool to delete PARs'
@@ -4683,7 +4571,7 @@ BEGIN
   DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
     tool_name => 'CREATE_REPLICATION_POLICY_TOOL',
     attributes => '{
-      "instruction": "Create a replication policy. Provide region, bucket_name, destination_region_name, destination_bucket_name, and policy_name. Returns JSON with replication_id and status_code.",
+      "instruction": "Creates a cross‑region replication policy from a source bucket to a destination bucket to enable continuous replication.",
       "function": "&&INSTALL_SCHEMA.oci_object_storage_agents.create_replication_policy"
     }',
     description => 'Tool to create replication policies'
@@ -4694,7 +4582,7 @@ BEGIN
   DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
     tool_name => 'DELETE_REPLICATION_POLICY_TOOL',
     attributes => '{
-      "instruction": "Delete a replication policy. Provide region, bucket_name, and replication_id. Returns JSON with status_code.",
+      "instruction": "Removes a replication policy from a bucket to stop replication.",
       "function": "&&INSTALL_SCHEMA.oci_object_storage_agents.delete_replication_policy"
     }',
     description => 'Tool to delete replication policies'
@@ -4705,7 +4593,7 @@ BEGIN
   DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
     tool_name => 'CREATE_RETENTION_RULE_TOOL',
     attributes => '{
-      "instruction": "Create a retention rule. Provide region, bucket_name, display_name, duration_amount, and time_unit. Returns JSON with retention_rule_id and status_code.",
+      "instruction": "Creates a retention rule on a bucket to enforce minimum retention periods for objects.",
       "function": "&&INSTALL_SCHEMA.oci_object_storage_agents.create_retention_rule"
     }',
     description => 'Tool to create Object Storage retention rules'
@@ -4716,7 +4604,7 @@ BEGIN
   DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
     tool_name => 'DELETE_RETENTION_RULE_TOOL',
     attributes => '{
-      "instruction": "Delete a retention rule. Provide region, bucket_name, and retention_rule_id. Returns JSON with status_code.",
+      "instruction": "Removes an existing retention rule from a bucket.",
       "function": "&&INSTALL_SCHEMA.oci_object_storage_agents.delete_retention_rule"
     }',
     description => 'Tool to delete Object Storage retention rules'
@@ -4727,7 +4615,7 @@ BEGIN
   DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
     tool_name => 'DELETE_OBJECT_LIFECYCLE_POLICY_TOOL',
     attributes => '{
-      "instruction": "Delete the object lifecycle policy on a bucket. Provide region and bucket_name. Returns JSON with status_code.",
+      "instruction": "Removes the lifecycle policy from a bucket to stop automated transitions or deletions.",
       "function": "&&INSTALL_SCHEMA.oci_object_storage_agents.delete_object_lifecycle_policy"
     }',
     description => 'Tool to delete lifecycle policy on a bucket'
@@ -4738,7 +4626,7 @@ BEGIN
   DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
     tool_name => 'CANCEL_WORK_REQUEST_TOOL',
     attributes => '{
-      "instruction": "Cancel a work request. Provide work_request_id and region. Returns JSON with status_code and opc_request_id.",
+      "instruction": "Requests cancellation of an asynchronous Object Storage work request.",
       "function": "&&INSTALL_SCHEMA.oci_object_storage_agents.cancel_work_request"
     }',
     description => 'Tool to cancel Object Storage work requests'
@@ -4749,7 +4637,7 @@ BEGIN
   DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
     tool_name => 'GET_NAMESPACE_TOOL',
     attributes => '{
-      "instruction": "Retrieve the Object Storage namespace for the tenancy. Provide compartment name (informational) and region. Returns JSON with namespace and status_code.",
+      "instruction": "Resolves the tenancy’s Object Storage namespace for the given region; foundational for bucket and object operations.",
       "function": "&&INSTALL_SCHEMA.oci_object_storage_agents.get_namespace"
     }',
     description => 'Tool to retrieve Object Storage namespace'
@@ -4766,4 +4654,4 @@ BEGIN
 END;
 /
 
-
+alter session set current_schema = ADMIN;
