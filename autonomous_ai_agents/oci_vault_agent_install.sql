@@ -8,7 +8,7 @@
 --   to automate OCI Vault operations via Select AI Agent (Oracle AI Database).
 --
 -- Script Structure
---   1) Initialization: grants, configuration setup, and resource-principal handling.
+--   1) Initialization: grants, configuration setup.
 --   2) Package deployment: &&INSTALL_SCHEMA.oci_object_storage_agents (spec and body).
 --   3) AI tool setup: creation of all Object Storage agent tools.
 --
@@ -20,27 +20,25 @@
 --
 -- Notes:
 --   - Optional CONFIG_JSON keys:
---       * use_resource_principal (true/false)   -- default: true when omitted
---       * credential_name (string)              -- used if not using resource principal
---       * compartment_ocid (string)             -- optional default compartment OCID
---   - You may also store or update config in OCI_AGENT_CONFIG after install.
+--       * credential_name (string)              
+--       * compartment_name (string)
+--   - You may also update config in OCI_AGENT_CONFIG after install.
 --
 SET SERVEROUTPUT ON
 SET VERIFY OFF
 
--- First argument: schema
-DEFINE INSTALL_SCHEMA = 'ADB_APP_STORE_USER'
+-- First argument: Schema Name (Required)
+DEFINE INSTALL_SCHEMA = '<schema_name>'
 
 -- Second argument: JSON config (optional)
--- If not passed, default to empty string
-DEFINE INSTALL_CONFIG_JSON = '{"use_resource_principal": true, "credential_name": "<cred_name>", "compartment_name": "<comp_name>", "compartment_ocid": "<comp_ocid>"}'
+-- DEFINE INSTALL_CONFIG_JSON = q'({"credential_name": "MY_CRED", "compartment_name": "MY_COMP"})'
+DEFINE INSTALL_CONFIG_JSON = NULL
 
 -------------------------------------------------------------------------------
 -- Initializes the OCI Vault AI Agent. This procedure:
 --   • Grants all required DBMS_CLOUD_OCI Vault type privileges.
 --   • Creates the OCI_AGENT_CONFIG table.
---   • Parses the JSON config and persists credential, compartment, and RP flags.
---   • Enables resource principal if configured.
+--   • Parses the JSON config and persists credential, compartment.
 -- Ensures the Vault agent is fully ready for tool execution.
 -------------------------------------------------------------------------------
 CREATE OR REPLACE PROCEDURE initilize_vault_agent(
@@ -157,17 +155,25 @@ IS
   ----------------------------------------------------------------------------
   -- Helper: generic MERGE for a single config key/value
   ----------------------------------------------------------------------------
-  PROCEDURE merge_config_key(p_key IN VARCHAR2, p_val IN CLOB, p_agent IN VARCHAR2) IS
+  PROCEDURE merge_config_key(
+    p_schema IN VARCHAR2,
+    p_key    IN VARCHAR2,
+    p_val    IN CLOB,
+    p_agent  IN VARCHAR2
+  ) IS
+    l_sql CLOB;
   BEGIN
-    EXECUTE IMMEDIATE
-      'MERGE INTO OCI_AGENT_CONFIG c
+    l_sql :=
+      'MERGE INTO ' || p_schema || '.OCI_AGENT_CONFIG c
          USING (SELECT :k AS "KEY", :v AS "VALUE", :a AS "AGENT" FROM DUAL) src
            ON (c."KEY" = src."KEY" AND c."AGENT" = src."AGENT")
        WHEN MATCHED THEN
          UPDATE SET c."VALUE" = src."VALUE"
        WHEN NOT MATCHED THEN
-         INSERT ("KEY", "VALUE", "AGENT") VALUES (src."KEY", src."VALUE", src."AGENT")'
-    USING p_key, p_val, p_agent;
+         INSERT ("KEY", "VALUE", "AGENT") VALUES (src."KEY", src."VALUE", src."AGENT")';
+
+    EXECUTE IMMEDIATE l_sql
+      USING p_key, p_val, p_agent;
   EXCEPTION
     WHEN OTHERS THEN
       DBMS_OUTPUT.PUT_LINE('Warning: failed to persist ' || p_key || ' config: ' || SQLERRM);
@@ -196,15 +202,15 @@ IS
 
     -- Persist credential_name, compartment_ocid, compartment_name if present
     IF p_credential_name IS NOT NULL THEN
-      merge_config_key('CREDENTIAL_NAME', p_credential_name, c_vault_agent);
+      merge_config_key(p_schema, 'CREDENTIAL_NAME', p_credential_name, c_vault_agent);
     END IF;
 
     IF p_compartment_ocid IS NOT NULL THEN
-      merge_config_key('COMPARTMENT_OCID', p_compartment_ocid, c_vault_agent);
+      merge_config_key(p_schema, 'COMPARTMENT_OCID', p_compartment_ocid, c_vault_agent);
     END IF;
 
     IF p_compartment_name IS NOT NULL THEN
-      merge_config_key('COMPARTMENT_NAME', p_compartment_name, c_vault_agent);
+      merge_config_key(p_schema, 'COMPARTMENT_NAME', p_compartment_name, c_vault_agent);
     END IF;
 
     -- Persist ENABLE_RESOURCE_PRINCIPAL as YES/NO based on effective value (default YES)
@@ -214,7 +220,7 @@ IS
       l_enable_rp_str := 'NO';
     END IF;
 
-    merge_config_key('ENABLE_RESOURCE_PRINCIPAL', l_enable_rp_str, c_vault_agent);
+    merge_config_key(p_schema, 'ENABLE_RESOURCE_PRINCIPAL', l_enable_rp_str, c_vault_agent);
 
     -- Now enable or skip enabling resource principal at DB level based on effective flag
     IF l_effective_use_rp THEN
@@ -250,10 +256,10 @@ BEGIN
     o_compartment_ocid  => l_compartment_ocid
   );
 
-  -- Create generic agent config table (idempotent: ignore if already exists)
+  -- Create generic agent config table
   BEGIN
     EXECUTE IMMEDIATE
-      'CREATE TABLE OCI_AGENT_CONFIG (
+      'CREATE TABLE ' || l_schema_name || '.OCI_AGENT_CONFIG (
          "ID"     NUMBER GENERATED BY DEFAULT AS IDENTITY,
          "KEY"    VARCHAR2(200) NOT NULL,
          "VALUE"  CLOB,
@@ -264,7 +270,7 @@ BEGIN
   EXCEPTION
     WHEN OTHERS THEN
       IF SQLCODE = -955 THEN
-        NULL; -- table already exists; safe to continue on re-run
+        NULL; -- already exists
       ELSE
         RAISE;
       END IF;
@@ -292,7 +298,7 @@ END initilize_vault_agent;
 BEGIN
   initilize_vault_agent(
     p_install_schema_name => '&&INSTALL_SCHEMA',
-    p_config_json         => '&&INSTALL_CONFIG_JSON'
+    p_config_json         => &&INSTALL_CONFIG_JSON
   );
 END;
 /
@@ -327,7 +333,6 @@ AS
 
   -- Additional functions consolidated into the package
   FUNCTION list_secrets (
-      compartment_name IN VARCHAR2,
       region           IN VARCHAR2
   ) RETURN CLOB;
 
@@ -379,7 +384,6 @@ AS
 
   FUNCTION change_secret_compartment (
       secret_id         IN VARCHAR2,
-      compartment_name  IN VARCHAR2,
       region            IN VARCHAR2
   ) RETURN CLOB;
 
@@ -630,15 +634,12 @@ AS
       l_params         := l_cfg.get_object('config_params');
       credential_name  := l_params.get_string('CREDENTIAL_NAME');
       compartment_name := l_params.get_string('COMPARTMENT_NAME');
-      compartment_id   := l_params.get_string('COMPARTMENT_OCID');
     END IF;
 
-    IF compartment_id IS NULL THEN
-      l_json := get_compartment_ocid_by_name(compartment_name => compartment_name);
-      l_obj := JSON_OBJECT_T.parse(l_json);
-      IF l_obj.has('compartment_ocid') THEN
-        compartment_id := l_obj.get_string('compartment_ocid');
-      END IF;
+    l_json := get_compartment_ocid_by_name(compartment_name => compartment_name);
+    l_obj := JSON_OBJECT_T.parse(l_json);
+    IF l_obj.has('compartment_ocid') THEN
+      compartment_id := l_obj.get_string('compartment_ocid');
     END IF;
 
     l_resp := DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE.GET_NAMESPACE(
@@ -898,7 +899,6 @@ AS
   -- list_secrets (package version)
   ----------------------------------------------------------------------
   FUNCTION list_secrets (
-      compartment_name   IN VARCHAR2,
       region             IN VARCHAR2
   ) RETURN CLOB
   AS
@@ -1496,7 +1496,6 @@ AS
   ----------------------------------------------------------------------
   FUNCTION change_secret_compartment (
       secret_id         IN VARCHAR2,
-      compartment_name  IN VARCHAR2,
       region            IN VARCHAR2
   ) RETURN CLOB
   AS
@@ -1580,7 +1579,7 @@ BEGIN
     DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
         tool_name => 'LIST_SECRETS_TOOL',
         attributes => '{
-            "instruction": "List all secrets in a specified OCI Vault compartment. Provide compartment name, region, and credential name. Returns structured JSON including status code, headers, and array of secrets with details and timestamps.",
+            "instruction": "Enumerate all secrets visible to this agent within the configured compartment of the specified region. Use to inventory secrets, review basic metadata (name/OCID, vault, lifecycle state, timestamps), and support governance. This tool never returns secret payloads.",
             "function": "&&INSTALL_SCHEMA.oci_vault_agents.list_secrets"
             }',
         description => 'Tool for listing all secrets in a given OCI Vault compartment'
@@ -1594,7 +1593,7 @@ BEGIN
     DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
         tool_name => 'LIST_SECRET_VERSIONS_TOOL',
         attributes => '{
-            "instruction": "List all versions of an OCI Vault secret. Provide secret OCID, region, and credential name. Returns structured JSON including status code, headers, and an array of secret versions with stages and timestamps.",
+            "instruction": "List every version of a secret to understand its rotation history and stage assignments. Use for auditing and troubleshooting rotations. This tool returns version metadata only, not secret contents.",
             "function": "&&INSTALL_SCHEMA.oci_vault_agents.list_secret_versions"
             }',
         description => 'Tool for listing all versions of an OCI Vault secret'
@@ -1608,7 +1607,7 @@ BEGIN
     DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
         tool_name => 'GET_SECRET_VERSION_TOOL',
         attributes => '{
-            "instruction": "Retrieve a specific version of an OCI Vault secret. Provide secret OCID, version number, region, and credential name. Returns structured JSON including status code, headers, stages, and timestamps.",
+            "instruction": "Retrieve metadata for a specific version of a secret, including stage and timing information, to verify the state of that version. Does not return the secret value.",
             "function": "&&INSTALL_SCHEMA.oci_vault_agents.get_secret_version"
             }',
         description => 'Tool for fetching a specific version of an OCI Vault secret'
@@ -1622,7 +1621,7 @@ BEGIN
     DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
         tool_name => 'UPDATE_SECRET_TOOL',
         attributes => '{
-            "instruction": "Update an OCI Vault secret. Provide secret OCID, optional description, current version, new secret value, defined tags, freeform tags, secret rules, region, and credential name. Returns structured JSON with status code, headers, and updated secret details.",
+            "instruction": "Update secret metadata or roll a new version. Use to rotate the secret by supplying new content or to adjust description, tags, or rules. When content is provided, a new CURRENT version is created in OCI Vault.",
             "function": "&&INSTALL_SCHEMA.oci_vault_agents.update_secret"
             }',
         description => 'Tool for updating an OCI Vault secret'
@@ -1636,7 +1635,7 @@ BEGIN
     DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
         tool_name => 'SCHEDULE_SECRET_DELETION_TOOL',
         attributes => '{
-            "instruction": "Schedule deletion of an OCI Vault secret. Provide secret OCID, optional deletion timestamp, region, and credential name. Returns structured JSON with status code, headers, and confirmation message.",
+            "instruction": "Schedule a delayed deletion of a secret. Use when decommissioning; the secret remains recoverable until the scheduled time and can be canceled before it executes.",
             "function": "&&INSTALL_SCHEMA.oci_vault_agents.schedule_secret_deletion"
             }',
         description => 'Tool for scheduling deletion of an OCI Vault secret'
@@ -1650,7 +1649,7 @@ BEGIN
     DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
         tool_name => 'SCHEDULE_SECRET_VERSION_DELETION_TOOL',
         attributes => '{
-            "instruction": "Schedule deletion of a specific OCI Vault secret version. Provide secret OCID, version number, optional deletion timestamp, region, and credential name. Returns structured JSON with status code, headers, and confirmation message.",
+            "instruction": "Schedule deletion of a specific secret version without removing the secret itself. Useful for pruning superseded versions while retaining the active one.",
             "function": "&&INSTALL_SCHEMA.oci_vault_agents.schedule_secret_version_deletion"
             }',
         description => 'Tool for scheduling deletion of a specific OCI Vault secret version'
@@ -1663,10 +1662,10 @@ BEGIN
     drop_tool_if_exists(tool_name => 'CANCEL_SECRET_DELETION_TOOL');
     DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
         tool_name => 'CANCEL_SECRET_DELETION_TOOL',
-        attributes => '{"instruction": "Cancels a scheduled deletion for an OCI Vault secret. ' ||
-                                  'Provide the secret OCID, region, and credential name. ' ||
-                                  'Returns structured JSON with status, message, HTTP status code (if available), and headers.", 
-                        "function" : "&&INSTALL_SCHEMA.oci_vault_agents.cancel_secret_deletion"}',
+        attributes => '{
+            "instruction": "Cancel a previously scheduled deletion of a secret and keep it active.",
+            "function": "&&INSTALL_SCHEMA.oci_vault_agents.cancel_secret_deletion"
+            }',
         description => 'Tool for cancelling a scheduled deletion of an OCI Vault secret'
     );
 
@@ -1678,7 +1677,7 @@ BEGIN
     DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
         tool_name => 'CANCEL_SECRET_VERSION_DELETION_TOOL',
         attributes => '{
-            "instruction": "Cancel scheduled deletion of a specific OCI Vault secret version. Provide secret OCID, version number, region, and credential name. Returns structured JSON with status code, headers, and confirmation message.",
+            "instruction": "Cancel a previously scheduled deletion for a specific secret version.",
             "function": "&&INSTALL_SCHEMA.oci_vault_agents.cancel_secret_version_deletion"
             }',
         description => 'Tool for cancelling scheduled deletion of a specific secret version'
@@ -1691,10 +1690,10 @@ BEGIN
     drop_tool_if_exists(tool_name => 'CHANGE_SECRET_COMPARTMENT_TOOL');
     DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
         tool_name => 'CHANGE_SECRET_COMPARTMENT_TOOL',
-        attributes => '{"instruction": "Change the compartment of an OCI Vault secret. ' ||
-                       'Provide secret OCID, target compartment name, region, and credential name. ' ||
-                       'Returns structured JSON describing success or failure.", 
-                        "function" : "&&INSTALL_SCHEMA.oci_vault_agents.change_secret_compartment"}',
+        attributes => '{
+            "instruction": "Move a secret to a different compartment to align with tenancy structure, permissions, or cost ownership. The secret remains the same resource with updated compartment context.",
+            "function": "&&INSTALL_SCHEMA.oci_vault_agents.change_secret_compartment"
+            }',
         description => 'Tool for changing the compartment of an OCI Vault secret'
     );
 
@@ -1706,7 +1705,7 @@ BEGIN
     DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
         tool_name => 'CREATE_SECRET_TOOL',
         attributes => '{
-            "instruction": "Create a new OCI Vault secret. Provide secret name, plaintext, description, compartment name or OCID, vault OCID, key OCID, region, and credential name (optional). Returns structured JSON with status, secret details, HTTP status code, and headers.",
+            "instruction": "Create a new secret in OCI Vault using the specified vault and key, establishing its initial CURRENT version with the provided plaintext. Use for onboarding new credentials or initializing managed secrets.",
             "function": "&&INSTALL_SCHEMA.oci_vault_agents.create_secret"
             }',
         description => 'Tool for creating a secret in OCI Vault (Select AI Agent / Oracle AI Database)'
@@ -1720,7 +1719,7 @@ BEGIN
     DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
         tool_name => 'GET_SECRET_TOOL',
         attributes => '{
-            "instruction": "Retrieve an OCI Vault secret. Provide secret OCID, region, and credential name (optional). Returns structured JSON including status code, headers, and secret details with timestamps.",
+            "instruction": "Retrieve existing secret metadata to inspect its state, associations, and timing details. Use for monitoring and diagnostics; this tool does not expose secret material.",
             "function": "&&INSTALL_SCHEMA.oci_vault_agents.get_secret"
             }',
         description => 'Tool for fetching an OCI Vault secret (Select AI Agent / Oracle AI Database)'
@@ -1742,4 +1741,3 @@ END;
 /
 
 alter session set current_schema = ADMIN;
-
