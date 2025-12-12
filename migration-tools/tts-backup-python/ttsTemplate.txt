@@ -1,0 +1,642 @@
+#
+#
+# TtsTemplate.txt
+#
+# Copyright (c) 2019, 2025, Oracle and/or its affiliates.
+#
+#   NAME
+#     TtsTemplate.txt - sql scripts for tts-backup.py
+#
+#   DESCRIPTION
+#     <short description of component this file declares/defines>
+#
+#   NOTES
+#     <other useful comments, qualifications, etc.>
+#
+#   MODIFIED   (MM/DD/YY)
+#   hkarniya    11/18/25 - Bug 38667283: DRY_RUN enhancements
+#   sovaraka    10/07/25 - Bug 37924415,37860857,37925905: Added checks
+#                          for redaction, ols, dvrealm policies
+#   hkarniya    09/11/25 - Bug 37893757: Add compatible validation
+#   sovaraka    07/03/23 - Bug 38150434: Added sql scripts for tts-backup
+#   sovaraka    07/01/25 - Creation
+#
+#
+
+[template]
+
+get_tablespaces:
+  select tablespace_name from dba_tablespaces where contents = 'PERMANENT' and
+  tablespace_name not in ('SYSTEM', 'SYSAUX');
+
+validate_schemas:
+  declare
+    l_cnt number := 0;
+    l_msg varchar2(30000);
+  begin
+    select count(*) into l_cnt from dba_users where username = '${schema}';
+    if l_cnt = 0 then
+      l_msg := 'ERROR : Schema ${schema} not found in the database.';
+      if ('${dry_run}' = 'TRUE') then
+        dbms_output.put_line(l_msg);
+      else 
+        raise_application_error(-20001, l_msg);
+      end if;
+    end if;
+
+    -- check if there are any XMLSCHEMA tables
+    select count(*) into l_cnt from dba_xml_tables 
+    where owner = '${schema}'
+    ${exc_tbl_filter};
+
+    if (l_cnt > 0) then
+      l_msg := 'ERROR : Validation failed for schema ${schema}: The schema contains XMLType tables linked to registered XMLSchemas. ' ||
+          'Autonomous Database does not support object-relational XMLType tables. ' ||
+          'Please use exclude_tables option to exclude these tables.. ';
+      if ('${dry_run}' = 'TRUE') then
+        dbms_output.put_line(l_msg);
+      else
+        raise_application_error(-20001, l_msg);
+      end if;
+    end if;
+  end;
+  /
+
+tts_src_get_scn:
+  declare
+    l_current_scn v\$database.current_scn%TYPE;
+    l_current_ckp v\$datafile_header.checkpoint_change#%TYPE;
+  begin
+    select current_scn into l_current_scn from v\$database;
+    select min(checkpoint_change#) into l_current_ckp from v\$datafile_header where tablespace_name in (${ts_list}) and checkpoint_change# >= ${incr_scn};
+    dbms_output.put_line(l_current_scn || ',' || l_current_ckp);
+  end;
+  /
+
+validate_tablespaces:
+  declare
+    l_platform_name v\$database.platform_name%TYPE;
+    l_ts_block_size dba_tablespaces.block_size%TYPE;
+    l_ts_status dba_tablespaces.status%TYPE;
+    l_ts_bigfile dba_tablespaces.bigfile%TYPE;
+    l_ts_encrypted dba_tablespaces.encrypted%TYPE;
+    l_default_ts_name user_users.default_tablespace%TYPE;
+    l_cnt number;
+    l_nls_charset database_properties.property_value%TYPE;
+    l_nls_ncharset database_properties.property_value%TYPE;
+    l_timezone varchar2(32);
+    l_tts_charset_status boolean;
+    l_error_msg varchar2(1024);
+    l_msg varchar2(30000);
+  begin
+    if ('${tablespace}' = 'SYSTEM' or '${tablespace}' = 'SYSAUX') then
+      l_msg := 'ERROR : Administrative tablespaces SYSTEM, SYSAUX cannot be transported';
+      if ('${dry_run}' = 'TRUE') then
+        dbms_output.put_line(l_msg);
+      else
+        raise_application_error(-20001, l_msg);
+      end if;
+    end if;
+
+    -- Check if platform is supported for transport
+    begin
+      select d.platform_name into l_platform_name
+      from v\$database d, v\$transportable_platform t
+      where d.platform_id = t.platform_id;
+    exception
+      when no_data_found then
+        l_msg := 'ERROR : Source database platform ' || l_platform_name || ' is not supported for transportable tablespace.';
+        if ('${dry_run}' = 'TRUE') then
+          dbms_output.put_line(l_msg);
+        else
+          raise_application_error(-20001, l_msg);
+        end if;
+    end;
+
+    -- Check tablespace properties
+    select block_size, bigfile, encrypted, status 
+    into l_ts_block_size, l_ts_bigfile, l_ts_encrypted, l_ts_status 
+    from dba_tablespaces where tablespace_name = '${tablespace}';
+
+    if (l_ts_block_size != 8192) then
+      l_msg := 'ERROR : Tablespace ${tablespace} has block size ' || l_ts_block_size || '. Only 8K block size is supported.';
+      if ('${dry_run}' = 'TRUE') then
+        dbms_output.put_line(l_msg);
+      else
+        raise_application_error(-20001, l_msg);
+      end if;
+    end if;
+
+    if ('${final_backup}' = 'TRUE' and l_ts_status != 'READ ONLY') then
+      l_msg := 'ERROR : Tablespace ${tablespace} is not in read only mode in final backup';
+      if ('${dry_run}' = 'TRUE') then
+        dbms_output.put_line(l_msg);
+      else
+        raise_application_error(-20001, l_msg);
+      end if;
+    end if;
+
+    -- check if the tablespace is default tablespace of current user
+    -- check if current user's default tablespace is in read write mode
+    select u.default_tablespace, t.status into l_default_ts_name, l_ts_status
+    from user_users u, dba_tablespaces t where u.default_tablespace = t.tablespace_name;
+    if (l_default_ts_name = '${tablespace}') then
+      l_msg := 'ERROR : Tablespace ${tablespace} can not be default tablespace of user running transport.';
+      if ('${dry_run}' = 'TRUE') then
+        dbms_output.put_line(l_msg);
+      else
+        raise_application_error(-20001, l_msg);
+      end if;
+    end if;
+    if (l_ts_status != 'ONLINE') then
+      l_msg := 'ERROR : Default tablespace ' || l_default_ts_name || ' of current user is not in READ WRITE mode';
+      if ('${dry_run}' = 'TRUE') then
+        dbms_output.put_line(l_msg);
+      else
+        raise_application_error(-20001, l_msg);
+      end if;
+    end if;
+
+    -- check if xml type is used by the tablespace and XML DB is not supported by target
+    -- check if xml type col's exists for any table or table is xml type.
+    select count(distinct t.table_name) into l_cnt from dba_tables t
+    join dba_tab_columns c on t.table_name = c.table_name and t.owner = c.owner
+    where t.tablespace_name = '${tablespace}'
+    ${exc_tbl_filter}
+    and (t.table_name in (select table_name from dba_xml_tables) or c.data_type = 'XMLTYPE');
+    if (l_cnt > 0) then
+      l_msg := 'ERROR : Tablespace ${tablespace} has tables containing XMLType data.';
+      if ('${dry_run}' = 'TRUE') then
+        dbms_output.put_line(l_msg);
+      else
+        raise_application_error(-20001, l_msg);
+      end if;
+    end if;
+
+    -- check if xml type is used by the tablespace from dba_segments
+    select count(distinct c.table_name) into l_cnt from dba_segments s
+    join dba_tab_columns c on s.owner = c.owner and s.segment_name = c.table_name
+    where s.tablespace_name = '${tablespace}'
+    ${exc_tbl_filter_seg}
+    and c.data_type = 'XMLTYPE';
+    if (l_cnt > 0) then
+      l_msg := 'ERROR : Tablespace ${tablespace} has tables containing XMLType data.';
+      if ('${dry_run}' = 'TRUE') then
+        dbms_output.put_line(l_msg);
+      else
+        raise_application_error(-20001, l_msg);
+      end if;
+    end if;
+
+    -- check if any of the table column data type owners are not in schema list
+    select count(*) into l_cnt from all_tab_columns atc 
+    JOIN all_tables at ON atc.table_name = at.table_name and atc.owner = at.owner 
+    and at.tablespace_name = '${tablespace}' and atc.data_type_owner NOT IN (${sc_list})
+    ${exc_tbl_filter_dt};
+    if (l_cnt > 0) then
+      l_msg := 
+        'ERROR : Validation failed for tablespace "${tablespace}": Some columns reference data types owned by schemas that are not in the allowed transport list. ' || 
+        'Ensure all referenced data types belong to the transported schemas. ' ||
+        'Tablespace: "${tablespace}", Affected Columns: ' || l_cnt || '.';
+      if ('${dry_run}' = 'TRUE') then
+        dbms_output.put_line(l_msg);
+      else
+        raise_application_error(-20001, l_msg);
+      end if;
+    end if;
+
+    -- check timezone is not Timpstamp with Local Time Zone (TSLTZ)
+    select dbtimezone into l_timezone from dual;
+    if (l_timezone != '+00:00') then
+      select count(*) into l_cnt from all_tab_columns atc
+      join all_tables at on atc.table_name = at.table_name 
+      where atc.data_type = 'TIMESTAMP WITH LOCAL TIME ZONE' and
+      at.tablespace_name = '${tablespace}';
+      if (l_cnt > 0) then
+        l_msg := 'ERROR : Source database is using local time zone (TSLTZ) : ' || l_timezone ||
+                'Tablespace : "${tablespace}", contains TIMESTAMP WITH LOCAL TIME ZONE data.';
+        if ('${dry_run}' = 'TRUE') then
+          dbms_output.put_line(l_msg);
+        else
+          raise_application_error(-20001, l_msg);
+        end if;
+      end if;
+    end if;
+
+    -- run transport charset check
+    l_tts_charset_status := dbms_tts.transport_char_set_check(ts_list => '${tablespace}',
+      target_db_char_set_name => 'AL32UTF8', target_db_nchar_set_name => 'AL16UTF16', err_msg => l_error_msg);
+    if (l_tts_charset_status = false) then
+        select property_value into l_nls_charset from database_properties where property_name = 'NLS_CHARACTERSET';
+        select property_value into l_nls_ncharset from database_properties where property_name = 'NLS_NCHAR_CHARACTERSET';
+        l_msg := 'Transport tablespace charset check failed for tablespace ${tablespace}: ' || l_error_msg;
+        if ('${dry_run}' = 'TRUE') then
+          dbms_output.put_line(l_msg);
+        else
+          raise_application_error(-20001, l_msg);
+        end if;
+    end if;
+  exception
+    when others then
+      if ('${dry_run}' = 'TRUE') then
+        dbms_output.put_line('ERROR : ' ||SQLERRM);
+      else
+        raise_application_error(-20001, 'ERROR : ' || SQLERRM);
+      end if;
+  end;
+  /
+
+validate_tablespaces_dbversion_11g:
+  -- Perform TTS Check
+  begin
+    dbms_tts.transport_set_check(ts_list => ${ts_list}, incl_constraints => TRUE, full_check => TRUE);
+  end;
+  /
+  select 'VIOLATION: ' || violations FROM transport_set_violations;
+  declare
+    l_violations_cnt number;
+    l_msg varchar2(30000);
+  begin
+    select count(*) into l_violations_cnt from transport_set_violations;
+    if l_violations_cnt > 0 then
+      l_msg := 'Transport set check failed for tablespace list.';
+      if ('${dry_run}' = 'TRUE') then
+        dbms_output.put_line(l_msg);
+      else
+        raise_application_error(-20001, l_msg);
+      end if;
+    end if;
+  end;
+  /
+
+get_common_schemas_dbversion_11g:
+  select username from dba_users where username in ('SYS','SYSTEM');
+
+get_common_schemas:
+  select username from dba_users where common = 'YES';
+
+get_local_schemas_dbversion_11g:
+  select username from dba_users where username not in ('SYS','SYSTEM');
+
+get_local_schemas:
+  select username from dba_users where common = 'NO';
+
+owners_in_tablespaces:
+  select distinct owner from dba_tables where tablespace_name in (${ts_list});
+
+object_validation:
+  -- SEGMENTS : Physical Segments (tables, indexes, lobs, partitions etc.)
+  SELECT 'SEGMENT,' || owner || '.' || segment_name
+  FROM dba_segments
+  WHERE tablespace_name IN (${ts_list})
+    AND owner NOT IN (${sc_list});
+
+  -- Indexes : already covered under dba_segments
+
+  -- LOB_Segments : already covered under dba_segments
+
+  -- Partitions : already covered under dba_segments
+
+  -- Triggers : Logical triggers (not covered by dba_segments)
+  SELECT 'TRIGGER,' || tr.owner || '.' || tr.trigger_name
+  FROM dba_triggers tr
+  JOIN dba_tables ta ON tr.table_name = ta.table_name AND tr.owner = ta.owner
+  WHERE ta.tablespace_name IN (${ts_list})
+    AND tr.owner NOT IN (${sc_list});
+
+  -- Materialized View Logs : Materialized view logs
+  SELECT 'MVIEW_LOG,' || l.log_owner || '.' || l.log_table
+  FROM dba_mview_logs l
+  JOIN dba_segments s ON l.log_owner = s.owner AND l.log_table = s.segment_name
+  WHERE s.tablespace_name IN (${ts_list})
+    AND l.log_owner NOT IN (${sc_list});
+
+  -- Materialized Views
+  SELECT 'MVIEW,' || m.owner || '.' || m.mview_name
+  FROM dba_mviews m
+  JOIN dba_segments s ON m.owner = s.owner AND m.mview_name = s.segment_name
+  WHERE s.tablespace_name IN (${ts_list})
+    AND m.owner NOT IN (${sc_list});
+
+  -- Synonyms
+  SELECT 'SYNONYM,' || sy.owner || '.' || sy.synonym_name
+  FROM dba_synonyms sy
+  JOIN dba_tables ta ON sy.table_name = ta.table_name AND sy.owner = ta.owner
+  WHERE ta.tablespace_name IN (${ts_list})
+    AND sy.owner NOT IN (${sc_list});
+
+  -- Constraints : Select Constraints belongs to ts_list and owner doesn't belong to sc_list
+  -- Not required, Table validation is enough
+
+  -- Procedure, Functions, Packages, Views, Sequences (schema bound objects)
+  SELECT 'OBJECT,' || owner || '.' || object_name || ',' || object_type AS OBJECT_NAME
+  FROM dba_objects
+  WHERE object_type IN ('PROCEDURE', 'FUNCTION', 'PACKAGE', 'PACKAGE BODY', 'VIEW', 'SEQUENCE')
+    AND owner NOT IN (${sc_list})
+    AND object_name IN (
+        SELECT segment_name FROM dba_segments 
+        WHERE tablespace_name IN (${ts_list})
+    );
+
+tts_src_create_directory:
+  set feedback off
+    create or replace directory ${tts_dir_name} as '${tts_dir_path}';
+    GRANT READ, WRITE ON DIRECTORY ${tts_dir_name} TO ${db_user};
+
+tts_src_drop_directory:
+  set feedback off
+    drop directory ${tts_dir_name};
+
+tts_src_export_tde_keys:
+  set feedback off
+  administer key management export encryption keys with secret "${secret_code}"  
+  to '${tde_keys_path}' force keystore identified by "${tde_wallet_password}";
+
+tts_src_export_tde_current_keys:
+  set feedback off
+  administer key management export encryption keys with secret "${secret_code}"  
+  to '${tde_keys_path}' force keystore identified by "${tde_wallet_password}"
+  with identifier in (select key_id from v\\$encryption_keys k, v\\$pdbs p 
+                      where p.con_id = k.con_id and p.name = '${dst_name}' and backed_up = 'NO');
+
+tts_src_gather_data:
+  declare
+    l_platform_name v\$database.platform_name%TYPE;
+    l_platform_id v\$database.platform_id%TYPE;
+    l_current_scn v\$database.current_scn%TYPE;
+    l_product product_component_version.product%TYPE;
+    l_version product_component_version.version%TYPE;
+    l_version_full VARCHAR2(160);
+    l_dst_version database_properties.property_value%TYPE;
+    l_nls_charset database_properties.property_value%TYPE;
+    l_nls_ncharset database_properties.property_value%TYPE;
+    l_pdb_guid v\$$${l_pdb_table}.${l_pdb_type}%TYPE;
+    l_xmltype_exists varchar2(10);
+    l_timezone varchar2(32);
+    l_storage_size dba_data_files.bytes%TYPE;
+    l_sf_additional_size dba_data_files.bytes%TYPE;
+    l_bf_additional_size dba_data_files.bytes%TYPE;
+    l_host_list varchar2(4000) := '';
+    l_tbs_read_only varchar2(10);
+    l_bigfile_list varchar2(30000) := '';
+    l_smallfile_list varchar2(30000) := '';
+    l_encrypted_list varchar2(30000) := '';
+    l_unencrypted_list varchar2(30000) := '';
+    l_role_list       clob := empty_clob();
+    l_mview_schemas   clob := empty_clob();
+    l_sched_cred_list clob := empty_clob();
+    l_src_compatible  varchar2(160);
+  begin
+    select ${l_pdb_type} into l_pdb_guid from v\$$${l_pdb_table};
+    select property_value into l_dst_version from database_properties where property_name = 'DST_PRIMARY_TT_VERSION';
+    select platform_name, platform_id, current_scn into l_platform_name, l_platform_id, l_current_scn from v\$database;
+    select property_value into l_nls_charset from database_properties where property_name = 'NLS_CHARACTERSET';
+    select property_value into l_nls_ncharset from database_properties where property_name = 'NLS_NCHAR_CHARACTERSET';
+    select product, version into l_product, l_version from product_component_version where product like 'Oracle%Database%';
+    BEGIN
+      EXECUTE IMMEDIATE 'SELECT ${l_version_type} FROM product_component_version where product like ''Oracle%Database%''' INTO l_version_full;
+      EXCEPTION
+        WHEN OTHERS THEN
+          l_version_full := l_version;
+    END;
+    select decode(count(*), 0, 'false', 'true') into l_xmltype_exists from dba_tables t
+    join dba_tab_columns c on t.table_name = c.table_name and t.owner = c.owner
+    where t.tablespace_name in (${ts_list})
+    ${exc_tbl_filter}
+    and (t.table_name in (select table_name from dba_xml_tables) or c.data_type = 'XMLTYPE');
+
+    select dbtimezone into l_timezone from dual;
+    select (sum(bytes) / 1024 / 1024 / 1024) into l_storage_size from dba_data_files where tablespace_name in (${ts_list});
+    
+    -- smallfile tablespaces move require additional size
+    select nvl(max(sum(df.bytes)/1024/1024/1024),0) into l_sf_additional_size
+    from dba_data_files df, dba_tablespaces dt 
+    where df.tablespace_name = dt.tablespace_name and 
+    df.tablespace_name in (${ts_list}) and dt.bigfile = 'NO' 
+    group by df.tablespace_name;
+
+    -- bigfile tablespaces move require additional size
+    select nvl(max(sum(df.bytes)/1024/1024/1024),0) into l_bf_additional_size
+    from dba_data_files df, dba_tablespaces dt 
+    where df.tablespace_name = dt.tablespace_name and 
+    df.tablespace_name in (${ts_list}) and dt.bigfile = 'YES' 
+    group by df.tablespace_name;
+    
+    FOR rec IN (SELECT host_name, instance_name FROM gv\$$${l_pdb_table} pdb, gv\$instance inst
+                  WHERE pdb.name = UPPER('${database_name}') 
+                  AND pdb.open_mode = 'READ WRITE' 
+                  AND pdb.inst_id = inst.inst_id) LOOP
+          l_host_list := l_host_list || ';' || rec.host_name || ':' || rec.instance_name;
+    END LOOP;
+    l_host_list := SUBSTR(l_host_list, 2);
+    select decode(count(*), 0, 'true', 'false') into l_tbs_read_only from dba_tablespaces where status != 'READ ONLY' and tablespace_name in (${ts_list});
+
+    FOR rec IN (SELECT tablespace_name, bigfile, encrypted FROM dba_tablespaces where tablespace_name IN (${ts_list})) LOOP
+      IF rec.bigfile = 'YES' THEN
+        l_bigfile_list := l_bigfile_list || ';' || rec.tablespace_name;
+      ELSE
+        l_smallfile_list := l_smallfile_list || ';' || rec.tablespace_name;
+      END IF;
+
+      IF rec.encrypted = 'YES' THEN
+        l_encrypted_list := l_encrypted_list || ';' || rec.tablespace_name;
+      ELSE
+        l_unencrypted_list := l_unencrypted_list || ';' || rec.tablespace_name;
+      END IF;
+    END LOOP;
+    
+    IF LENGTH(l_bigfile_list) > 0 THEN
+        l_bigfile_list := SUBSTR(l_bigfile_list, 2);
+    END IF;
+    IF LENGTH(l_smallfile_list) > 0 THEN
+        l_smallfile_list := SUBSTR(l_smallfile_list, 2);
+    END IF;
+    IF LENGTH(l_encrypted_list) > 0 THEN
+        l_encrypted_list := SUBSTR(l_encrypted_list, 2);
+    END IF;
+    IF LENGTH(l_unencrypted_list) > 0 THEN
+        l_unencrypted_list := SUBSTR(l_unencrypted_list, 2);
+    END IF;
+    
+    FOR rec IN (SELECT distinct grantee from dba_tab_privs where owner in (${sc_list}) and 
+                grantee in (select role from dba_roles ${l_common_clause})) loop
+      l_role_list := l_role_list || ';' || rec.grantee;
+    END LOOP;
+    IF DBMS_LOB.getlength(l_role_list) > 0 THEN
+      l_role_list := DBMS_LOB.SUBSTR(l_role_list, DBMS_LOB.getlength(l_role_list) - 1, 2);
+    END IF;
+
+    FOR rec IN (SELECT distinct owner from dba_mviews where owner in (${sc_list})) loop
+      l_mview_schemas := l_mview_schemas || ';' || rec.owner;
+    END LOOP;
+    IF DBMS_LOB.getlength(l_mview_schemas) > 0 THEN
+      l_mview_schemas := DBMS_LOB.SUBSTR(l_mview_schemas, DBMS_LOB.getlength(l_mview_schemas) - 1, 2);
+    END IF;
+
+    FOR rec IN (SELECT credential_name from dba_scheduler_credentials where owner in (${sc_list})) loop
+      l_sched_cred_list := l_sched_cred_list || ';' || rec.credential_name;
+    END LOOP;
+    IF DBMS_LOB.getlength(l_sched_cred_list) > 0 THEN
+      l_sched_cred_list := DBMS_LOB.SUBSTR(l_sched_cred_list, DBMS_LOB.getlength(l_sched_cred_list) - 1, 2);
+    END IF;
+
+    select value into l_src_compatible from v\$parameter where name = 'compatible';
+
+    dbms_output.put_line(l_pdb_guid       || ',' ||
+                          l_dst_version    || ',' ||
+                          l_platform_name  || ',' ||
+                          l_platform_id    || ',' ||
+                          l_current_scn    || ',' ||
+                          l_nls_charset    || ',' ||
+                          l_nls_ncharset   || ',' ||
+                          l_product        || ',' ||
+                          l_version        || ',' ||
+                          l_version_full   || ',' ||
+                          l_xmltype_exists || ',' ||
+                          l_timezone       || ',' ||
+                          l_storage_size   || ',' ||
+                          l_host_list      || ',' ||
+                          l_tbs_read_only  || ',' ||
+                          l_bigfile_list   || ',' ||
+                          l_smallfile_list || ',' ||
+                          l_encrypted_list || ',' ||
+                          l_unencrypted_list || ',' ||
+                          l_sf_additional_size || ',' ||
+                          l_bf_additional_size || ',' ||
+                          l_role_list || ',' ||
+                          l_mview_schemas || ',' ||
+                          l_sched_cred_list || ',' ||
+                          l_src_compatible);
+  end;
+  /
+
+tts_src_export_schema: 
+  ${oracle_home}/bin/expdp 
+  \"${db_user}/${db_password}@${l_conn_str}\" 
+  SCHEMAS=${schemas} 
+  DIRECTORY=${tts_dir_name} 
+  DUMPFILE=schema.dmp 
+  CONTENT=METADATA_ONLY 
+  CLUSTER=NO 
+  EXCLUDE=TABLE,INDEX 
+  LOGFILE=export.log
+
+tts_src_export_tablespaces:
+  ${oracle_home}/bin/expdp
+  \"${db_user}/${db_password}@
+  ${l_conn_str}\" 
+  DIRECTORY=${tts_dir_name} 
+  DUMPFILE=${dump_file}
+  TRANSPORT_TABLESPACES=${tablespaces}
+  ${exclude_clause}
+  CLUSTER=NO
+  LOGFILE=${expdp_log_file}
+  ${tts_closure_check}
+
+tts_src_backup_tablespaces:
+  ${oracle_home}/bin/rman << EOF | tee ${tts_dir_name}/backup_${backup_type}.log
+  set echo on;
+  connect target '${db_user}/${db_password}@${l_conn_str}';
+  set command id to '${project_name}_${backup_type}';
+  ${encryption_off_clause}
+  set nocfau;
+  ${encryption_on_clause}
+  run {
+  ${channel_string}
+  ${backup_string}
+  }
+  EOF
+
+purge_dba_recyclebin:
+  declare
+    l_cnt number;
+  begin
+    if '${final_backup}' = 'TRUE' then
+      select count(*) into l_cnt from dba_recyclebin
+      where ts_name in (${ts_list});
+
+      if l_cnt > 0 then
+        raise_application_error(-20001,
+          'Validation failed: Found BIN$ objects in one or more tablespaces from tbs list. ' ||
+          'Please purge dba_recyclebin to avoid move failures at ADBS.'
+        );
+      end if;
+    end if;
+  end;
+  /
+
+validate_ols_policies:
+  declare
+    l_ols_enable number := 0;
+    l_ols_schema number := 0;
+    l_ols_policy_list varchar2(30000) := '';
+  begin
+    select count(*) into l_ols_enable from v\$$option where parameter = 'Oracle Label Security' and value = 'TRUE';
+    select count(*) into l_ols_schema from dba_users where username = 'LBACSYS';
+    IF l_ols_enable > 0 and l_ols_schema > 0 THEN
+      FOR rec IN (SELECT policy_name FROM all_sa_table_policies where SCHEMA_NAME in (${sc_list})) LOOP
+        l_ols_policy_list := l_ols_policy_list || ';' || rec.policy_name;
+      END LOOP;
+      IF LENGTH(l_ols_policy_list) > 0 THEN
+          l_ols_policy_list := SUBSTR(l_ols_policy_list, 2);
+      END IF;
+    END IF;
+    dbms_output.put_line(l_ols_policy_list);
+  end;
+  /
+
+validate_redaction_policies:
+  declare
+    l_redaction_policy_list varchar2(30000) := '';
+  begin
+    FOR rec IN (SELECT policy_name FROM redaction_policies where object_owner IN (${sc_list})) LOOP
+        l_redaction_policy_list := l_redaction_policy_list || ';' || rec.policy_name;
+      END LOOP;
+
+      IF LENGTH(l_redaction_policy_list) > 0 THEN
+          l_redaction_policy_list := SUBSTR(l_redaction_policy_list, 2);
+      END IF;
+    dbms_output.put_line(l_redaction_policy_list);
+  end;
+  /
+
+validate_dvops_protection:
+  declare
+    l_dvrealmapp_cnt number := 0;
+  begin
+    select count(*) into l_dvrealmapp_cnt from dba_dv_status WHERE name = 'DV_APP_PROTECTION' and status = 'ENABLED';
+    dbms_output.put_line(l_dvrealmapp_cnt);
+  end;
+  /
+
+validate_dvrealm_policies:
+  declare
+    l_dvconf_cnt number := 0;
+    l_dvenabled_cnt number := 0;
+    l_dv_roles_granted number := 0;
+  begin
+    select count(*) into l_dvconf_cnt from dba_dv_status WHERE name = 'DV_CONFIGURE_STATUS' and status = 'TRUE';
+    select count(*) into l_dvenabled_cnt from dba_dv_status WHERE name = 'DV_ENABLE_STATUS' and status = 'TRUE';
+    select 
+      case 
+        when count(distinct granted_role) = 2 then 1 else 0 
+      end as dv_roles_granted
+    into l_dv_roles_granted
+    from dba_role_privs
+    where granted_role in ('DV_OWNER','DV_ACCTMGR');
+    dbms_output.put_line(l_dvconf_cnt || ',' || l_dvenabled_cnt || ',' || l_dv_roles_granted);
+  end;
+  /
+
+get_dv_protected_schemas:
+  declare
+    l_dv_schemas number := 0;
+    l_datapump_user number := 1;
+  begin
+    select count(*) into l_dv_schemas from DBA_DV_REALM_object where owner in (${sc_list});
+    IF l_dv_schemas > 0 THEN
+      select count(*) into l_datapump_user from DBA_DV_DATAPUMP_AUTH where grantee = 'SYS';
+    END IF;
+    dbms_output.put_line(l_datapump_user);
+  end;
+  /

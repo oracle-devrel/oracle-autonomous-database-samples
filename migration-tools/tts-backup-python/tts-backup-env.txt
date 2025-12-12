@@ -1,0 +1,87 @@
+#
+# $Header: pdbcs/no_ship_src/service/scripts/tts-backup-env.txt /main/15 2025/08/13 07:58:35 hkarniya Exp $
+#
+# tts-backup-env.txt
+#
+# Copyright (c) 2024, 2025, Oracle and/or its affiliates.
+#
+#   NAME
+#     tts-backup-env.txt - <one-line expansion of the name>
+#
+#   DESCRIPTION
+#     <short description of component this file declares/defines>
+#
+#   NOTES
+#     <other useful comments, qualifications, etc.>
+#
+#   MODIFIED   (MM/DD/YY)
+#   hkarniya    08/04/25 - Bug 38274082: Option to exclude statistics
+#   hkarniya    07/11/25 - Bug 38179045: Option to exclude tables
+#   hkarniya    07/01/25 - Bug 37848678: Provide dry-run option
+#   hkarniya    06/15/25 - Bug 38076817: support section size backup for tts
+#   hkarniya    05/20/25 - Bug 37973559: Code refactor
+#   hkarniya    05/15/25 - Bug 37819695: Take passwords as cli arguments or runtime inputs
+#   hkarniya    04/23/25 - Bug 37866112: Add to option USE_ALL_RAC_INSTANCES
+#   cchowdar    04/07/25 - Bug 37803647: Added FSS support
+#   hkarniya    04/05/25 - Bug 37793929: Migrate to OCI installer
+#   hkarniya    03/24/25 - Bug 37746561: Validate plsql objects and
+#                           add opc proxy host and port
+#   hkarniya    03/24/25 - Bug 37746539: Support 11g source database
+#   hkarniya    02/13/25 - Bug 37588601: support full transport of DB,
+#                          TABLESPACES is optional input
+#   hkarniya    01/30/25 - Bug 37515587: Update schemas as optional input
+#   hkarniya    10/03/24 - Creation
+#
+[DEFAULT]
+### Project and Tablespace inputs
+PROJECT_NAME=
+DATABASE_NAME=
+TABLESPACES=
+SCHEMAS=
+
+
+#### Database connection inputs
+HOSTNAME=
+LSNR_PORT=
+DB_SVC_NAME=
+ORAHOME=
+DBUSER=
+DB_VERSION=
+
+
+#### Object Storage Service (OSS) inputs
+#### OCI Installer inputs
+TTS_BACKUP_URL=
+TTS_BUNDLE_URL=
+OCI_INSTALLER_PATH=
+CONFIG_FILE=
+COMPARTMENT_OCID=
+OCI_PROXY_HOST=
+OCI_PROXY_PORT=
+
+
+### File Storage Service (FSS) inputs
+TTS_FSS_CONFIG=
+TTS_FSS_MOUNT_DIR=
+
+
+### Final backup inputs
+FINAL_BACKUP=
+
+
+### Performance inputs 
+PARALLELISM=
+USE_ALL_RAC_INSTANCES=
+
+
+### Dry run inputs 
+DRY_RUN=
+
+
+### Exclude tables input (case-sensitive)
+EXCLUDE_TABLES=
+
+
+## Exclude statistics input (TRUE/FALSE)
+## Default to FALSE
+EXCLUDE_STATISTICS=
