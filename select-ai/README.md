@@ -36,7 +36,13 @@ Select AI serves as a productivity tool for experienced SQL developers and empow
 
 ## Folder Structure
 
+Examples using the different APIs
 - **sql/**
 - **python/**
 - **r/**
-- **notebooks/**
+
+Examples using Oracle Machine Learning notebooks
+- **notebooks/sql**
+- **notebooks/python**
+- **notebooks/r**
+

@@ -1,0 +1,875 @@
+[
+  {
+    "name" : "SelectAI4Py -2- Natural Language to SQL (NL2SQL)",
+    "description" : null,
+    "tags" : null,
+    "version" : "7",
+    "layout" : "jupyter",
+    "type" : "low",
+    "snapshot" : false,
+    "isEditable" : true,
+    "isRunnable" : true,
+    "template" : null,
+    "templateConfig" : null,
+    "paragraphs" : [
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : null,
+        "hasTitle" : false,
+        "message" : [ ],
+        "selectedVisualization" : null,
+        "visualizationConfig" : null,
+        "hideCode" : true,
+        "hideResult" : true,
+        "hideGutter" : true,
+        "hideVizConfig" : true,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1764702391974,
+          "endTime" : 1764702392483,
+          "interpreter" : "md.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [ ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : null,
+        "hasTitle" : false,
+        "message" : [
+          "%md",
+          "# Using Select AI for Natural Language to SQL (NL2SQL) Generation",
+          "",
+          "One of the features of Select AI enables you to ask questions of your database data using natural language. ",
+          "Select AI augments your user-provided prompt with metadata from tables and views in your database schema before sending it to LLMs. ",
+          "The generated SQL query is then processed according the 'action' specified. ",
+          "",
+          "Select AI provides multiple **actions**. These are related to NL2SQL: ",
+          "",
+          "* `showsql` - generate and return the SQL query",
+          "* `runsql` (default) - generate and run the SQL query returning the query result",
+          "* `narrate` - generate natural language text from data returned from the NL2SQL query or RAG, depending on the AI profile settings",
+          "* `explainsql` - return an explanation of generated SQL query",
+          "* `showprompt` - return the augmented prompt that Select AI sends to the LLM",
+          "",
+          ">Note that the full Select AI functionality is available in Oracle Autonomous Database 23ai. NL2SQL is also available with Oracle Database 23.7+ instances and Autonomous Database 19c instances. ",
+          "",
+          "---",
+          "",
+          "Copyright (c) 2025 Oracle Corporation  ",
+          "###### [The Universal Permissive License (UPL), Version 1.0](https://oss.oracle.com/licenses/upl/)"
+        ],
+        "selectedVisualization" : "html",
+        "visualizationConfig" : null,
+        "hideCode" : true,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : true,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1764702392925,
+          "endTime" : 1764702393322,
+          "interpreter" : "md.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "<h1 id=\"using-select-ai-for-natural-language-to-sql-nl2sql-generation\">Using Select AI for Natural Language to SQL (NL2SQL) Generation</h1>\n<p>One of the features of Select AI enables you to ask questions of your database data using natural language.\nSelect AI augments your user-provided prompt with metadata from tables and views in your database schema before sending it to LLMs.\nThe generated SQL query is then processed according the 'action' specified.</p>\n<p>Select AI provides multiple <strong>actions</strong>. These are related to NL2SQL:</p>\n<ul>\n<li><code>showsql</code> - generate and return the SQL query</li>\n<li><code>runsql</code> (default) - generate and run the SQL query returning the query result</li>\n<li><code>narrate</code> - generate natural language text from data returned from the NL2SQL query or RAG, depending on the AI profile settings</li>\n<li><code>explainsql</code> - return an explanation of generated SQL query</li>\n<li><code>showprompt</code> - return the augmented prompt that Select AI sends to the LLM</li>\n</ul>\n<blockquote>\n<p>Note that the full Select AI functionality is available in Oracle Autonomous Database 23ai. NL2SQL is also available with Oracle Database 23.7+ instances and Autonomous Database 19c instances.</p>\n</blockquote>\n<hr />\n<p>Copyright (c) 2025 Oracle Corporation</p>\n<h6 id=\"the-universal-permissive-license-upl-version-10\"><a href=\"https://oss.oracle.com/licenses/upl/\">The Universal Permissive License (UPL), Version 1.0</a></h6>\n",
+              "type" : "HTML"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : null,
+        "hasTitle" : false,
+        "message" : [
+          "%md",
+          "### For more information...",
+          "",
+          "<a href=\"https://docs.oracle.com/en/cloud/paas/autonomous-database/serverless/pysai/index.html\" target=\"_blank\">Select AI for Python documentation</a>"
+        ],
+        "selectedVisualization" : "html",
+        "visualizationConfig" : null,
+        "hideCode" : true,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : true,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1764702393733,
+          "endTime" : 1764702394106,
+          "interpreter" : "md.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "<h3 id=\"for-more-information\">For more information...</h3>\n<p><a href=\"https://docs.oracle.com/en/cloud/paas/autonomous-database/serverless/pysai/index.html\" target=\"_blank\">Select AI for Python documentation</a></p>\n",
+              "type" : "HTML"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : null,
+        "hasTitle" : false,
+        "message" : [
+          "%md",
+          "## Prerequisites",
+          "",
+          "Before proceeding, you must complete steps in the **SelectAI4Py -0- Prerequisites and Setup** notebook:",
+          "",
+          "* ADMIN: grants and network access",
+          "* Select AI user: OCI_GENAI_PY_DEMO profile definition",
+          "",
+          "These steps are required for the NL2SQL commands in this notebook to run correctly."
+        ],
+        "selectedVisualization" : "html",
+        "visualizationConfig" : null,
+        "hideCode" : true,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : true,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1764702394916,
+          "endTime" : 1764702395279,
+          "interpreter" : "md.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "<h2 id=\"prerequisites\">Prerequisites</h2>\n<p>Before proceeding, you must complete steps in the <strong>SelectAI4Py -0- Prerequisites and Setup</strong> notebook:</p>\n<ul>\n<li>ADMIN: grants and network access</li>\n<li>Select AI user: OCI_GENAI_PY_DEMO profile definition</li>\n</ul>\n<p>These steps are required for the NL2SQL commands in this notebook to run correctly.</p>\n",
+              "type" : "HTML"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : null,
+        "hasTitle" : false,
+        "message" : [
+          "%md",
+          "### Working with NL2SQL Actions",
+          "",
+          "In the following examples, you'll see how to use each Select AI NL2SQL action.  ",
+          "",
+          "Use `showsql` to display SQL generated from natural language without running the query. This is followed by `runsql` to both generate and run the SQL query. Use ",
+          "`showprompt` to reveal the augmented prompt that includes your schema metadata. ",
+          "",
+          "You'll learn how to build on previous queries by asking follow-up questions leveraging the original conversation capability, ",
+          "followed by the customizable converation management API for greater control over conversations.  ",
+          "You'll then examine a more complex example that interprets business terms like \"baby boomer.\" ",
+          "",
+          "Lastly, you'll use `show_sql` to view the generated SQL query, `run_sql` to run the generated SQL query, `narrate` to get natural language text from the structured ",
+          "results, `explainsql` to understand the generated SQL, and the `generate` method."
+        ],
+        "selectedVisualization" : "html",
+        "visualizationConfig" : null,
+        "hideCode" : true,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : true,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1764702395672,
+          "endTime" : 1764702396221,
+          "interpreter" : "md.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "<h3 id=\"working-with-nl2sql-actions\">Working with NL2SQL Actions</h3>\n<p>In the following examples, you'll see how to use each Select AI NL2SQL action.</p>\n<p>Use <code>showsql</code> to display SQL generated from natural language without running the query. This is followed by <code>runsql</code> to both generate and run the SQL query. Use\n<code>showprompt</code> to reveal the augmented prompt that includes your schema metadata.</p>\n<p>You'll learn how to build on previous queries by asking follow-up questions leveraging the original conversation capability,\nfollowed by the customizable converation management API for greater control over conversations.<br />\nYou'll then examine a more complex example that interprets business terms like &quot;baby boomer.&quot;</p>\n<p>Lastly, you'll use <code>show_sql</code> to view the generated SQL query, <code>run_sql</code> to run the generated SQL query, <code>narrate</code> to get natural language text from the structured\nresults, <code>explainsql</code> to understand the generated SQL, and the <code>generate</code> method.</p>\n",
+              "type" : "HTML"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : "Create a profile proxy object for the current session",
+        "hasTitle" : true,
+        "message" : [
+          "%python",
+          "",
+          "import select_ai",
+          "",
+          "profile = select_ai.Profile(profile_name=\"OCI_GENAI_PY_DEMO\")"
+        ],
+        "selectedVisualization" : "html",
+        "visualizationConfig" : null,
+        "hideCode" : false,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : false,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1764702396618,
+          "endTime" : 1764702399035,
+          "interpreter" : "python.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [ ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : "Show SQL for \"how many customers do I have?\"",
+        "hasTitle" : true,
+        "message" : [
+          "%python",
+          "",
+          "# This begins a series of conversation-aware queries that build on previous requests using the conversation capability.",
+          "",
+          "profile.show_sql(prompt = \"how many customers do I have?\")"
+        ],
+        "selectedVisualization" : "raw",
+        "visualizationConfig" : null,
+        "hideCode" : false,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : false,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1764702399568,
+          "endTime" : 1764702402798,
+          "interpreter" : "python.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "'SELECT COUNT(\"c\".\"CUST_ID\") AS \"customer_count\" FROM \"SH\".\"CUSTOMERS\" \"c\"'\n",
+              "type" : "TEXT"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : "Run SQL query for \"how many customers do I have?\"",
+        "hasTitle" : true,
+        "message" : [
+          "%python",
+          "",
+          "profile.run_sql(prompt = \"how many customers do I have?\")"
+        ],
+        "selectedVisualization" : "raw",
+        "visualizationConfig" : null,
+        "hideCode" : false,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : false,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1764702403274,
+          "endTime" : 1764702405586,
+          "interpreter" : "python.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "   customer_count\n0           55500\n",
+              "type" : "TEXT"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : "Show prompt for \"how many customers do I have?\"",
+        "hasTitle" : true,
+        "message" : [
+          "%python",
+          "",
+          "import json",
+          "",
+          "result = profile.show_prompt(prompt = \"how many customers do I have?\")",
+          "",
+          "if isinstance(result, str):",
+          "    parsed = json.loads(result)",
+          "    print(json.dumps(parsed, indent=2))",
+          "else:",
+          "    print(json.dumps(result, indent=2))"
+        ],
+        "selectedVisualization" : "raw",
+        "visualizationConfig" : "[{\"raw\":{\"height\":400,\"lastColumns\":[],\"version\":1}}]",
+        "hideCode" : false,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : false,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1764702405984,
+          "endTime" : 1764702406786,
+          "interpreter" : "python.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "[\n  {\n    \"role\": \"SYSTEM\",\n    \"content\": [\n      {\n        \"type\": \"TEXT\",\n        \"text\": \"### Oracle SQL tables with their properties:\"\n      }\n    ]\n  },\n  {\n    \"role\": \"SYSTEM\",\n    \"content\": [\n      {\n        \"type\": \"TEXT\",\n        \"text\": \"--'dimension table' # CREATE TABLE \\\"SH\\\".\\\"CUSTOMERS\\\" (\\\"CUST_ID\\\" NUMBER 'primary key' , \\\"CUST_VALID\\\" VARCHAR2(1) , \\\"CUST_EFF_TO\\\" DATE , \\\"CUST_EFF_FROM\\\" DATE , \\\"CUST_SRC_ID\\\" NUMBER , \\\"CUST_TOTAL_ID\\\" NUMBER , \\\"CUST_TOTAL\\\" VARCHAR2(14) , \\\"CUST_EMAIL\\\" VARCHAR2(50) 'customer email id' , \\\"CUST_CREDIT_LIMIT\\\" NUMBER 'customer credit limit' , \\\"CUST_INCOME_LEVEL\\\" VARCHAR2(30) 'customer income level' , \\\"CUST_MAIN_PHONE_NUMBER\\\" VARCHAR2(25) 'customer main phone number' , \\\"COUNTRY_ID\\\" NUMBER 'foreign key to the countries table (snowflake)' , \\\"CUST_STATE_PROVINCE_ID\\\" NUMBER , \\\"CUST_STATE_PROVINCE\\\" VARCHAR2(40) 'customer geography: state or province' , \\\"CUST_CITY_ID\\\" NUMBER , \\\"CUST_CITY\\\" VARCHAR2(30) 'city where the customer lives' , \\\"CUST_POSTAL_CODE\\\" VARCHAR2(10) 'postal code of the customer' , \\\"CUST_STREET_ADDRESS\\\" VARCHAR2(40) 'customer street address' , \\\"CUST_MARITAL_STATUS\\\" VARCHAR2(20) 'customer marital status; low cardinality attribute' , \\\"CUST_YEAR_OF_BIRTH\\\" NUMBER(4,0) 'customer year of birth' , \\\"CUST_GENDER\\\" CHAR(1) 'gender; low cardinality attribute' , \\\"CUST_LAST_NAME\\\" VARCHAR2(40) 'last name of the customer' , \\\"CUST_FIRST_NAME\\\" VARCHAR2(20) 'first name of the customer')\"\n      }\n    ]\n  },\n  {\n    \"role\": \"SYSTEM\",\n    \"content\": [\n      {\n        \"type\": \"TEXT\",\n        \"text\": \"--'facts table, without a primary key; all rows are uniquely identified by the combination of all foreign keys' # CREATE TABLE \\\"SH\\\".\\\"SALES\\\" (\\\"PROD_ID\\\" NUMBER 'FK to the products dimension table' , \\\"AMOUNT_SOLD\\\" NUMBER(10,2) 'invoiced amount to the customer' , \\\"QUANTITY_SOLD\\\" NUMBER(10,2) 'product quantity sold with the transaction' , \\\"PROMO_ID\\\" NUMBER 'promotion identifier, without FK constraint (intentionally) to show outer join optimization' , \\\"CHANNEL_ID\\\" NUMBER 'FK to the channels dimension table' , \\\"TIME_ID\\\" DATE 'FK to the times dimension table' , \\\"CUST_ID\\\" NUMBER 'FK to the customers dimension table')\"\n      }\n    ]\n  },\n  {\n    \"role\": \"SYSTEM\",\n    \"content\": [\n      {\n        \"type\": \"TEXT\",\n        \"text\": \"--'dimension table' # CREATE TABLE \\\"SH\\\".\\\"PRODUCTS\\\" (\\\"PROD_ID\\\" NUMBER(6,0) 'primary key' , \\\"PROD_VALID\\\" VARCHAR2(1) , \\\"PROD_EFF_TO\\\" DATE , \\\"PROD_EFF_FROM\\\" DATE , \\\"PROD_SRC_ID\\\" NUMBER , \\\"PROD_TOTAL_ID\\\" NUMBER , \\\"PROD_TOTAL\\\" VARCHAR2(13) , \\\"PROD_MIN_PRICE\\\" NUMBER(8,2) 'product minimum price' , \\\"PROD_LIST_PRICE\\\" NUMBER(8,2) 'product list price' , \\\"PROD_STATUS\\\" VARCHAR2(20) 'product status' , \\\"SUPPLIER_ID\\\" NUMBER(6,0) 'this column' , \\\"PROD_PACK_SIZE\\\" VARCHAR2(30) 'product package size' , \\\"PROD_UNIT_OF_MEASURE\\\" VARCHAR2(20) 'product unit of measure' , \\\"PROD_WEIGHT_CLASS\\\" NUMBER(3,0) 'product weight class' , \\\"PROD_CATEGORY_DESC\\\" VARCHAR2(2000) 'product category description' , \\\"PROD_CATEGORY_ID\\\" NUMBER , \\\"PROD_CATEGORY\\\" VARCHAR2(50) 'product category' , \\\"PROD_SUBCATEGORY_DESC\\\" VARCHAR2(2000) 'product subcategory description' , \\\"PROD_SUBCATEGORY_ID\\\" NUMBER , \\\"PROD_SUBCATEGORY\\\" VARCHAR2(50) 'product subcategory' , \\\"PROD_DESC\\\" VARCHAR2(4000) 'product description' , \\\"PROD_NAME\\\" VARCHAR2(50) 'product name')\"\n      }\n    ]\n  },\n  {\n    \"role\": \"SYSTEM\",\n    \"content\": [\n      {\n        \"type\": \"TEXT\",\n        \"text\": \"--'country dimension table (snowflake)' # CREATE TABLE \\\"SH\\\".\\\"COUNTRIES\\\" (\\\"COUNTRY_ID\\\" NUMBER 'primary key' , \\\"COUNTRY_NAME_HIST\\\" VARCHAR2(40) , \\\"COUNTRY_TOTAL_ID\\\" NUMBER , \\\"COUNTRY_TOTAL\\\" VARCHAR2(11) , \\\"COUNTRY_REGION_ID\\\" NUMBER , \\\"COUNTRY_REGION\\\" VARCHAR2(20) 'e.g. Europe, Asia' , \\\"COUNTRY_SUBREGION_ID\\\" NUMBER , \\\"COUNTRY_SUBREGION\\\" VARCHAR2(30) 'e.g. Western Europe, to allow hierarchies' , \\\"COUNTRY_NAME\\\" VARCHAR2(40) 'country name' , \\\"COUNTRY_ISO_CODE\\\" CHAR(2))\"\n      }\n    ]\n  },\n  {\n    \"role\": \"USER\",\n    \"content\": [\n      {\n        \"type\": \"TEXT\",\n        \"text\": \"\\n\\nGiven an input Question, create a syntactically correct Oracle SQL query to run. Pretty print the SQL query. \\n - Pay attention to using only the column names that you can see in the schema description.\\n - Be careful to not query for columns that do not exist. Also, pay attention to which column is in which table.\\n - Please double check that the SQL query you generate is valid for Oracle Database.\\n - Consider table name, schema name and column name to be case sensitive and enclose in double quotes.  - Only use the tables listed below. \\n - If the table definition includes the table owner, you should include both the owner name and user-qualified table name in the Oracle SQL. - DO NOT keep empty lines in the middle of the Oracle SQL.\\n - DO NOT write anything else except the Oracle SQL.\\n - Always use table alias and easy to read column aliases. \\n\\nFor string comparisons in WHERE clause, CAREFULLY check if any string in the question is in DOUBLE QUOTES, and follow the rules: \\n - If a string is in DOUBLE QUOTES, use case SENSITIVE comparisons with NO UPPER() function.\\n - If a string is not in DOUBLE QUOTES, use case INSENSITIVE comparisons by using UPPER() function around both operands of the string comparison.\\nNote: These rules apply strictly to string comparisons in the WHERE clause and do not affect column names, table names, or other query components.\\n\\nQuestion: how many customers do I have?\"\n      }\n    ]\n  }\n]\n",
+              "type" : "TEXT"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : "Run SQL query for \"how many are in each country\"",
+        "hasTitle" : true,
+        "message" : [
+          "%python",
+          "",
+          "profile.run_sql(prompt=\"how many are in each country?\")"
+        ],
+        "selectedVisualization" : "raw",
+        "visualizationConfig" : null,
+        "hideCode" : false,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : false,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1764702407204,
+          "endTime" : 1764702411810,
+          "interpreter" : "python.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "    country_id              country_name  customer_count\n0        52770                     Italy            7780\n1        52775                    Brazil             832\n2        52782                     Japan             624\n3        52789            United Kingdom            7557\n4        52776                   Germany            8173\n5        52790  United States of America           18520\n6        52779                    France            3833\n7        52772                    Canada            2010\n8        52778                     Spain            2039\n9        52771                     China             712\n10       52769                 Singapore             597\n11       52785               New Zealand             244\n12       52786                    Poland             708\n13       52774                 Australia             831\n14       52773                 Argentina             403\n15       52777                   Denmark             383\n16       52791              South Africa              88\n17       52787              Saudi Arabia              75\n18       52788                    Turkey              91\n",
+              "type" : "TEXT"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : "Run SQL query for \"add to that the number of males and females in each country\"",
+        "hasTitle" : true,
+        "message" : [
+          "%python",
+          "",
+          "# This uses the conversation to further refine the result from the previous invocation.",
+          "profile.run_sql(prompt = \"add the number of males and females in each country\")"
+        ],
+        "selectedVisualization" : "raw",
+        "visualizationConfig" : null,
+        "hideCode" : false,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : false,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1764702414318,
+          "endTime" : 1764702420212,
+          "interpreter" : "python.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "    country_id              country_name  male_count  female_count\n0        52770                     Italy        5167          2613\n1        52775                    Brazil         531           301\n2        52782                     Japan         397           227\n3        52789            United Kingdom        5111          2446\n4        52776                   Germany        5564          2609\n5        52790  United States of America       12323          6197\n6        52779                    France        2614          1219\n7        52772                    Canada        1371           639\n8        52778                     Spain        1376           663\n9        52771                     China         477           235\n10       52769                 Singapore         395           202\n11       52785               New Zealand         157            87\n12       52786                    Poland         476           232\n13       52774                 Australia         531           300\n14       52773                 Argentina         264           139\n15       52777                   Denmark         257           126\n16       52791              South Africa          51            37\n17       52787              Saudi Arabia          52            23\n18       52788                    Turkey          61            30\n",
+              "type" : "TEXT"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : "Find the top 3 baby boomer big spenders",
+        "hasTitle" : true,
+        "message" : [
+          "%python",
+          "",
+          "# This uses the general knowledge of the LLM to understand what a \"baby boomer\" and \"big spenders\" are.",
+          "profile.run_sql(prompt=\"find the top 3 baby boomer big spenders\")"
+        ],
+        "selectedVisualization" : "raw",
+        "visualizationConfig" : null,
+        "hideCode" : false,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : false,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1764702420725,
+          "endTime" : 1764702426997,
+          "interpreter" : "python.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "  first_name last_name  total_spent\n0     Marvel  Bakerman    145358.48\n1     Harold     Allis    143700.70\n2        Ona  Cattlett    122683.52\n",
+              "type" : "TEXT"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : "Narrate the query result for \"find the top 3 baby boomer big spenders\"",
+        "hasTitle" : true,
+        "message" : [
+          "%python",
+          "",
+          "profile.narrate(prompt = \"find the top 3 baby boomer big spenders\")"
+        ],
+        "selectedVisualization" : "raw",
+        "visualizationConfig" : null,
+        "hideCode" : false,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : false,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1764702427442,
+          "endTime" : 1764702435536,
+          "interpreter" : "python.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "'The top 3 big spenders who were born between 1946 and 1964 are:\\n* Marvel Bakerman\\n* Harold Allis\\n* Ona Cattlett \\nThey have spent the most money among their age group.'\n",
+              "type" : "TEXT"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : "Show SQL for \"find the top 3 baby boomer big spenders\"",
+        "hasTitle" : true,
+        "message" : [
+          "%python",
+          "",
+          "# Notice in the query: \"CUST_YEAR_OF_BIRTH BETWEEN 1946 AND 1964\"",
+          "sql = profile.show_sql(prompt = \"find the top 3 baby boomer big spenders\")",
+          "print(sql)"
+        ],
+        "selectedVisualization" : "raw",
+        "visualizationConfig" : null,
+        "hideCode" : false,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : false,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1764702436010,
+          "endTime" : 1764702479255,
+          "interpreter" : "python.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "SELECT \n  \"c\".\"CUST_FIRST_NAME\" AS \"first_name\", \n  \"c\".\"CUST_LAST_NAME\" AS \"last_name\", \n  SUM(\"s\".\"AMOUNT_SOLD\") AS \"total_spent\"\nFROM \n  \"SH\".\"CUSTOMERS\" \"c\"\n  JOIN \"SH\".\"SALES\" \"s\" ON \"c\".\"CUST_ID\" = \"s\".\"CUST_ID\"\nWHERE \n  \"c\".\"CUST_YEAR_OF_BIRTH\" BETWEEN 1946 AND 1964\nGROUP BY \n  \"c\".\"CUST_FIRST_NAME\", \n  \"c\".\"CUST_LAST_NAME\"\nORDER BY \n  \"total_spent\" DESC\nFETCH FIRST 3 ROWS ONLY\n",
+              "type" : "TEXT"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : "Explain SQL for \"find the top 3 baby boomer big spenders\"",
+        "hasTitle" : true,
+        "message" : [
+          "%python",
+          "",
+          "response = profile.explain_sql(prompt = \"find the top 3 baby boomer big spenders\")",
+          "print(response.replace('```sql\\n', '\\nSQL Query:\\n\\n').replace('```', '\\n'))"
+        ],
+        "selectedVisualization" : "raw",
+        "visualizationConfig" : null,
+        "hideCode" : false,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : false,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1764702479836,
+          "endTime" : 1764702501445,
+          "interpreter" : "python.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "\nSQL Query:\n\nSELECT \n  \"c\".\"CUST_FIRST_NAME\" AS \"first_name\", \n  \"c\".\"CUST_LAST_NAME\" AS \"last_name\", \n  SUM(\"s\".\"AMOUNT_SOLD\") AS \"total_spent\"\nFROM \n  \"SH\".\"CUSTOMERS\" \"c\"\n  JOIN \"SH\".\"SALES\" \"s\" ON \"c\".\"CUST_ID\" = \"s\".\"CUST_ID\"\nWHERE \n  \"c\".\"CUST_YEAR_OF_BIRTH\" BETWEEN 1946 AND 1964\nGROUP BY \n  \"c\".\"CUST_FIRST_NAME\", \n  \"c\".\"CUST_LAST_NAME\"\nORDER BY \n  \"total_spent\" DESC\nFETCH FIRST 3 ROWS ONLY;\n\n\n\n**Explanation:**\n\nThis Oracle SQL query finds the top 3 big spenders among baby boomers, who are defined as individuals born between 1946 and 1964.\n\n1. **Table Selection:** The query joins two tables: `\"SH\".\"CUSTOMERS\"` (aliased as `\"c\"`) and `\"SH\".\"SALES\"` (aliased as `\"s\"`). The join is performed on the `\"CUST_ID\"` column, which is common to both tables.\n2. **Filtering:** The `WHERE` clause filters the results to include only customers born between 1946 and 1964, which is the typical birth year range for baby boomers.\n3. **Grouping:** The `GROUP BY` clause groups the results by the customer's first and last names (`\"CUST_FIRST_NAME\"` and `\"CUST_LAST_NAME\"`).\n4. **Aggregation:** The `SUM` function calculates the total amount spent by each customer (`\"AMOUNT_SOLD\"`).\n5. **Sorting:** The `ORDER BY` clause sorts the results in descending order by the total amount spent (`\"total_spent\"`).\n6. **Limiting:** The `FETCH FIRST 3 ROWS ONLY` clause returns only the top 3 rows, which correspond to the top 3 big spenders among baby boomers.\n\n**Note:** The query uses table aliases (`\"c\"` and `\"s\"`) to improve readability and follows the rules for string comparisons in the `WHERE` clause. Since there are no string comparisons in this query, the rules do not apply. However, the query is written with attention to case sensitivity and uses double quotes to enclose table and column names, as required by Oracle SQL.\n",
+              "type" : "TEXT"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : null,
+        "hasTitle" : false,
+        "message" : [
+          "%md",
+          "",
+          "#### Use GENERATE for dynamic action selection",
+          "",
+          "The `generate()` method handles different Select AI actions specified as an argument. Additional parameters like conversation IDs can be passed for context-aware ",
+          "conversations. ",
+          "",
+          "The examples demonstrate using generate with different actions: `showsql` to get SQL statements, `runsql` to run queries, ",
+          "`explainsql` to obtain query explanations, and `narrate` to provide a natural language interpretation of the query result."
+        ],
+        "selectedVisualization" : "html",
+        "visualizationConfig" : null,
+        "hideCode" : true,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : true,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1764702501986,
+          "endTime" : 1764702502979,
+          "interpreter" : "md.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "<h4 id=\"use-generate-for-dynamic-action-selection\">Use GENERATE for dynamic action selection</h4>\n<p>The <code>generate()</code> method handles different Select AI actions specified as an argument. Additional parameters like conversation IDs can be passed for context-aware\nconversations.</p>\n<p>The examples demonstrate using generate with different actions: <code>showsql</code> to get SQL statements, <code>runsql</code> to run queries,\n<code>explainsql</code> to obtain query explanations, and <code>narrate</code> to provide a natural language interpretation of the query result.</p>\n",
+              "type" : "HTML"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : "Use GENERATE with 'showsql'",
+        "hasTitle" : true,
+        "message" : [
+          "%python",
+          "",
+          "response = profile.generate(",
+          "    prompt = \"find the top 3 baby boomer big spenders\",",
+          "    action = select_ai.Action.SHOWSQL",
+          ")",
+          "print(response)"
+        ],
+        "selectedVisualization" : "raw",
+        "visualizationConfig" : null,
+        "hideCode" : false,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : false,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1764702503403,
+          "endTime" : 1764702510098,
+          "interpreter" : "python.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "SELECT \n  \"c\".\"CUST_FIRST_NAME\" AS \"first_name\", \n  \"c\".\"CUST_LAST_NAME\" AS \"last_name\", \n  SUM(\"s\".\"AMOUNT_SOLD\") AS \"total_spent\"\nFROM \n  \"SH\".\"CUSTOMERS\" \"c\"\n  JOIN \"SH\".\"SALES\" \"s\" ON \"c\".\"CUST_ID\" = \"s\".\"CUST_ID\"\nWHERE \n  \"c\".\"CUST_YEAR_OF_BIRTH\" BETWEEN 1946 AND 1964\nGROUP BY \n  \"c\".\"CUST_FIRST_NAME\", \n  \"c\".\"CUST_LAST_NAME\"\nORDER BY \n  \"total_spent\" DESC\nFETCH FIRST 3 ROWS ONLY\n",
+              "type" : "TEXT"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : "Use GENERATE with 'runsql' for the same prompt",
+        "hasTitle" : true,
+        "message" : [
+          "%python",
+          "",
+          "response = profile.generate(",
+          "    prompt = \"find the top 3 baby boomer big spenders\",",
+          "    action = select_ai.Action.RUNSQL",
+          ")",
+          "print(response)"
+        ],
+        "selectedVisualization" : "raw",
+        "visualizationConfig" : null,
+        "hideCode" : false,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : false,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1764702510505,
+          "endTime" : 1764702516413,
+          "interpreter" : "python.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "[\n  {\n    \"first_name\" : \"Marvel\",\n    \"last_name\" : \"Bakerman\",\n    \"total_spent\" : 145358.48\n  },\n  {\n    \"first_name\" : \"Harold\",\n    \"last_name\" : \"Allis\",\n    \"total_spent\" : 143700.7\n  },\n  {\n    \"first_name\" : \"Ona\",\n    \"last_name\" : \"Cattlett\",\n    \"total_spent\" : 122683.52\n  }\n]\n",
+              "type" : "TEXT"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : "Use GENERATE with 'explainsql' for the same prompt",
+        "hasTitle" : true,
+        "message" : [
+          "%python",
+          "",
+          "response = profile.generate(",
+          "    prompt = \"find the top 3 baby boomer big spenders\",",
+          "    action = select_ai.Action.EXPLAINSQL",
+          ")",
+          "print(response)"
+        ],
+        "selectedVisualization" : "raw",
+        "visualizationConfig" : null,
+        "hideCode" : false,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : false,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1764702517026,
+          "endTime" : 1764702534274,
+          "interpreter" : "python.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "```sql\nSELECT \n  c.\"first_name\", \n  c.\"last_name\", \n  SUM(s.\"amount_sold\") AS \"total_spent\"\nFROM \n  \"SH\".\"CUSTOMERS\" c\n  JOIN \"SH\".\"SALES\" s ON c.\"cust_id\" = s.\"cust_id\"\nWHERE \n  c.\"cust_year_of_birth\" BETWEEN 1946 AND 1964\nGROUP BY \n  c.\"first_name\", \n  c.\"last_name\"\nORDER BY \n  \"total_spent\" DESC\nFETCH FIRST 3 ROWS ONLY;\n```\n\n**Explanation:**\n\nThis Oracle SQL query finds the top 3 big spenders among baby boomers, who are defined as individuals born between 1946 and 1964.\n\n1. **Table Selection:** The query joins two tables: `\"SH\".\"CUSTOMERS\"` (aliased as `c`) and `\"SH\".\"SALES\"` (aliased as `s`). The join is performed on the `\"cust_id\"` column, which is common to both tables.\n2. **Filtering:** The `WHERE` clause filters the results to include only customers born between 1946 and 1964, which is the typical birth year range for baby boomers. Since the birth year range is not in double quotes, we don't need to use case sensitive comparisons.\n3. **Grouping:** The `GROUP BY` clause groups the results by the customer's first and last names (`\"first_name\"` and `\"last_name\"`).\n4. **Aggregation:** The `SUM` function calculates the total amount spent by each customer (`\"amount_sold\"`).\n5. **Sorting:** The `ORDER BY` clause sorts the results in descending order by the total amount spent (`\"total_spent\"`).\n6. **Limiting:** The `FETCH FIRST 3 ROWS ONLY` clause returns only the top 3 rows, which correspond to the top 3 big spenders among baby boomers.\n\n**Note:** The query uses table aliases (`c` and `s`) to improve readability and follows the rules for string comparisons in the `WHERE` clause. However, since there are no string comparisons in this query, the rules do not apply. The query is written with attention to case sensitivity and uses double quotes to enclose table and column names, as required by Oracle SQL.\n",
+              "type" : "TEXT"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : "Use GENERATE with 'narrate' for the same prompt",
+        "hasTitle" : true,
+        "message" : [
+          "%python",
+          "",
+          "response = profile.generate(",
+          "    prompt = \"find the top 3 baby boomer big spenders\",",
+          "    action = select_ai.Action.NARRATE",
+          ")",
+          "print(response)"
+        ],
+        "selectedVisualization" : "raw",
+        "visualizationConfig" : null,
+        "hideCode" : false,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : false,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1764702535044,
+          "endTime" : 1764702543136,
+          "interpreter" : "python.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "The top 3 big spenders among baby boomers are:\n* Marvel Bakerman\n* Harold Allis\n* Ona Cattlett \nThey have spent the most money among their age group.\n",
+              "type" : "TEXT"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      },
+      {
+        "row" : 0,
+        "col" : 0,
+        "sizeX" : 0,
+        "width" : 12,
+        "title" : null,
+        "hasTitle" : false,
+        "message" : [
+          "%md",
+          "# End of Script"
+        ],
+        "selectedVisualization" : "html",
+        "visualizationConfig" : null,
+        "hideCode" : true,
+        "hideResult" : false,
+        "hideGutter" : true,
+        "hideVizConfig" : true,
+        "hideInIFrame" : false,
+        "enabled" : true,
+        "forms" : "[]",
+        "result" : {
+          "startTime" : 1764702543701,
+          "endTime" : 1764702544109,
+          "interpreter" : "md.low",
+          "taskStatus" : "SUCCESS",
+          "status" : "SUCCESS",
+          "results" : [
+            {
+              "message" : "<h1 id=\"end-of-script\">End of Script</h1>\n",
+              "type" : "HTML"
+            }
+          ],
+          "forms" : "[]"
+        },
+        "relations" : [ ],
+        "dynamicFormParams" : "{}"
+      }
+    ]
+  }
+]
