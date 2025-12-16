@@ -46,7 +46,7 @@ Open tts-backup-env.txt file downloaded to the project directory and provide the
 
 ##### Project and Tablespace inputs
 
-***PROJECT_NAME** ***: Name for transport tablespace project. (REQUIRED INPUT) \
+***PROJECT_NAME***: Name for transport tablespace project. (REQUIRED INPUT) \
 ***DATABASE_NAME*** : Database Name containing the tablespaces.  (REQUIRED INPUT) \
 ***TABLESPACES*** : List of comma separated transportable tablespaces.  (OPTIONAL INPUT) if empty all user tablespaces are added.\
 ***SCHEMAS*** : List of comma separated transportable schemas. (OPTIONAL INPUT) if empty all required users are added. None of the schemas should be a common user.
@@ -65,18 +65,18 @@ Open tts-backup-env.txt file downloaded to the project directory and provide the
 
 ***TTS_BACKUP_URL*** : (REQUIRED INPUT) Object storage bucket uri for backup files.      \
 ***TTS_BUNDLE_URL*** : (REQUIRED INPUT) Object storage bucket uri for transportable tablespace bundle.\
-***OCI_INSTALLER_PATH :*** (REQUIRED INPUT) Path to oci_install.jar\
-***CONFIG_FILE :*** **(REQUIRED INPUT) Path to dowloaded API keys config file. Make sure to update the key_file parameter with the file path to your private key in the config file.\
-***COMPARTMENT_OCID :*** **(REQUIRED INPUT) Compartment OCID of bucket  (TTS_BACKUP_URL) that stores backup files. \
-***OCI_PROXY_HOST :** ***(OPTIONAL INPUT) HTTP proxy server.\
-***OCI_PROXY_HOST :** ***(OPTIONAL INPUT)  HTTP proxy server connection port.
+***OCI_INSTALLER_PATH*** : (REQUIRED INPUT) Path to oci_install.jar\
+***CONFIG_FILE*** : (REQUIRED INPUT) Path to dowloaded API keys config file. Make sure to update the key_file parameter with the file path to your private key in the config file.\
+***COMPARTMENT_OCID*** :(REQUIRED INPUT) Compartment OCID of bucket  (TTS_BACKUP_URL) that stores backup files. \
+***OCI_PROXY_HOST*** : (OPTIONAL INPUT) HTTP proxy server.\
+***OCI_PROXY_HOST*** : (OPTIONAL INPUT)  HTTP proxy server connection port.
 
 ##### File Storage Service (FSS) inputs ( Required if using FSS for migration. Leave them empty if using OSS. )
 
-***TTS_FSS_CONFIG*** : (REQUIRED INPUT) FSS configuration should given in the format FSS:\<FIle System Name\>:\<FQDN of Mount Target\>:\<Export Path\>\
+***TTS_FSS_CONFIG*** : (REQUIRED INPUT) FSS configuration should given in the format FSS:\<File System Name\>:\<FQDN of Mount Target\>:\<Export Path\>\
 ***TTS_FSS_MOUNT_DIR*** : (REQUIRED INPUT) Absolute path where file system was mounted on source database host\ 
 \
-Refer to [<https://blogs.oracle.com/datawarehousing/post/attach-file-system-autonomous-database>]{.underline} for details on how FIle System should be configured for use by ADB-S.
+Refer to the blog [How to Attach a File system to your Autonomous Database](<https://blogs.oracle.com/datawarehousing/post/attach-file-system-autonomous-database>) for details on how file system should be configured for use by ADB-S.
 
 ##### TDE keys inputs
 
