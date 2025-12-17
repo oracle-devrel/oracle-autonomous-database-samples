@@ -97,7 +97,7 @@ Leave these a blank unless really needed.
 
 **Backup Utility Sample Inputs**
 
-Here is an example of [backup utility sample inputs] (https://https://github.com/oracle-devrel/oracle-autonomous-database-samples/tree/main/migration-tools/tts-backup-python/tts_backup_utility_sample_inputs.txt
+Here is an example of [backup utility sample inputs](https://https://github.com/oracle-devrel/oracle-autonomous-database-samples/tree/main/migration-tools/tts-backup-python/tts_backup_utility_sample_inputs.txt
 
 Run the TTS Backup Tool from the project directory as below. User will be prompted for database password and optional TDE wallet store password.
 
