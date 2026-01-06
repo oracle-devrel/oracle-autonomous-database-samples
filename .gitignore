@@ -32,3 +32,10 @@ Temporary Items
 .csr
 .pem
 replace-default-config.sh
+
+# Terraform
+**/.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
