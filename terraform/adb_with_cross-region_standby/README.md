@@ -4,7 +4,7 @@ This Terraform example creates an Autonomous AI Database with a cross-region sta
 
 You can run it by updating the file _terraform.tfvars_ file with the settings you want. 
 
-Enter your tenancy OCID, user OCID, user fingerprint, private key file path, region name, and compartment OCID. Change the other settings like database name and compute count to your liking.
+Enter your tenancy OCID, user OCID, user fingerprint, private key file path, region name, and compartment OCID. Change the other settings like database name and compute count to your liking and enter the ADMIN user password you want.
 
 ```tenancy_ocid     = ""
 user_ocid        = ""
@@ -19,7 +19,7 @@ standby_region = "us-phoenix-1"
 adb_display_name = "primarydb"
 adb_db_name      = "primarydb"
 
-admin_password = "WelcomeADB26"
+admin_password = ""
   
 db_workload = "OLTP"
 

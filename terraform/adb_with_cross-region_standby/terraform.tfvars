@@ -11,7 +11,7 @@ standby_region = "us-phoenix-1"
 adb_display_name = "primarydb"
 adb_db_name      = "primarydb"
 
-admin_password = "WelcomeADB26"
+admin_password = ""
 
 db_workload = "OLTP"
 
