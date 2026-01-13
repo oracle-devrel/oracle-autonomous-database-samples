@@ -1,69 +1,5 @@
 #!/usr/bin/python3
 #
-# $Header: pdbcs/no_ship_src/service/scripts/tts-backup.py /main/28 2025/11/23 15:55:21 hkarniya Exp $
-#
-# tts-backup.py
-#
-# Copyright (c) 2024, 2025, Oracle and/or its affiliates.
-#
-#    NAME
-#      tts-backup.py - <one-line expansion of the name>
-#
-#    DESCRIPTION
-#      Usage : echo -e "<DBPASSWORD>\n<TDE_WALLET_STORE_PASSWORD>" | python3 tts-backup.py [OPTIONS]
-#      Options : --IGNORE_ERRORS=<TRUE/FALSE> : Optional, provide true to ignore schema bould validation errors
-#              : --JDK8_PATH=<path_to_jdk8> : Optional, provide jdk8path to download wallet for objstore bucket
-#
-#    NOTES
-#      <other useful comments, qualifications, etc.>
-#
-#    MODIFIED   (MM/DD/YY)
-#    hkarniya    11/18/25 - Bug 38667283: DRY_RUN enhancements (added expdp validation)
-#    hkarniya    11/18/25 - Bug 38667283: Update param-value to TRUE/FALSE for
-#                           consistency
-#    sovaraka    10/07/25 - Bug 37924415, 37860857, 37925905: Added checks
-#                           for redaction, ols, dvrealm policies
-#    hkarniya    09/11/25 - Bug 37893757: Add compatible validation
-#    sovaraka    08/15/25 - Bug 38150434: Added changes to use template
-#    hkarniya    08/04/25 - Bug 38274082: Fix imp errors
-#    hkarniya    07/30/25 - Bug 38258577: use scn for 11g incremental backup
-#    hkarniya    07/11/25 - Bug 38179045: Option to exclude tables
-#    hkarniya    07/01/25 - Bug 37848678: Provide dry-run option
-#    hkarniya    06/24/25 - Bug 38112133: Fix object validations and remove
-#                           user input dependency
-#    hkarniya    06/15/25 - Bug 38076817: support section size backup for tts
-#    hkarniya    05/20/25 - Bug 37973559: Code refactor
-#    hkarniya    05/15/25 - Bug 37819695: Take passwords as cli arguments or runtime inputs
-#    hkarniya    05/15/25 - Bug 37860680: Limit project_name to 128 chars
-#    hkarniya    05/05/25 - Bug 37906886: Allow higher number of tablespaces
-#                           for DRCC regions
-#    hkarniya    04/24/25 - Bug 37483994: allow higher db_files during tts
-#    hkarniya    04/23/25 - Bug 37866112: Add to option USE_ALL_RAC_INSTANCES,
-#                           Fail tbs validation if DBTIME is different and contains TSLTZ.
-#    cchowdar    04/07/25 - Bug 37803647: Added FSS support
-#    hkarniya    04/05/25 - Bug 37793929: Migrate to OCI installer
-#    hkarniya    03/24/25 - Bug 37769080: Moved failed project dir to
-#                           project_dir_failed to allow retry
-#    hkarniya    03/24/25 - Bug 37682974: Introduce additional storage
-#                           for small file move operation
-#    hkarniya    03/24/25 - Bug 37746561: Validate plsql objects and
-#                           add opc proxy host and port
-#    hkarniya    03/24/25 - Bug 37746539: Support 11g source database
-#    hkarniya    03/24/25 - Bug 37728223: Utilize multiple RAC instances
-#    hkarniya    03/13/25 - Bug 37584519: update complete ts_list to
-#                           transport_set_check() to allow foreign key
-#                           constraints
-#    hkarniya    02/13/25 - Bug 37588601: support full transport of DB,
-#                           TABLESPACES is optional input
-#    hkarniya    02/11/25 - Bug 37549117: Validate SYS owned datatype columns
-#    hkarniya    01/31/25 - Bug 37544070: Add a check before export TDE Keys
-#    hkarniya    01/30/25 - Bug 37484020: Validate XMLType columns and 
-#                           XMLTYPE tables 
-#    hkarniya    01/30/25 - Bug 37407438: Fix Bundle name with TimeDate
-#    hkarniya    01/30/25 - Bug 37515587: Update Schemas to optional and 
-#                           not a common user
-#    hkarniya    10/03/24 - Creation
-#
 import os
 import sys
 import json
@@ -128,6 +64,25 @@ def split_into_lines(items, to_upper=True, chunk_size=10):
   item_list = ",\n".join(chunks)
   return item_list
 
+class ConsoleLogger:
+  """
+  A class to send Python output simultaneously to the terminal and a log file.
+  """
+  def __init__(self, logfile):
+    self.logfile = open(logfile, "a", buffering=1)
+    self.stdout = sys.stdout
+    self.stderr = sys.stderr
+
+  def write(self, data):
+    self.stdout.write(data)
+    self.logfile.write(data)
+
+  def flush(self):
+    self.stdout.flush()
+    self.logfile.flush()
+    
+  def fileno(self):
+    return self.stdout.fileno()
 
 class Environment:
   """
@@ -163,13 +118,13 @@ class Environment:
   
   def usage(self):
     print_stderr("=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=")
-    print_stderr("optional arguments allowed : --IGNORE_ERRORS, --JDK8_PATH")
+    print_stderr("optional arguments allowed : --IGNORE_NON_FATAL_ERRORS, --JDK8_PATH")
     print_stderr("runtime required inputs    : DBPASSWORD")
     print_stderr("runtime optional inputs    : TDE_WALLET_STORE_PASSWORD")
     print_stderr("=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=")
     print_stderr("Provide inputs during runtime manually - ")
     print_stderr("        Usage: python3 " + sys.argv[0] + " [OPTIONS]")
-    print_stderr("        Example: python3 " + sys.argv[0] + " --IGNORE_ERRORS=<True/False> --JDK8_PATH=<path to jdk8> ")
+    print_stderr("        Example: python3 " + sys.argv[0] + " --IGNORE_NON_FATAL_ERRORS=<True/False> --JDK8_PATH=<path to jdk8> ")
     print_stderr("")
     print_stderr("Or provide inputs via standard input (e.g., for automation):")
     print_stderr("        Usage: echo -e \"<DBPASSWORD>\\n<TDE_WALLET_STORE_PASSWORD>\" | python3 " + sys.argv[0] + " [OPTIONS]")
@@ -177,7 +132,7 @@ class Environment:
     print_stderr("=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=")
     print_stderr("        ARGUMENTS DESCRIPTION      ")
     print_stderr("=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=")
-    print_stderr("--IGNORE_ERRORS=<optional, provide if required to ignore schema bound object validation errors...>")
+    print_stderr("--IGNORE_NON_FATAL_ERRORS=<optional, provide if required to ignore schema bound object validation errors...>")
     print_stderr("--JDK8_PATH=<optional, provide to use jdk8_path to download objstore bucket wallet...>")
     print_stderr("=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=")
     sys.exit(1)
@@ -186,7 +141,7 @@ class Environment:
     """Load environment variables from the arguments provided and 
        set them as class attributes."""
     arg_dict = {}
-    arg_vars = ['IGNORE_ERRORS', 'JDK8_PATH']
+    arg_vars = ['IGNORE_NON_FATAL_ERRORS', 'JDK8_PATH']
 
     # Populate arg_dict from given args
     for arg in args:
@@ -216,13 +171,13 @@ class Environment:
     runtime_vars = ['DBPASSWORD', 'TDE_WALLET_STORE_PASSWORD']
     for key in runtime_vars:
       if key == "DBPASSWORD":
-        value = secure_input(f"Enter value for required variable {key}: ").strip()
+        value = secure_input(f"Enter database password: ").strip()
         if not value:
           print(f"Missing required variable: {key}")
           self.usage()
       else:
         value = secure_input(
-              f"Enter value for optional variable {key} \n"
+                f"Enter TDE wallet store password (optional) \n"
                 f"Required only if any of the tablespaces are TDE encrypted "
                 f"(leave empty and press Enter if not applicable): "
             ).strip()
@@ -286,7 +241,7 @@ class Environment:
 
     # Load optional variables; set to empty if not found
     optional_vars = ['SCHEMAS', 'TABLESPACES', 'OCI_INSTALLER_PATH',
-                     'OCI_PROXY_HOST', 'OCI_PROXY_PORT', 'USE_ALL_RAC_INSTANCES',
+                     'OCI_PROXY_HOST', 'OCI_PROXY_PORT', 'CLUSTER_MODE',
                      'DRCC_REGION', 'DRY_RUN', 'EXCLUDE_TABLES', 'EXCLUDE_STATISTICS', 
                      'TRANSPORT_TABLES_PROTECTED_BY_REDACTION_POLICIES', 'TRANSPORT_TABLES_PROTECTED_BY_OLS_POLICIES', 'TRANSPORT_DB_PROTECTED_BY_DATABASE_VAULT','DVREALM_USER', 'DVREALM_PASSWORD']
     for var in optional_vars:
@@ -345,10 +300,10 @@ class Environment:
     if db_version not in ['11g', '12c', '19c', '23ai']:
       raise ValueError(f"DB_VERSION value should be one of ['11g', '12c', '19c', '23ai'] but value is {db_version}.")
 
-    setattr(self, 'USE_ALL_RAC_INSTANCES', getattr(self, 'USE_ALL_RAC_INSTANCES', 'TRUE') or 'TRUE')
-    use_all_rac_instances = getattr(self, 'USE_ALL_RAC_INSTANCES').strip().upper()
-    if use_all_rac_instances not in ['TRUE', 'FALSE']:
-      raise ValueError(f"USE_ALL_RAC_INSTANCES value should be one of ['TRUE' , 'FALSE' , 'true' , 'false'] but value is {use_all_rac_instances}.")
+    setattr(self, 'CLUSTER_MODE', getattr(self, 'CLUSTER_MODE', 'TRUE') or 'TRUE')
+    cluser_mode = getattr(self, 'CLUSTER_MODE').strip().upper()
+    if cluser_mode not in ['TRUE', 'FALSE']:
+      raise ValueError(f"CLUSTER_MODE value should be one of ['TRUE' , 'FALSE' , 'true' , 'false'] but value is {cluser_mode}.")
 
     # Set optional var's 
     opt_vars = ['DRCC_REGION', 'DRY_RUN', 'EXCLUDE_STATISTICS']
@@ -373,6 +328,9 @@ class Environment:
     # Create directories and bundle files
     self._setup_backup_directories()
 
+    # Setup log file to send all Python output to console and log file in real-time
+    self._setup_log_file()
+
     #create directories needed if the storage type is fss
     if getattr(self, 'STORAGE_TYPE') == "FSS":
       path = os.path.join(getattr(self, 'TTS_FSS_MOUNT_DIR'), getattr(self,'PROJECT_NAME'))
@@ -389,6 +347,7 @@ class Environment:
       os.makedirs(project_dir_path)
       print(f"Created project directory: {project_dir_path} \n")
 
+
     # No need for manifest json in case of dry run
     if getattr(self, 'DRY_RUN').strip().upper() == "TRUE":
       print(f"DRY_RUN : Skipping Create/Load of project manifest file...\n")
@@ -397,6 +356,7 @@ class Environment:
     # Load project manifest JSON file and process it if already exists
     tts_project_file = os.path.join(project_dir_path, f"{getattr(self, 'PROJECT_NAME')}.json")
     setattr(self, 'TTS_PROJECT_FILE', tts_project_file)
+
 
     # Create a new manifest file if it doesn't exist
     if not os.path.isfile(tts_project_file):
@@ -462,8 +422,30 @@ class Environment:
     print(f"Created project directory with backup level {getattr(self, 'BACKUP_LEVEL')} : {tts_dir_path}.")
 
     setattr(self, 'BUNDLE_FILE_NAME', bundle_file_name)
-    setattr(self, 'TTS_BUNDLE_FILE', tts_bundle_file) 
+    setattr(self, 'TTS_BUNDLE_FILE', tts_bundle_file)
 
+  def _setup_log_file(self):
+    """Set up log file"""
+    project_dir_path = getattr(self, 'PROJECT_DIR_PATH')
+
+    if getattr(self, 'DRY_RUN').strip().upper() == "TRUE":
+      log_file_name = f"{getattr(self, 'PROJECT_NAME')}_LEVEL_{getattr(self, 'BACKUP_LEVEL')}_DRY_RUN.log"
+    else:
+      log_file_name = f"{getattr(self, 'PROJECT_NAME')}_LEVEL_{getattr(self, 'BACKUP_LEVEL')}.log"
+    log_file_path = os.path.join(project_dir_path, log_file_name)
+    if os.path.isfile(log_file_path):
+      now = subprocess.check_output("date +%d-%b-%Y_%H_%M_%S", shell=True).decode().strip()
+      if getattr(self, 'DRY_RUN').strip().upper() == "TRUE":
+        log_file_name = f"{getattr(self, 'PROJECT_NAME')}_LEVEL_{getattr(self, 'BACKUP_LEVEL')}_DRY_RUN_{now}.log"
+      else:
+        log_file_name = f"{getattr(self, 'PROJECT_NAME')}_LEVEL_{getattr(self, 'BACKUP_LEVEL')}_{now}.log"
+      log_file_path = os.path.join(project_dir_path, log_file_name)
+    
+    setattr(self, 'TTS_LOG_FILE', log_file_name)
+    
+    log_output = ConsoleLogger(log_file_path)
+    sys.stdout = log_output
+    sys.stderr = log_output
 
 class SqlPlus:
   """
@@ -702,9 +684,15 @@ class TTS_SRC_RUN_VALIDATIONS:
 
   def _run_object_validation(self, template, ts_list, sc_list):
     """Run SQL object validation for all tablespaces."""
+    if self._env.DB_VERSION == '11g':
+      l_user_list_clause = "and username not in ('SYS','SYSTEM')"
+    else:
+      l_user_list_clause = "and username not in ('SYS','SYSTEM') and common='NO'"
+
     Configuration.substitutions = {
         'sc_list': sc_list.upper(),
         'ts_list': ts_list.upper(),
+        'l_user_list_clause': l_user_list_clause,
       }
       
     if self._env.DRY_RUN.strip().upper() == "TRUE":
@@ -722,11 +710,11 @@ class TTS_SRC_RUN_VALIDATIONS:
     if os.path.isfile(_log_file) and os.path.getsize(_log_file) > 0:
       print(f" Please review: {_log_file}\n")
       print("This file contains a list of database objects that will NOT be transported.\n")
-      if self._env.IGNORE_ERRORS and self._env.IGNORE_ERRORS.upper() == 'TRUE':
+      if self._env.IGNORE_NON_FATAL_ERRORS and self._env.IGNORE_NON_FATAL_ERRORS.upper() == 'TRUE':
         print("Errors Ignored proceeding...\n")
       else:
-        print("Please run with option --IGNORE_ERRORS=TRUE to ignore errors...\n")
-        print("IGNORE_ERRORS option not provided, exiting...")
+        print("Please run with option --IGNORE_NON_FATAL_ERRORS=TRUE to ignore non fatal errors...\n")
+        print("IGNORE_NON_FATAL_ERRORS option not provided, exiting...")
         print(f" Review: {_log_file}\n")
         if self._env.DRY_RUN.strip().upper() == "FALSE":
           sys.exit(1)
@@ -1000,6 +988,7 @@ class TTS_SRC_CREATE_WALLET:
         '-bucket', self._env.TTS_BACKUP_URL.split('/')[-1],
         '-walletDir', self._env.TTS_DIR_PATH,
         '-libDir', self._env.PROJECT_DIR_PATH,
+        '-configFile', os.path.join(self._env.ORAHOME, 'dbs', f'opc{os.environ["ORACLE_SID"]}.ora'),
         '-import-all-trustcerts'
     ]
     if self._env.OCI_PROXY_HOST and self._env.OCI_PROXY_PORT:
@@ -1243,7 +1232,7 @@ class TTS_SRC_WALLET_COPIER:
         print(f"Skipping wallet copy to current host: {current_host}.")
         continue
       
-      if self._env.USE_ALL_RAC_INSTANCES.upper() == 'TRUE':
+      if self._env.CLUSTER_MODE.upper() == 'TRUE':
         self.copy_to_host(host_name)    
 
   def copy_to_host(self, host_name):
@@ -1300,7 +1289,7 @@ class TTS_SRC_RMAN_BACKUP:
     try:
       process = subprocess.Popen(command, shell=True, stdout=sys.stdout, stderr=sys.stderr, universal_newlines=True)
       stdout, stderr = process.communicate()
-
+      
       if process.returncode == 0 or process.returncode == 5:
         print(f"{command_type} executed successfully.")
         return 0
@@ -1314,13 +1303,24 @@ class TTS_SRC_RMAN_BACKUP:
   def _append_log_to_backup(self, log_filename):
     """Appends the specified log file to backup.log."""
     log_path = os.path.join(self._env.TTS_DIR_PATH, log_filename)
-    backup_log_path = os.path.join(self._env.TTS_DIR_PATH, 'backup.log')
+    backup_log_path = os.path.join(self._env.TTS_DIR_PATH, "backup.log")
 
     if os.path.exists(log_path):
       with open(log_path, 'r') as log_file:
         log_content = log_file.read()
       with open(backup_log_path, 'a') as backup_file:
         backup_file.write(log_content)
+
+  def _append_to_tts_log(self, log_filename):
+    """Appends the RMAN/expdp logs to tts.log."""
+    log_file_path = os.path.join(self._env.TTS_DIR_PATH, log_filename)
+    tts_log_path = os.path.join(self._env.PROJECT_DIR_PATH, self._env.TTS_LOG_FILE)
+
+    if os.path.exists(log_file_path):
+      with open(log_file_path, 'r') as log_file:
+        log_content = log_file.read()
+      with open(tts_log_path, 'a') as tts_file:
+        tts_file.write(log_content)
 
   def tts_src_get_scn(self, template):
     """Get the scn for the next backup"""
@@ -1387,8 +1387,8 @@ class TTS_SRC_RMAN_BACKUP:
             break
         host_name, instance_name = ele.split(':')
         # Skip allocating channel in other racn instances
-        # if USE_ALL_RAC_INSTANCES is set to FALSE
-        if self._env.USE_ALL_RAC_INSTANCES.upper() == 'FALSE':
+        # if CLUSTER_MODE is set to FALSE
+        if self._env.CLUSTER_MODE.upper() == 'FALSE':
           if host_name != current_host:
             continue
         
@@ -1419,13 +1419,13 @@ class TTS_SRC_RMAN_BACKUP:
       return min(cpu_count, 4)
     else:
       # We adjust parallelism = instances * cpu_count
-      if self._env.USE_ALL_RAC_INSTANCES.upper() == 'FALSE':
+      if self._env.CLUSTER_MODE.upper() == 'FALSE':
         return self._env.PARALLELISM
       else:
         return (self._env.PARALLELISM + len(self.host_array) - 1) // len(self.host_array)
 
-  def check_rman_log_for_errors(self, log_file):
-    """Checks the RMAN log file for errors and raises an exception if any are found."""
+  def check_log_for_errors(self, log_file):
+    """Checks the RMAN/EXPDP log file for errors and raises an exception if any are found."""
     try:
       with open(log_file, 'r') as log:
         log_contents = log.read()
@@ -1435,9 +1435,13 @@ class TTS_SRC_RMAN_BACKUP:
             print(f"RMAN errors found. {line}")
             print(f"Please check logs at {log_file}.")
             return False
+          if "EXPORT" in line and "stopped due to fatal error" in line:
+            print(f"EXPDP errors found. {line}")
+            print(f"Please check logs at {log_file}.")
+            return False
       return True
     except Exception as e:
-      print(f"Error reading RMAN log file {log_file}: {str(e)}")
+      print(f"Error reading RMAN/EXPDP log file {log_file}: {str(e)}")
       return False
 
   def tts_src_backup_tablespaces(self, backup_type, template):
@@ -1538,16 +1542,19 @@ class TTS_SRC_RMAN_BACKUP:
     # Check the log file for errors after execution
     log_file = f"{self._env.TTS_DIR_PATH}/backup_{backup_type}.log"
 
-    if not self.check_rman_log_for_errors(log_file):
+    if not self.check_log_for_errors(log_file):
       print(f"Error found in RMAN log file: {log_file}. Backup failed.")
       return 1
-
+    rman_log_file = ""
     if backup_type == "encrypted":
-      self._env.RMAN_LOGFILES.append("backup_encrypted.log")
-
+      rman_log_file = "backup_encrypted.log"
     if backup_type == "unencrypted":
-      self._env.RMAN_LOGFILES.append("backup_unencrypted.log")
-    
+      rman_log_file = "backup_unencrypted.log"
+
+    self._env.RMAN_LOGFILES.append(rman_log_file)
+
+    # Append schema RMAN logs to tts log file
+    self._append_to_tts_log(rman_log_file)
     return return_val
 
   def tts_src_export_schema(self, template):
@@ -1567,9 +1574,22 @@ class TTS_SRC_RMAN_BACKUP:
         'tts_dir_name': self._env.TTS_DIR_NAME,
       }
     expdp_command = ' '.join(line.strip() for line in template.get("tts_src_export_schema").splitlines() if line.strip())
-    
+    print(expdp_command)
     return_val = self._execute_command(expdp_command, "EXPDP")
-    self._append_log_to_backup('export.log')
+    expdp_log_file = "export.log"
+    
+    # Append logs to expdp log file
+    self._append_log_to_backup(expdp_log_file)
+    
+    # Append schema expdp logs to tts log file
+    self._append_to_tts_log(expdp_log_file)
+
+    # Check the log file for errors after execution
+    log_file = f"{self._env.TTS_DIR_PATH}/{expdp_log_file}"
+
+    if not self.check_log_for_errors(log_file):
+      print(f"Error found in EXPDP log file: {log_file}. Export of Schema Metadata failed.")
+      return 1
     return return_val
 
   
@@ -1617,7 +1637,18 @@ class TTS_SRC_RMAN_BACKUP:
     expdp_command = ' '.join(line.strip() for line in template.get("tts_src_export_tablespaces").splitlines() if line.strip())    
     print(expdp_command)
     return_val = self._execute_command(expdp_command, "EXPDP")
+    # Append logs to expdp log file
     self._append_log_to_backup(expdp_log_file)
+    
+    # Append tablespace expdp logs to tts log file
+    self._append_to_tts_log(expdp_log_file)
+
+    # Check the log file for errors after execution
+    log_file = f"{self._env.TTS_DIR_PATH}/{expdp_log_file}"
+
+    if not self.check_log_for_errors(log_file):
+      print(f"Error found in EXPDP log file: {log_file}. Export of Tablespace Metadata failed.")
+      return 1
     return return_val
 
   def tts_src_create_manifest(self):
@@ -1783,7 +1814,7 @@ class TTS_SRC_BUNDLE_MANAGER:
         host_name = host.split(':')[0]
         if current_host == host_name:
           continue
-        if self._env.USE_ALL_RAC_INSTANCES.upper() == 'TRUE':
+        if self._env.CLUSTER_MODE.upper() == 'TRUE':
           rm_tts_dir = f"ssh -oStrictHostKeyChecking=no {host_name} 'rm -rf {self._env.PROJECT_DIR_PATH}'"
           print(f"Removing remote directory on {host_name}...")
           subprocess.run(rm_tts_dir, shell=True, check=True)
