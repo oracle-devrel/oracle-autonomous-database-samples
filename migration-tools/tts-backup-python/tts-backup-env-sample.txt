@@ -1,15 +1,12 @@
-################################################################################
-###                     Project and Tablespace inputs                        ###
-################################################################################
+[DEFAULT]
+### Project and Tablespace inputs
 PROJECT_NAME=tts_project
 DATABASE_NAME=orclpdb1
 TABLESPACES=emptbs,salestbs
 SCHEMAS=user1,user2,user3
 
 
-################################################################################
-###                     Database connection inputs                           ###
-################################################################################
+#### Database connection inputs
 HOSTNAME=mydbhost1
 LSNR_PORT=1521
 DB_SVC_NAME=orclpdb1.company.com
@@ -18,12 +15,8 @@ DBUSER=mydbuser
 DB_VERSION=19c
 
 
-################################################################################
-###                     Object Storage Service (OSS) inputs                  ###
-################################################################################
-#    The following inputs are required only in case of OSS based transport   ###
-#    Please leave them empty if using FSS.                                   ###
-################################################################################
+#### Object Storage Service (OSS) inputs
+#### OCI Installer inputs
 TTS_BACKUP_URL=https://objectstorage.us-ashburn-1.oraclecloud.com/n/mynamespace1/b/tts-backup
 TTS_BUNDLE_URL=https://objectstorage.us-ashburn-1.oraclecloud.com/n/mynamespace1/b/tts-metadata
 OCI_INSTALLER_PATH=/home/oracle/opc_installer/oci_installer/oci_install.jar
@@ -33,23 +26,24 @@ OCI_PROXY_HOST=proxy.company.com
 OCI_PROXY_PORT=80
 
 
-################################################################################
-###                     File Storage Service (FSS) inputs                    ###
-################################################################################
-#    The following inputs are required only in case of FSS based transport   ###
-#    Please leave them empty if using Object storage.                        ###
-################################################################################
+### File Storage Service (FSS) inputs
 TTS_FSS_CONFIG=FSS:myFSS:myfss.vcn.com:/myFSS
 TTS_FSS_MOUNT_DIR=/u01/app/oracle/myFSS
 
-################################################################################
-###                     Final backup inputs                                  ###
-################################################################################
+### Run type inputs
 FINAL_BACKUP=TRUE/FALSE
+DRY_RUN=TRUE/FALSE
 
+### Performance inputs 
+PARALLELISM=8
+CLUSTER_MODE=TRUE/FALSE
 
-################################################################################
-###                     Performance inputs                                   ###
-################################################################################
-PARALLELISM=
-CPU_COUNT=
+### Miscellaneous inputs
+### Exclude tables input (case-sensitive)
+EXCLUDE_TABLES=table1,table2
+EXCLUDE_STATISTICS=TRUE/FALSE
+TRANSPORT_TABLES_PROTECTED_BY_REDACTION_POLICIES=FALSE
+TRANSPORT_TABLES_PROTECTED_BY_OLS_POLICIES=FALSE
+TRANSPORT_DB_PROTECTED_BY_DATABASE_VAULT=FALSE
+DVREALM_USER=
+DVREALM_PASSWORD=

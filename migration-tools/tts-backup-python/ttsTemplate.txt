@@ -1,28 +1,3 @@
-#
-#
-# TtsTemplate.txt
-#
-# Copyright (c) 2019, 2025, Oracle and/or its affiliates.
-#
-#   NAME
-#     TtsTemplate.txt - sql scripts for tts-backup.py
-#
-#   DESCRIPTION
-#     <short description of component this file declares/defines>
-#
-#   NOTES
-#     <other useful comments, qualifications, etc.>
-#
-#   MODIFIED   (MM/DD/YY)
-#   hkarniya    11/18/25 - Bug 38667283: DRY_RUN enhancements
-#   sovaraka    10/07/25 - Bug 37924415,37860857,37925905: Added checks
-#                          for redaction, ols, dvrealm policies
-#   hkarniya    09/11/25 - Bug 37893757: Add compatible validation
-#   sovaraka    07/03/23 - Bug 38150434: Added sql scripts for tts-backup
-#   sovaraka    07/01/25 - Creation
-#
-#
-
 [template]
 
 get_tablespaces:
@@ -53,6 +28,21 @@ validate_schemas:
       l_msg := 'ERROR : Validation failed for schema ${schema}: The schema contains XMLType tables linked to registered XMLSchemas. ' ||
           'Autonomous Database does not support object-relational XMLType tables. ' ||
           'Please use exclude_tables option to exclude these tables.. ';
+      if ('${dry_run}' = 'TRUE') then
+        dbms_output.put_line(l_msg);
+      else
+        raise_application_error(-20001, l_msg);
+      end if;
+    end if;
+
+    -- check if there are any virtual index
+    select count(*) into l_cnt from dba_objects
+    where owner = '${schema}' and object_type = 'INDEX' and
+    object_name not in (select index_name from dba_indexes);
+
+    if (l_cnt > 0) then
+      l_msg := 'ERROR : Validation failed for schema ${schema}: The schema contains VIRUTAL INDEXES.' ||
+          ' Please drop the virtual index or recreate as regular index and retry to avoid move failures at ADBS.';
       if ('${dry_run}' = 'TRUE') then
         dbms_output.put_line(l_msg);
       else
@@ -336,6 +326,16 @@ object_validation:
     AND object_name IN (
         SELECT segment_name FROM dba_segments 
         WHERE tablespace_name IN (${ts_list})
+    );
+
+  -- Object grant failures
+  SELECT 'OBJECT_GRANT_FAIL,' || ' GRANT TO ' || grantee || ' on ' || owner || '.' || table_name || ' will fail (GRANTEE NOT TRANSPORTED)'
+  FROM dba_tab_privs 
+  WHERE owner in (${sc_list})
+    AND grantee in (
+      SELECT username 
+      FROM dba_users 
+      WHERE username not in (${sc_list}) ${l_user_list_clause}
     );
 
 tts_src_create_directory:
