@@ -23,11 +23,15 @@
 --       * compartment_ocid (string)
 --   - You may also update config in OCI_AGENT_CONFIG after install.
 --
+
+
 SET SERVEROUTPUT ON
 SET VERIFY OFF
 
 -- First argument: Schema Name (Required)
-DEFINE INSTALL_SCHEMA = '<schema_name>'
+ACCEPT SCHEMA_NAME CHAR PROMPT 'Enter schema name: '
+
+DEFINE INSTALL_SCHEMA = '&SCHEMA_NAME'
 
 -- Second argument: JSON config (optional)
 -- DEFINE INSTALL_CONFIG_JSON = q'({"credential_name": "MY_CRED", "compartment_name": "MY_COMP"})'
@@ -58,15 +62,19 @@ IS
     'DBMS_CLOUD',
     'DBMS_CLOUD_ADMIN',
     'DBMS_CLOUD_AI_AGENT',
+    'DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE',
     'DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE_LIST_OBJECTS_RESPONSE_T',
     'DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE_LIST_OBJECT_VERSIONS_RESPONSE_T',
     'DBMS_CLOUD_OCI_OBJECT_STORAGE_LIST_OBJECTS_T',
+    'DBMS_CLOUD_OCI_OBJECT_STORAGE_BUCKET_T',
+    'DBMS_CLOUD_OCI_OBJECT_STORAGE_BUCKET_SUMMARY_TBL',
     'DBMS_CLOUD_OCI_OBJECT_STORAGE_OBJECT_SUMMARY_TBL',
     -- Head/Get/Put object likely types (best-effort)
     'DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE_GET_OBJECT_RESPONSE_T',
     'DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE_PUT_OBJECT_RESPONSE_T',
     'DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE_HEAD_OBJECT_RESPONSE_T',
     'DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE_HEAD_BUCKET_RESPONSE_T',
+    'DBMS_CLOUD_OCI_OBJECT_STORAGE_COMMIT_MULTIPART_UPLOAD_PART_DETAILS_T',
     -- Buckets
     'DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE_GET_BUCKET_RESPONSE_T',
     'DBMS_CLOUD_OCI_OBS_OBJECT_STORAGE_LIST_BUCKETS_RESPONSE_T',
@@ -360,6 +368,68 @@ END;
 /
 
 alter session set current_schema = &&INSTALL_SCHEMA;
+
+/*
+================================================================================
+Package: OCI_OBJECT_STORAGE_AGENTS
+================================================================================
+Purpose
+-------
+This package provides a comprehensive set of PL/SQL helper functions that
+expose Oracle Cloud Infrastructure (OCI) Object Storage operations as
+AI-agent–callable tools for Oracle Autonomous Database Select AI / AI Agents.
+
+The package abstracts low-level OCI REST and SDK calls and offers a clean,
+JSON-based interface that can be safely consumed by:
+  - Select AI Agents
+  - Oracle APEX applications
+  - Automation scripts
+  - Conversational AI workflows
+
+Key Capabilities
+----------------
+• Automatic resolution of:
+  - Object Storage namespace
+  - Compartment OCID
+  - Credentials
+  using centrally managed configuration (OCI_AGENT_CONFIG)
+
+• Read-only operations:
+  - List buckets, objects, versions, multipart uploads
+  - Retrieve metadata (HEAD / GET)
+  - Inspect lifecycle, retention, replication, and work requests
+
+• Write & management operations:
+  - Create, update, delete buckets and objects
+  - Upload objects (single & multipart)
+  - Manage lifecycle policies, retention rules, replication
+  - Create and manage Pre-Authenticated Requests (PAR)
+  - Restore, rename, copy, re-encrypt objects and buckets
+
+• All functions:
+  - Return JSON (CLOB) responses
+  - Are stateless and idempotent where possible
+  - Are safe for AI-agent execution
+
+Configuration Model
+-------------------
+This package relies on a configuration table (OCI_AGENT_CONFIG) to store:
+  - OCI credential name
+  - Default compartment name / OCID
+  - Other reusable parameters
+
+End users only need to configure once; all tools reuse it automatically.
+
+Who Is This For?
+----------------
+• DBAs automating OCI Object Storage from SQL
+• Developers building APEX + AI integrations
+• Platform teams creating reusable AI agents
+• End users interacting with Object Storage via natural language
+
+================================================================================
+*/
+
 ------------------------------------------------------------------------
 -- Package specification
 ------------------------------------------------------------------------
@@ -4052,406 +4122,406 @@ IS
 BEGIN
   ------------------------------------------------------------------------
   -- AI TOOL: LIST_OBJECTS_TOOL
-  -- maps to &&INSTALL_SCHEMA.oci_object_storage_agents.list_objects
+  -- maps to oci_object_storage_agents.list_objects
   ------------------------------------------------------------------------
   drop_tool_if_exists(tool_name => 'LIST_OBJECTS_TOOL');
   DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
     tool_name => 'LIST_OBJECTS_TOOL',
     attributes => '{
       "instruction": "List all objects in a bucket using resolved namespace and configured credentials; surfaces per-object metadata for inventory, audit, and pre/post operation workflows.",
-      "function": "&&INSTALL_SCHEMA.oci_object_storage_agents.list_objects"
+      "function": "oci_object_storage_agents.list_objects"
     }',
     description => 'Tool for listing objects in OCI Object Storage'
   );
 
   ------------------------------------------------------------------------
   -- AI TOOL: LIST_BUCKETS_TOOL
-  -- maps to &&INSTALL_SCHEMA.oci_object_storage_agents.list_buckets
+  -- maps to oci_object_storage_agents.list_buckets
   ------------------------------------------------------------------------
   drop_tool_if_exists(tool_name => 'LIST_BUCKETS_TOOL');
   DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
     tool_name => 'LIST_BUCKETS_TOOL',
     attributes => '{
       "instruction": "List all Object Storage buckets visible to the configured compartment scope in the given region; useful for navigation, selection, and governance views.",
-      "function": "&&INSTALL_SCHEMA.oci_object_storage_agents.list_buckets"
+      "function": "oci_object_storage_agents.list_buckets"
     }',
     description => 'Tool for listing Object Storage buckets'
   );
 
   ------------------------------------------------------------------------
   -- AI TOOL: GET_BUCKET_TOOL
-  -- maps to &&INSTALL_SCHEMA.oci_object_storage_agents.get_bucket
+  -- maps to oci_object_storage_agents.get_bucket
   ------------------------------------------------------------------------
   drop_tool_if_exists(tool_name => 'GET_BUCKET_TOOL');
   DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
     tool_name => 'GET_BUCKET_TOOL',
     attributes => '{
       "instruction": "Fetches a bucket’s configuration and summary properties in the given region to support governance, diagnostics, and detail panes.",
-      "function": "&&INSTALL_SCHEMA.oci_object_storage_agents.get_bucket"
+      "function": "oci_object_storage_agents.get_bucket"
     }',
     description => 'Tool for retrieving Object Storage bucket metadata'
   );
 
   ------------------------------------------------------------------------
   -- AI TOOL: HEAD_BUCKET_TOOL
-  -- maps to &&INSTALL_SCHEMA.oci_object_storage_agents.head_bucket
+  -- maps to oci_object_storage_agents.head_bucket
   ------------------------------------------------------------------------
   drop_tool_if_exists(tool_name => 'HEAD_BUCKET_TOOL');
   DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
     tool_name => 'HEAD_BUCKET_TOOL',
     attributes => '{
       "instruction": "Performs a lightweight metadata probe (HEAD) on a bucket to validate existence and inspect headers without retrieving content.",
-      "function": "&&INSTALL_SCHEMA.oci_object_storage_agents.head_bucket"
+      "function": "oci_object_storage_agents.head_bucket"
     }',
     description => 'Tool for retrieving Object Storage bucket metadata headers'
   );
 
   ------------------------------------------------------------------------
   -- AI TOOL: HEAD_OBJECT_TOOL
-  -- maps to &&INSTALL_SCHEMA.oci_object_storage_agents.head_object
+  -- maps to oci_object_storage_agents.head_object
   ------------------------------------------------------------------------
   drop_tool_if_exists(tool_name => 'HEAD_OBJECT_TOOL');
   DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
     tool_name => 'HEAD_OBJECT_TOOL',
     attributes => '{
       "instruction": "Performs an object metadata probe (HEAD) to validate existence and inspect headers such as etag and content-type without downloading payload.",
-      "function": "&&INSTALL_SCHEMA.oci_object_storage_agents.head_object"
+      "function": "oci_object_storage_agents.head_object"
     }',
     description => 'Tool for retrieving Object Storage object metadata headers'
   );
 
   ------------------------------------------------------------------------
   -- AI TOOL: LIST_MULTIPART_UPLOADS_TOOL
-  -- maps to &&INSTALL_SCHEMA.oci_object_storage_agents.list_multipart_uploads
+  -- maps to oci_object_storage_agents.list_multipart_uploads
   ------------------------------------------------------------------------
   drop_tool_if_exists(tool_name => 'LIST_MULTIPART_UPLOADS_TOOL');
   DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
     tool_name => 'LIST_MULTIPART_UPLOADS_TOOL',
     attributes => '{
       "instruction": "List all in-progress multipart uploads for a bucket to help resume, commit, or clean up unfinished large-object transfers.",
-      "function": "&&INSTALL_SCHEMA.oci_object_storage_agents.list_multipart_uploads"
+      "function": "oci_object_storage_agents.list_multipart_uploads"
     }',
     description => 'Tool for listing multipart uploads in Object Storage'
   );
 
   ------------------------------------------------------------------------
   -- AI TOOL: LIST_MULTIPART_UPLOAD_PARTS_TOOL
-  -- maps to &&INSTALL_SCHEMA.oci_object_storage_agents.list_multipart_upload_parts
+  -- maps to oci_object_storage_agents.list_multipart_upload_parts
   ------------------------------------------------------------------------
   drop_tool_if_exists(tool_name => 'LIST_MULTIPART_UPLOAD_PARTS_TOOL');
   DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
     tool_name => 'LIST_MULTIPART_UPLOAD_PARTS_TOOL',
     attributes => '{
       "instruction": "Inspects the parts uploaded for a given multipart session, enabling validation and completion logic for large transfers.",
-      "function": "&&INSTALL_SCHEMA.oci_object_storage_agents.list_multipart_upload_parts"
+      "function": "oci_object_storage_agents.list_multipart_upload_parts"
     }',
     description => 'Tool for listing multipart upload parts in Object Storage'
   );
 
   ------------------------------------------------------------------------
   -- AI TOOL: MAKE_BUCKET_WRITABLE_TOOL
-  -- maps to &&INSTALL_SCHEMA.oci_object_storage_agents.make_bucket_writable
+  -- maps to oci_object_storage_agents.make_bucket_writable
   ------------------------------------------------------------------------
   drop_tool_if_exists(tool_name => 'MAKE_BUCKET_WRITABLE_TOOL');
   DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
     tool_name => 'MAKE_BUCKET_WRITABLE_TOOL',
     attributes => '{
       "instruction": "Transitions a bucket to a writable state when it is read-only; use before performing write operations.",
-      "function": "&&INSTALL_SCHEMA.oci_object_storage_agents.make_bucket_writable"
+      "function": "oci_object_storage_agents.make_bucket_writable"
     }',
     description => 'Tool to set an OCI Object Storage bucket as writable'
   );
 
   ------------------------------------------------------------------------
   -- AI TOOL: PUT_OBJECT_LIFECYCLE_POLICY_TOOL
-  -- maps to &&INSTALL_SCHEMA.oci_object_storage_agents.put_object_lifecycle_policy
+  -- maps to oci_object_storage_agents.put_object_lifecycle_policy
   ------------------------------------------------------------------------
   drop_tool_if_exists(tool_name => 'PUT_OBJECT_LIFECYCLE_POLICY_TOOL');
   DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
     tool_name => 'PUT_OBJECT_LIFECYCLE_POLICY_TOOL',
     attributes => '{
       "instruction": "Defines lifecycle management rules on a bucket to transition or delete objects based on age or criteria.",
-      "function": "&&INSTALL_SCHEMA.oci_object_storage_agents.put_object_lifecycle_policy"
+      "function": "oci_object_storage_agents.put_object_lifecycle_policy"
     }',
     description => 'Tool to set lifecycle policies for OCI Object Storage buckets'
   );
 
   ------------------------------------------------------------------------
   -- AI TOOL: LIST_RETENTION_RULES_TOOL
-  -- maps to &&INSTALL_SCHEMA.oci_object_storage_agents.list_retention_rules
+  -- maps to oci_object_storage_agents.list_retention_rules
   ------------------------------------------------------------------------
   drop_tool_if_exists(tool_name => 'LIST_RETENTION_RULES_TOOL');
   DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
     tool_name => 'LIST_RETENTION_RULES_TOOL',
     attributes => '{
       "instruction": "List retention rules on a bucket to assess compliance posture and cleanup eligibility.",
-      "function": "&&INSTALL_SCHEMA.oci_object_storage_agents.list_retention_rules"
+      "function": "oci_object_storage_agents.list_retention_rules"
     }',
     description => 'Tool for listing OCI Object Storage retention rules'
   );
 
   ------------------------------------------------------------------------
   -- AI TOOL: GET_RETENTION_RULE_TOOL
-  -- maps to &&INSTALL_SCHEMA.oci_object_storage_agents.get_retention_rule
+  -- maps to oci_object_storage_agents.get_retention_rule
   ------------------------------------------------------------------------
   drop_tool_if_exists(tool_name => 'GET_RETENTION_RULE_TOOL');
   DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
     tool_name => 'GET_RETENTION_RULE_TOOL',
     attributes => '{
       "instruction": "Retrieves the full definition of a specific retention rule for review or update workflows.",
-      "function": "&&INSTALL_SCHEMA.oci_object_storage_agents.get_retention_rule"
+      "function": "oci_object_storage_agents.get_retention_rule"
     }',
     description => 'Tool for retrieving Object Storage retention rule details'
   );
 
   ------------------------------------------------------------------------
   -- AI TOOL: GET_OBJECT_TOOL
-  -- maps to &&INSTALL_SCHEMA.oci_object_storage_agents.get_object
+  -- maps to oci_object_storage_agents.get_object
   ------------------------------------------------------------------------
   drop_tool_if_exists(tool_name => 'GET_OBJECT_TOOL');
   DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
     tool_name => 'GET_OBJECT_TOOL',
     attributes => '{
       "instruction": "Retrieves object metadata (not payload) to inform downstream decisions such as conditional reads, cache validation, or UI displays.",
-      "function": "&&INSTALL_SCHEMA.oci_object_storage_agents.get_object"
+      "function": "oci_object_storage_agents.get_object"
     }',
     description => 'Tool for retrieving Object Storage object metadata (summary)'
   );
 
   ------------------------------------------------------------------------
   -- AI TOOL: PUT_OBJECT_TOOL
-  -- maps to &&INSTALL_SCHEMA.oci_object_storage_agents.put_object
+  -- maps to oci_object_storage_agents.put_object
   ------------------------------------------------------------------------
   drop_tool_if_exists(tool_name => 'PUT_OBJECT_TOOL');
   DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
     tool_name => 'PUT_OBJECT_TOOL',
     attributes => '{
       "instruction": "Upload object content to a bucket with an explicit MIME type; use for uploads and content updates.",
-      "function": "&&INSTALL_SCHEMA.oci_object_storage_agents.put_object"
+      "function": "oci_object_storage_agents.put_object"
     }',
     description => 'Tool to upload objects to OCI Object Storage'
   );
 
   ------------------------------------------------------------------------
   -- AI TOOL: LIST_PREAUTHENTICATED_REQUESTS_TOOL
-  -- maps to &&INSTALL_SCHEMA.oci_object_storage_agents.list_preauthenticated_requests
+  -- maps to oci_object_storage_agents.list_preauthenticated_requests
   ------------------------------------------------------------------------
   drop_tool_if_exists(tool_name => 'LIST_PREAUTHENTICATED_REQUESTS_TOOL');
   DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
     tool_name => 'LIST_PREAUTHENTICATED_REQUESTS_TOOL',
     attributes => '{
       "instruction": "Lists existing Preauthenticated Requests (PARs) for a bucket to audit access links and manage sharing.",
-      "function": "&&INSTALL_SCHEMA.oci_object_storage_agents.list_preauthenticated_requests"
+      "function": "oci_object_storage_agents.list_preauthenticated_requests"
     }',
     description => 'Tool for listing preauthenticated requests (PARs)'
   );
 
   ------------------------------------------------------------------------
   -- AI TOOL: LIST_REPLICATION_POLICIES_TOOL
-  -- maps to &&INSTALL_SCHEMA.oci_object_storage_agents.list_replication_policies
+  -- maps to oci_object_storage_agents.list_replication_policies
   ------------------------------------------------------------------------
   drop_tool_if_exists(tool_name => 'LIST_REPLICATION_POLICIES_TOOL');
   DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
     tool_name => 'LIST_REPLICATION_POLICIES_TOOL',
     attributes => '{
       "instruction": "Lists replication policies configured on a bucket to understand cross-region replication posture.",
-      "function": "&&INSTALL_SCHEMA.oci_object_storage_agents.list_replication_policies"
+      "function": "oci_object_storage_agents.list_replication_policies"
     }',
     description => 'Tool for listing Object Storage replication policies'
   );
 
   ------------------------------------------------------------------------
   -- AI TOOL: GET_REPLICATION_POLICY_TOOL
-  -- maps to &&INSTALL_SCHEMA.oci_object_storage_agents.get_replication_policy
+  -- maps to oci_object_storage_agents.get_replication_policy
   ------------------------------------------------------------------------
   drop_tool_if_exists(tool_name => 'GET_REPLICATION_POLICY_TOOL');
   DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
     tool_name => 'GET_REPLICATION_POLICY_TOOL',
     attributes => '{
       "instruction": "Retrieves details of a specific replication policy for status and configuration inspection.",
-      "function": "&&INSTALL_SCHEMA.oci_object_storage_agents.get_replication_policy"
+      "function": "oci_object_storage_agents.get_replication_policy"
     }',
     description => 'Tool for retrieving replication policy details'
   );
 
   ------------------------------------------------------------------------
   -- AI TOOL: LIST_REPLICATION_SOURCES_TOOL
-  -- maps to &&INSTALL_SCHEMA.oci_object_storage_agents.list_replication_sources
+  -- maps to oci_object_storage_agents.list_replication_sources
   ------------------------------------------------------------------------
   drop_tool_if_exists(tool_name => 'LIST_REPLICATION_SOURCES_TOOL');
   DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
     tool_name => 'LIST_REPLICATION_SOURCES_TOOL',
     attributes => '{
       "instruction": "Lists upstream replication sources associated with a bucket to understand replication topology.",
-      "function": "&&INSTALL_SCHEMA.oci_object_storage_agents.list_replication_sources"
+      "function": "oci_object_storage_agents.list_replication_sources"
     }',
     description => 'Tool for listing replication sources'
   );
 
   ------------------------------------------------------------------------
   -- AI TOOL: REENCRYPT_BUCKET_TOOL
-  -- maps to &&INSTALL_SCHEMA.oci_object_storage_agents.reencrypt_bucket
+  -- maps to oci_object_storage_agents.reencrypt_bucket
   ------------------------------------------------------------------------
   drop_tool_if_exists(tool_name => 'REENCRYPT_BUCKET_TOOL');
   DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
     tool_name => 'REENCRYPT_BUCKET_TOOL',
     attributes => '{
       "instruction": "Initiates a bucket-level re-encryption operation, typically after KMS rotation or encryption policy changes.",
-      "function": "&&INSTALL_SCHEMA.oci_object_storage_agents.reencrypt_bucket"
+      "function": "oci_object_storage_agents.reencrypt_bucket"
     }',
     description => 'Tool to re-encrypt buckets'
   );
 
   ------------------------------------------------------------------------
   -- AI TOOL: REENCRYPT_OBJECT_TOOL
-  -- maps to &&INSTALL_SCHEMA.oci_object_storage_agents.reencrypt_object
+  -- maps to oci_object_storage_agents.reencrypt_object
   ------------------------------------------------------------------------
   drop_tool_if_exists(tool_name => 'REENCRYPT_OBJECT_TOOL');
   DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
     tool_name => 'REENCRYPT_OBJECT_TOOL',
     attributes => '{
       "instruction": "Initiates re-encryption for a specific object, typically after KMS or encryption policy changes.",
-      "function": "&&INSTALL_SCHEMA.oci_object_storage_agents.reencrypt_object"
+      "function": "oci_object_storage_agents.reencrypt_object"
     }',
     description => 'Tool to re-encrypt objects'
   );
 
   ------------------------------------------------------------------------
   -- AI TOOL: RENAME_OBJECT_TOOL
-  -- maps to &&INSTALL_SCHEMA.oci_object_storage_agents.rename_object
+  -- maps to oci_object_storage_agents.rename_object
   ------------------------------------------------------------------------
   drop_tool_if_exists(tool_name => 'RENAME_OBJECT_TOOL');
   DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
     tool_name => 'RENAME_OBJECT_TOOL',
     attributes => '{
       "instruction": "Renames or moves an object within a bucket by changing its key name.",
-      "function": "&&INSTALL_SCHEMA.oci_object_storage_agents.rename_object"
+      "function": "oci_object_storage_agents.rename_object"
     }',
     description => 'Tool to rename objects'
   );
 
   ------------------------------------------------------------------------
   -- AI TOOL: RESTORE_OBJECTS_TOOL
-  -- maps to &&INSTALL_SCHEMA.oci_object_storage_agents.restore_objects
+  -- maps to oci_object_storage_agents.restore_objects
   ------------------------------------------------------------------------
   drop_tool_if_exists(tool_name => 'RESTORE_OBJECTS_TOOL');
   DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
     tool_name => 'RESTORE_OBJECTS_TOOL',
     attributes => '{
       "instruction": "Restores archived or versioned content for a limited duration to enable reads or rehydration.",
-      "function": "&&INSTALL_SCHEMA.oci_object_storage_agents.restore_objects"
+      "function": "oci_object_storage_agents.restore_objects"
     }',
     description => 'Tool to restore objects from Object Storage'
   );
 
   ------------------------------------------------------------------------
   -- AI TOOL: UPLOAD_PART_TOOL
-  -- maps to &&INSTALL_SCHEMA.oci_object_storage_agents.upload_part
+  -- maps to oci_object_storage_agents.upload_part
   ------------------------------------------------------------------------
   drop_tool_if_exists(tool_name => 'UPLOAD_PART_TOOL');
   DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
     tool_name => 'UPLOAD_PART_TOOL',
     attributes => '{
       "instruction": "Uploads a single part for an ongoing multipart transfer; repeat to assemble large objects.",
-      "function": "&&INSTALL_SCHEMA.oci_object_storage_agents.upload_part"
+      "function": "oci_object_storage_agents.upload_part"
     }',
     description => 'Tool for multipart upload parts'
   );
 
   ------------------------------------------------------------------------
   -- AI TOOL: UPDATE_NAMESPACE_METADATA_TOOL
-  -- maps to &&INSTALL_SCHEMA.oci_object_storage_agents.update_namespace_metadata
+  -- maps to oci_object_storage_agents.update_namespace_metadata
   ------------------------------------------------------------------------
   drop_tool_if_exists(tool_name => 'UPDATE_NAMESPACE_METADATA_TOOL');
   DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
     tool_name => 'UPDATE_NAMESPACE_METADATA_TOOL',
     attributes => '{
       "instruction": "Sets default namespace metadata such as default compartments for S3/Swift interoperability.",
-      "function": "&&INSTALL_SCHEMA.oci_object_storage_agents.update_namespace_metadata"
+      "function": "oci_object_storage_agents.update_namespace_metadata"
     }',
     description => 'Tool to update namespace metadata'
   );
 
   ------------------------------------------------------------------------
   -- AI TOOL: UPDATE_RETENTION_RULE_TOOL
-  -- maps to &&INSTALL_SCHEMA.oci_object_storage_agents.update_retention_rule
+  -- maps to oci_object_storage_agents.update_retention_rule
   ------------------------------------------------------------------------
   drop_tool_if_exists(tool_name => 'UPDATE_RETENTION_RULE_TOOL');
   DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
     tool_name => 'UPDATE_RETENTION_RULE_TOOL',
     attributes => '{
       "instruction": "Modifies an existing retention rule on a bucket to change display name or retention duration.",
-      "function": "&&INSTALL_SCHEMA.oci_object_storage_agents.update_retention_rule"
+      "function": "oci_object_storage_agents.update_retention_rule"
     }',
     description => 'Tool to update retention rules'
   );
 
   ------------------------------------------------------------------------
   -- AI TOOL: LIST_WORK_REQUESTS_TOOL
-  -- maps to &&INSTALL_SCHEMA.oci_object_storage_agents.list_work_requests
+  -- maps to oci_object_storage_agents.list_work_requests
   ------------------------------------------------------------------------
   drop_tool_if_exists(tool_name => 'LIST_WORK_REQUESTS_TOOL');
   DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
     tool_name => 'LIST_WORK_REQUESTS_TOOL',
     attributes => '{
       "instruction": "Lists Object Storage work requests for the configured compartment to monitor asynchronous operations.",
-      "function": "&&INSTALL_SCHEMA.oci_object_storage_agents.list_work_requests"
+      "function": "oci_object_storage_agents.list_work_requests"
     }',
     description => 'Tool for listing work requests'
   );
 
   ------------------------------------------------------------------------
   -- AI TOOL: LIST_WORK_REQUEST_ERRORS_TOOL
-  -- maps to &&INSTALL_SCHEMA.oci_object_storage_agents.list_work_request_errors
+  -- maps to oci_object_storage_agents.list_work_request_errors
   ------------------------------------------------------------------------
   drop_tool_if_exists(tool_name => 'LIST_WORK_REQUEST_ERRORS_TOOL');
   DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
     tool_name => 'LIST_WORK_REQUEST_ERRORS_TOOL',
     attributes => '{
       "instruction": "Retrieves error items associated with a work request to aid troubleshooting.",
-      "function": "&&INSTALL_SCHEMA.oci_object_storage_agents.list_work_request_errors"
+      "function": "oci_object_storage_agents.list_work_request_errors"
     }',
     description => 'Tool for listing work request errors'
   );
 
   ------------------------------------------------------------------------
   -- AI TOOL: LIST_WORK_REQUEST_LOGS_TOOL
-  -- maps to &&INSTALL_SCHEMA.oci_object_storage_agents.list_work_request_logs
+  -- maps to oci_object_storage_agents.list_work_request_logs
   ------------------------------------------------------------------------
   drop_tool_if_exists(tool_name => 'LIST_WORK_REQUEST_LOGS_TOOL');
   DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
     tool_name => 'LIST_WORK_REQUEST_LOGS_TOOL',
     attributes => '{
       "instruction": "Retrieves log messages for a work request to track progress and diagnose issues.",
-      "function": "&&INSTALL_SCHEMA.oci_object_storage_agents.list_work_request_logs"
+      "function": "oci_object_storage_agents.list_work_request_logs"
     }',
     description => 'Tool for listing work request logs'
   );
 
   ------------------------------------------------------------------------
   -- AI TOOL: GET_WORK_REQUEST_TOOL
-  -- maps to &&INSTALL_SCHEMA.oci_object_storage_agents.get_work_request
+  -- maps to oci_object_storage_agents.get_work_request
   ------------------------------------------------------------------------
   drop_tool_if_exists(tool_name => 'GET_WORK_REQUEST_TOOL');
   DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
     tool_name => 'GET_WORK_REQUEST_TOOL',
     attributes => '{
       "instruction": "Retrieves the current status and key attributes of a specific work request for monitoring.",
-      "function": "&&INSTALL_SCHEMA.oci_object_storage_agents.get_work_request"
+      "function": "oci_object_storage_agents.get_work_request"
     }',
     description => 'Tool for retrieving work request details'
   );
 
   ------------------------------------------------------------------------
   -- AI TOOL: UPDATE_BUCKET_TOOL
-  -- maps to &&INSTALL_SCHEMA.oci_object_storage_agents.update_bucket
+  -- maps to oci_object_storage_agents.update_bucket
   ------------------------------------------------------------------------
   drop_tool_if_exists(tool_name => 'UPDATE_BUCKET_TOOL');
   DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
       tool_name => 'UPDATE_BUCKET_TOOL',
       attributes => '{
           "instruction": "Updates bucket configuration such as display name, versioning state, public access, and object event settings.",
-          "function": "&&INSTALL_SCHEMA.oci_object_storage_agents.update_bucket"
+          "function": "oci_object_storage_agents.update_bucket"
       }',
       description => 'Tool to update OCI Object Storage buckets'
   );
@@ -4462,7 +4532,7 @@ BEGIN
     tool_name => 'CREATE_BUCKET_TOOL',
     attributes => '{
       "instruction": "Creates a new Object Storage bucket in the specified region under the configured compartment scope.",
-      "function": "&&INSTALL_SCHEMA.oci_object_storage_agents.create_bucket"
+      "function": "oci_object_storage_agents.create_bucket"
     }',
     description => 'Tool to create Object Storage buckets'
   );
@@ -4473,7 +4543,7 @@ BEGIN
     tool_name => 'DELETE_BUCKET_TOOL',
     attributes => '{
       "instruction": "Removes an Object Storage bucket that is already empty; use for deprovisioning.",
-      "function": "&&INSTALL_SCHEMA.oci_object_storage_agents.delete_bucket"
+      "function": "oci_object_storage_agents.delete_bucket"
     }',
     description => 'Tool to delete Object Storage buckets'
   );
@@ -4484,7 +4554,7 @@ BEGIN
     tool_name => 'DELETE_OBJECT_TOOL',
     attributes => '{
       "instruction": "Removes an object from a bucket; use for cleanup, archival workflows, or version management.",
-      "function": "&&INSTALL_SCHEMA.oci_object_storage_agents.delete_object"
+      "function": "oci_object_storage_agents.delete_object"
     }',
     description => 'Tool to delete objects from Object Storage'
   );
@@ -4495,7 +4565,7 @@ BEGIN
     tool_name => 'COPY_OBJECT_TOOL',
     attributes => '{
       "instruction": "Copies an object to a destination bucket and region, enabling cross-bucket or cross-region duplication.",
-      "function": "&&INSTALL_SCHEMA.oci_object_storage_agents.copy_object"
+      "function": "oci_object_storage_agents.copy_object"
     }',
     description => 'Tool to copy objects between buckets/regions'
   );
@@ -4506,7 +4576,7 @@ BEGIN
     tool_name => 'CREATE_MULTIPART_UPLOAD_TOOL',
     attributes => '{
       "instruction": "Initiates a multipart upload session for large object transfers.",
-      "function": "&&INSTALL_SCHEMA.oci_object_storage_agents.create_multipart_upload"
+      "function": "oci_object_storage_agents.create_multipart_upload"
     }',
     description => 'Tool to start multipart uploads'
   );
@@ -4517,7 +4587,7 @@ BEGIN
     tool_name => 'COMMIT_MULTIPART_UPLOAD_TOOL',
     attributes => '{
       "instruction": "Finalizes a multipart upload by committing the selected parts.",
-      "function": "&&INSTALL_SCHEMA.oci_object_storage_agents.commit_multipart_upload"
+      "function": "oci_object_storage_agents.commit_multipart_upload"
     }',
     description => 'Tool to finalize multipart uploads'
   );
@@ -4528,7 +4598,7 @@ BEGIN
     tool_name => 'ABORT_MULTIPART_UPLOAD_TOOL',
     attributes => '{
       "instruction": "Cancels an in-progress multipart upload and cleans up partial state.",
-      "function": "&&INSTALL_SCHEMA.oci_object_storage_agents.abort_multipart_upload"
+      "function": "oci_object_storage_agents.abort_multipart_upload"
     }',
     description => 'Tool to abort multipart uploads'
   );
@@ -4539,7 +4609,7 @@ BEGIN
     tool_name => 'CREATE_PREAUTHENTICATED_REQUEST_TOOL',
     attributes => '{
       "instruction": "Creates a Preauthenticated Request (PAR) to grant time‑bound access to a bucket or object via a signed URL.",
-      "function": "&&INSTALL_SCHEMA.oci_object_storage_agents.create_preauthenticated_request"
+      "function": "oci_object_storage_agents.create_preauthenticated_request"
     }',
     description => 'Tool to create PARs for Object Storage'
   );
@@ -4550,7 +4620,7 @@ BEGIN
     tool_name => 'GET_PREAUTHENTICATED_REQUEST_TOOL',
     attributes => '{
       "instruction": "Retrieves details of a Preauthenticated Request (PAR) for review, auditing, or client presentation.",
-      "function": "&&INSTALL_SCHEMA.oci_object_storage_agents.get_preauthenticated_request"
+      "function": "oci_object_storage_agents.get_preauthenticated_request"
     }',
     description => 'Tool to get PAR details'
   );
@@ -4561,7 +4631,7 @@ BEGIN
     tool_name => 'DELETE_PREAUTHENTICATED_REQUEST_TOOL',
     attributes => '{
       "instruction": "Revokes a Preauthenticated Request (PAR) to immediately disable the shared link.",
-      "function": "&&INSTALL_SCHEMA.oci_object_storage_agents.delete_preauthenticated_request"
+      "function": "oci_object_storage_agents.delete_preauthenticated_request"
     }',
     description => 'Tool to delete PARs'
   );
@@ -4572,7 +4642,7 @@ BEGIN
     tool_name => 'CREATE_REPLICATION_POLICY_TOOL',
     attributes => '{
       "instruction": "Creates a cross‑region replication policy from a source bucket to a destination bucket to enable continuous replication.",
-      "function": "&&INSTALL_SCHEMA.oci_object_storage_agents.create_replication_policy"
+      "function": "oci_object_storage_agents.create_replication_policy"
     }',
     description => 'Tool to create replication policies'
   );
@@ -4583,7 +4653,7 @@ BEGIN
     tool_name => 'DELETE_REPLICATION_POLICY_TOOL',
     attributes => '{
       "instruction": "Removes a replication policy from a bucket to stop replication.",
-      "function": "&&INSTALL_SCHEMA.oci_object_storage_agents.delete_replication_policy"
+      "function": "oci_object_storage_agents.delete_replication_policy"
     }',
     description => 'Tool to delete replication policies'
   );
@@ -4594,7 +4664,7 @@ BEGIN
     tool_name => 'CREATE_RETENTION_RULE_TOOL',
     attributes => '{
       "instruction": "Creates a retention rule on a bucket to enforce minimum retention periods for objects.",
-      "function": "&&INSTALL_SCHEMA.oci_object_storage_agents.create_retention_rule"
+      "function": "oci_object_storage_agents.create_retention_rule"
     }',
     description => 'Tool to create Object Storage retention rules'
   );
@@ -4605,7 +4675,7 @@ BEGIN
     tool_name => 'DELETE_RETENTION_RULE_TOOL',
     attributes => '{
       "instruction": "Removes an existing retention rule from a bucket.",
-      "function": "&&INSTALL_SCHEMA.oci_object_storage_agents.delete_retention_rule"
+      "function": "oci_object_storage_agents.delete_retention_rule"
     }',
     description => 'Tool to delete Object Storage retention rules'
   );
@@ -4616,7 +4686,7 @@ BEGIN
     tool_name => 'DELETE_OBJECT_LIFECYCLE_POLICY_TOOL',
     attributes => '{
       "instruction": "Removes the lifecycle policy from a bucket to stop automated transitions or deletions.",
-      "function": "&&INSTALL_SCHEMA.oci_object_storage_agents.delete_object_lifecycle_policy"
+      "function": "oci_object_storage_agents.delete_object_lifecycle_policy"
     }',
     description => 'Tool to delete lifecycle policy on a bucket'
   );
@@ -4627,7 +4697,7 @@ BEGIN
     tool_name => 'CANCEL_WORK_REQUEST_TOOL',
     attributes => '{
       "instruction": "Requests cancellation of an asynchronous Object Storage work request.",
-      "function": "&&INSTALL_SCHEMA.oci_object_storage_agents.cancel_work_request"
+      "function": "oci_object_storage_agents.cancel_work_request"
     }',
     description => 'Tool to cancel Object Storage work requests'
   );
@@ -4638,7 +4708,7 @@ BEGIN
     tool_name => 'GET_NAMESPACE_TOOL',
     attributes => '{
       "instruction": "Resolves the tenancy’s Object Storage namespace for the given region; foundational for bucket and object operations.",
-      "function": "&&INSTALL_SCHEMA.oci_object_storage_agents.get_namespace"
+      "function": "oci_object_storage_agents.get_namespace"
     }',
     description => 'Tool to retrieve Object Storage namespace'
   );

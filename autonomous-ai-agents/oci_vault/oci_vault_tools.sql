@@ -28,7 +28,8 @@ SET SERVEROUTPUT ON
 SET VERIFY OFF
 
 -- First argument: Schema Name (Required)
-DEFINE INSTALL_SCHEMA = '<schema_name>'
+ACCEPT SCHEMA_NAME CHAR PROMPT 'Enter schema name: '
+DEFINE INSTALL_SCHEMA = '&SCHEMA_NAME'
 
 -- Second argument: JSON config (optional)
 -- DEFINE INSTALL_CONFIG_JSON = q'({"credential_name": "MY_CRED", "compartment_name": "MY_COMP"})'
@@ -1573,154 +1574,154 @@ IS
 BEGIN
     ------------------------------------------------------------------------
     -- AI TOOL: LIST_SECRETS_TOOL
-    -- maps to &&INSTALL_SCHEMA.oci_vault_agents.list_secrets
+    -- maps to oci_vault_agents.list_secrets
     ------------------------------------------------------------------------
     drop_tool_if_exists(tool_name => 'LIST_SECRETS_TOOL');
     DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
         tool_name => 'LIST_SECRETS_TOOL',
         attributes => '{
             "instruction": "Enumerate all secrets visible to this agent within the configured compartment of the specified region. Use to inventory secrets, review basic metadata (name/OCID, vault, lifecycle state, timestamps), and support governance. This tool never returns secret payloads.",
-            "function": "&&INSTALL_SCHEMA.oci_vault_agents.list_secrets"
+            "function": "oci_vault_agents.list_secrets"
             }',
         description => 'Tool for listing all secrets in a given OCI Vault compartment'
     );
 
     ------------------------------------------------------------------------
     -- AI TOOL: LIST_SECRET_VERSIONS_TOOL
-    -- maps to &&INSTALL_SCHEMA.oci_vault_agents.list_secret_versions
+    -- maps to oci_vault_agents.list_secret_versions
     ------------------------------------------------------------------------
     drop_tool_if_exists(tool_name => 'LIST_SECRET_VERSIONS_TOOL');
     DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
         tool_name => 'LIST_SECRET_VERSIONS_TOOL',
         attributes => '{
             "instruction": "List every version of a secret to understand its rotation history and stage assignments. Use for auditing and troubleshooting rotations. This tool returns version metadata only, not secret contents.",
-            "function": "&&INSTALL_SCHEMA.oci_vault_agents.list_secret_versions"
+            "function": "oci_vault_agents.list_secret_versions"
             }',
         description => 'Tool for listing all versions of an OCI Vault secret'
     );
 
     ------------------------------------------------------------------------
     -- AI TOOL: GET_SECRET_VERSION_TOOL
-    -- maps to &&INSTALL_SCHEMA.oci_vault_agents.get_secret_version
+    -- maps to oci_vault_agents.get_secret_version
     ------------------------------------------------------------------------
     drop_tool_if_exists(tool_name => 'GET_SECRET_VERSION_TOOL');
     DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
         tool_name => 'GET_SECRET_VERSION_TOOL',
         attributes => '{
             "instruction": "Retrieve metadata for a specific version of a secret, including stage and timing information, to verify the state of that version. Does not return the secret value.",
-            "function": "&&INSTALL_SCHEMA.oci_vault_agents.get_secret_version"
+            "function": "oci_vault_agents.get_secret_version"
             }',
         description => 'Tool for fetching a specific version of an OCI Vault secret'
     );
 
     ------------------------------------------------------------------------
     -- AI TOOL: UPDATE_SECRET_TOOL
-    -- maps to &&INSTALL_SCHEMA.oci_vault_agents.update_secret
+    -- maps to oci_vault_agents.update_secret
     ------------------------------------------------------------------------
     drop_tool_if_exists(tool_name => 'UPDATE_SECRET_TOOL');
     DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
         tool_name => 'UPDATE_SECRET_TOOL',
         attributes => '{
             "instruction": "Update secret metadata or roll a new version. Use to rotate the secret by supplying new content or to adjust description, tags, or rules. When content is provided, a new CURRENT version is created in OCI Vault.",
-            "function": "&&INSTALL_SCHEMA.oci_vault_agents.update_secret"
+            "function": "oci_vault_agents.update_secret"
             }',
         description => 'Tool for updating an OCI Vault secret'
     );
 
     ------------------------------------------------------------------------
     -- AI TOOL: SCHEDULE_SECRET_DELETION_TOOL
-    -- maps to &&INSTALL_SCHEMA.oci_vault_agents.schedule_secret_deletion
+    -- maps to oci_vault_agents.schedule_secret_deletion
     ------------------------------------------------------------------------
     drop_tool_if_exists(tool_name => 'SCHEDULE_SECRET_DELETION_TOOL');
     DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
         tool_name => 'SCHEDULE_SECRET_DELETION_TOOL',
         attributes => '{
             "instruction": "Schedule a delayed deletion of a secret. Use when decommissioning; the secret remains recoverable until the scheduled time and can be canceled before it executes.",
-            "function": "&&INSTALL_SCHEMA.oci_vault_agents.schedule_secret_deletion"
+            "function": "oci_vault_agents.schedule_secret_deletion"
             }',
         description => 'Tool for scheduling deletion of an OCI Vault secret'
     );
 
     ------------------------------------------------------------------------
     -- AI TOOL: SCHEDULE_SECRET_VERSION_DELETION_TOOL
-    -- maps to &&INSTALL_SCHEMA.oci_vault_agents.schedule_secret_version_deletion
+    -- maps to oci_vault_agents.schedule_secret_version_deletion
     ------------------------------------------------------------------------
     drop_tool_if_exists(tool_name => 'SCHEDULE_SECRET_VERSION_DELETION_TOOL');
     DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
         tool_name => 'SCHEDULE_SECRET_VERSION_DELETION_TOOL',
         attributes => '{
             "instruction": "Schedule deletion of a specific secret version without removing the secret itself. Useful for pruning superseded versions while retaining the active one.",
-            "function": "&&INSTALL_SCHEMA.oci_vault_agents.schedule_secret_version_deletion"
+            "function": "oci_vault_agents.schedule_secret_version_deletion"
             }',
         description => 'Tool for scheduling deletion of a specific OCI Vault secret version'
     );
 
     ------------------------------------------------------------------------
     -- AI TOOL: CANCEL_SECRET_DELETION_TOOL
-    -- maps to &&INSTALL_SCHEMA.oci_vault_agents.cancel_secret_deletion
+    -- maps to oci_vault_agents.cancel_secret_deletion
     ------------------------------------------------------------------------
     drop_tool_if_exists(tool_name => 'CANCEL_SECRET_DELETION_TOOL');
     DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
         tool_name => 'CANCEL_SECRET_DELETION_TOOL',
         attributes => '{
             "instruction": "Cancel a previously scheduled deletion of a secret and keep it active.",
-            "function": "&&INSTALL_SCHEMA.oci_vault_agents.cancel_secret_deletion"
+            "function": "oci_vault_agents.cancel_secret_deletion"
             }',
         description => 'Tool for cancelling a scheduled deletion of an OCI Vault secret'
     );
 
     ------------------------------------------------------------------------
     -- AI TOOL: CANCEL_SECRET_VERSION_DELETION_TOOL
-    -- maps to &&INSTALL_SCHEMA.oci_vault_agents.cancel_secret_version_deletion
+    -- maps to oci_vault_agents.cancel_secret_version_deletion
     ------------------------------------------------------------------------
     drop_tool_if_exists(tool_name => 'CANCEL_SECRET_VERSION_DELETION_TOOL');
     DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
         tool_name => 'CANCEL_SECRET_VERSION_DELETION_TOOL',
         attributes => '{
             "instruction": "Cancel a previously scheduled deletion for a specific secret version.",
-            "function": "&&INSTALL_SCHEMA.oci_vault_agents.cancel_secret_version_deletion"
+            "function": "oci_vault_agents.cancel_secret_version_deletion"
             }',
         description => 'Tool for cancelling scheduled deletion of a specific secret version'
     );
 
     ------------------------------------------------------------------------
     -- AI TOOL: CHANGE_SECRET_COMPARTMENT_TOOL
-    -- maps to &&INSTALL_SCHEMA.oci_vault_agents.change_secret_compartment
+    -- maps to oci_vault_agents.change_secret_compartment
     ------------------------------------------------------------------------
     drop_tool_if_exists(tool_name => 'CHANGE_SECRET_COMPARTMENT_TOOL');
     DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
         tool_name => 'CHANGE_SECRET_COMPARTMENT_TOOL',
         attributes => '{
             "instruction": "Move a secret to a different compartment to align with tenancy structure, permissions, or cost ownership. The secret remains the same resource with updated compartment context.",
-            "function": "&&INSTALL_SCHEMA.oci_vault_agents.change_secret_compartment"
+            "function": "oci_vault_agents.change_secret_compartment"
             }',
         description => 'Tool for changing the compartment of an OCI Vault secret'
     );
 
     ------------------------------------------------------------------------
     -- AI TOOL: CREATE_SECRET_TOOL
-    -- maps to &&INSTALL_SCHEMA.oci_vault_agents.create_secret
+    -- maps to oci_vault_agents.create_secret
     ------------------------------------------------------------------------
     drop_tool_if_exists(tool_name => 'CREATE_SECRET_TOOL');
     DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
         tool_name => 'CREATE_SECRET_TOOL',
         attributes => '{
             "instruction": "Create a new secret in OCI Vault using the specified vault and key, establishing its initial CURRENT version with the provided plaintext. Use for onboarding new credentials or initializing managed secrets.",
-            "function": "&&INSTALL_SCHEMA.oci_vault_agents.create_secret"
+            "function": "oci_vault_agents.create_secret"
             }',
         description => 'Tool for creating a secret in OCI Vault (Select AI Agent / Oracle AI Database)'
     );
 
     ------------------------------------------------------------------------
     -- AI TOOL: GET_SECRET_TOOL
-    -- maps to &&INSTALL_SCHEMA.oci_vault_agents.get_secret
+    -- maps to oci_vault_agents.get_secret
     ------------------------------------------------------------------------
     drop_tool_if_exists(tool_name => 'GET_SECRET_TOOL');
     DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
         tool_name => 'GET_SECRET_TOOL',
         attributes => '{
             "instruction": "Retrieve existing secret metadata to inspect its state, associations, and timing details. Use for monitoring and diagnostics; this tool does not expose secret material.",
-            "function": "&&INSTALL_SCHEMA.oci_vault_agents.get_secret"
+            "function": "oci_vault_agents.get_secret"
             }',
         description => 'Tool for fetching an OCI Vault secret (Select AI Agent / Oracle AI Database)'
     );
