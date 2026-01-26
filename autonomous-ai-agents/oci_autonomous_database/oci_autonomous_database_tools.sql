@@ -1,28 +1,73 @@
--- Copyright (c) 2025 Oracle and/or its affiliates.
--- Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl/
---
--- Installer script for OCI Autonomous Database AI tools (Select AI Agent / Oracle AI Database)
---
--- Purpose:
---   Install a consolidated PL/SQL package and AI Agent tool registrations
---   to automate OCI Autonomous Database operations via Select AI Agent (Oracle AI Database).
---
--- Script Structure
---   1) Initialization: grants, configuration setup.
---   2) Package deployment: &&INSTALL_SCHEMA.oci_autonomous_database_agents (spec and body).
---   3) AI tool setup: creation of all Autonomous Database agent tools.
---
--- Usage:
---   sqlplus admin@db @oci_autonomous_database_tools.sql <INSTALL_SCHEMA> [CONFIG_JSON]
---
--- Notes:
---   - Optional CONFIG_JSON keys:
---       * use_resource_principal (boolean)
---       * credential_name (string)
---       * compartment_name (string)
---       * compartment_ocid (string)
---   - You may also update config in OCI_AGENT_CONFIG after install.
---
+rem ============================================================================
+rem LICENSE
+rem   Copyright (c) 2025 Oracle and/or its affiliates.
+rem   Licensed under the Universal Permissive License (UPL), Version 1.0
+rem   https://oss.oracle.com/licenses/upl/
+rem
+rem NAME
+rem   oci_autonomous_database_tools.sql
+rem
+rem DESCRIPTION
+rem   Installer script for OCI Autonomous Database AI tools
+rem   (Select AI Agent / Oracle AI Database).
+rem
+rem   This script installs a consolidated PL/SQL package and registers
+rem   AI Agent tools used to automate OCI Autonomous Database operations
+rem   via Select AI Agent (Oracle AI Database).
+rem
+rem RELEASE VERSION
+rem   1.0
+rem
+rem RELEASE DATE
+rem   26-Jan-2026
+rem
+rem MAJOR CHANGES IN THIS RELEASE
+rem   - Initial release
+rem   - Added Autonomous Database AI agent tool registrations
+rem
+rem SCRIPT STRUCTURE
+rem   1. Initialization:
+rem        - Grants
+rem        - Configuration setup
+rem
+rem   2. Package Deployment:
+rem        - &&INSTALL_SCHEMA.oci_autonomous_database_agents
+rem          (package specification and body)
+rem
+rem   3. AI Tool Setup:
+rem        - Creation of all Autonomous Database agent tools
+rem
+rem INSTALL INSTRUCTIONS
+rem   1. Connect as ADMIN or a user with required privileges
+rem   2. Run the script using SQL*Plus or SQLcl:
+rem
+rem      sqlplus admin@db @oci_autonomous_database_tools.sql <INSTALL_SCHEMA> [CONFIG_JSON]
+rem
+rem   3. Verify installation by checking tool registration
+rem      and package compilation status.
+rem
+rem PARAMETERS
+rem   INSTALL_SCHEMA (Required)
+rem     Schema in which the package and tools will be created.
+rem
+rem   CONFIG_JSON (Optional)
+rem     JSON string used to configure OCI access.
+rem
+rem NOTES
+rem   - Optional CONFIG_JSON keys:
+rem       * use_resource_principal (boolean)
+rem       * credential_name (string)
+rem       * compartment_name (string)
+rem       * compartment_ocid (string)
+rem
+rem   - Configuration can also be updated post-install
+rem     in the OCI_AGENT_CONFIG table.
+rem
+rem   - This script is idempotent only if DROP logic
+rem     is explicitly enabled.
+rem
+rem ============================================================================
+
 
 SET SERVEROUTPUT ON
 SET VERIFY OFF
@@ -38,7 +83,7 @@ DEFINE INSTALL_CONFIG_JSON = NULL
 -------------------------------------------------------------------------------
 -- Initializes the OCI Autonomous Database AI Agent.
 -------------------------------------------------------------------------------
-CREATE OR REPLACE PROCEDURE initilize_autonomous_database_agent(
+CREATE OR REPLACE PROCEDURE initialize_autonomous_database_agent(
   p_install_schema_name IN VARCHAR2,
   p_config_json         IN CLOB
 )
@@ -260,19 +305,19 @@ BEGIN
     p_compartment_ocid    => l_compartment_ocid
   );
 
-  DBMS_OUTPUT.PUT_LINE('initilize_autonomous_database_agent completed for schema ' || l_schema_name);
+  DBMS_OUTPUT.PUT_LINE('initialize_autonomous_database_agent completed for schema ' || l_schema_name);
 EXCEPTION
   WHEN OTHERS THEN
-    DBMS_OUTPUT.PUT_LINE('Fatal error in initilize_autonomous_database_agent: ' || SQLERRM);
+    DBMS_OUTPUT.PUT_LINE('Fatal error in initialize_autonomous_database_agent: ' || SQLERRM);
     RAISE;
-END initilize_autonomous_database_agent;
+END initialize_autonomous_database_agent;
 /
 
 -------------------------------------------------------------------------------
 -- Run initialization
 -------------------------------------------------------------------------------
 BEGIN
-  initilize_autonomous_database_agent(
+  initialize_autonomous_database_agent(
     p_install_schema_name => '&&INSTALL_SCHEMA',
     p_config_json         => &&INSTALL_CONFIG_JSON
   );
@@ -433,12 +478,6 @@ AS
 
   FUNCTION delete_key_store(
     key_store_id     IN VARCHAR2,
-    region           IN VARCHAR2 DEFAULT NULL,
-    credential_name  IN VARCHAR2 DEFAULT NULL
-  ) RETURN CLOB;
-
-  FUNCTION list_application_vips_fn(
-    compartment_id   IN VARCHAR2,
     region           IN VARCHAR2 DEFAULT NULL,
     credential_name  IN VARCHAR2 DEFAULT NULL
   ) RETURN CLOB;
@@ -1473,59 +1512,6 @@ AS
       RETURN l_result.to_clob();
   END delete_key_store;
 
-  FUNCTION list_application_vips_fn(
-    compartment_id   IN VARCHAR2,
-    region           IN VARCHAR2 DEFAULT NULL,
-    credential_name  IN VARCHAR2 DEFAULT NULL
-  ) RETURN CLOB
-  IS
-    l_response   DBMS_CLOUD_OCI_DB_DATABASE_LIST_APPLICATION_VIPS_RESPONSE_T;
-    l_result     JSON_OBJECT_T := JSON_OBJECT_T();
-    l_array      JSON_ARRAY_T := JSON_ARRAY_T();
-    l_item       JSON_OBJECT_T;
-    l_credential VARCHAR2(256);
-  BEGIN
-    resolve_credential(credential_name, l_credential);
-    l_response := DBMS_CLOUD_OCI_DB_DATABASE.LIST_APPLICATION_VIPS(
-      compartment_id  => compartment_id,
-      vm_cluster_id   => NULL,
-      limit           => NULL,
-      page            => NULL,
-      sort_by         => NULL,
-      sort_order      => NULL,
-      opc_request_id  => NULL,
-      region          => region,
-      endpoint        => NULL,
-      credential_name => l_credential
-    );
-
-    FOR i IN 1 .. l_response.response_body.COUNT LOOP
-      l_item := JSON_OBJECT_T();
-      l_item.put('id', l_response.response_body(i).id);
-      l_item.put('display_name', l_response.response_body(i).display_name);
-      l_item.put('compartment_id', l_response.response_body(i).compartment_id);
-      l_item.put('ip_address', l_response.response_body(i).ip_address);
-      l_item.put('hostname_label', l_response.response_body(i).hostname_label);
-      l_item.put('lifecycle_state', l_response.response_body(i).lifecycle_state);
-      l_item.put('lifecycle_details', l_response.response_body(i).lifecycle_details);
-      l_item.put('time_assigned', TO_CHAR(l_response.response_body(i).time_assigned, 'YYYY-MM-DD"T"HH24:MI:SS"Z"'));
-      l_array.append(l_item);
-    END LOOP;
-
-    l_result.put('status','success');
-    l_result.put('message','Application VIPs listed successfully');
-    l_result.put('application_vips', l_array);
-    l_result.put('status_code', l_response.status_code);
-    l_result.put('headers', l_response.headers);
-    RETURN l_result.to_clob();
-  EXCEPTION
-    WHEN OTHERS THEN
-      l_result := JSON_OBJECT_T();
-      l_result.put('status','error');
-      l_result.put('message', SQLERRM);
-      RETURN l_result.to_clob();
-  END list_application_vips_fn;
-
   FUNCTION list_autonomous_container_database(
     compartment_id   IN VARCHAR2,
     region           IN VARCHAR2 DEFAULT NULL,
@@ -1641,7 +1627,7 @@ END oci_autonomous_database_agents;
 -------------------------------------------------------------------------------
 -- This procedure installs or refreshes the OCI Autonomous Database AI Agent tools.
 -------------------------------------------------------------------------------
-CREATE OR REPLACE PROCEDURE initilize_autonomous_database_tools
+CREATE OR REPLACE PROCEDURE initialize_autonomous_database_tools
 IS
   PROCEDURE drop_tool_if_exists (tool_name IN VARCHAR2) IS
     l_tool_count NUMBER;
@@ -1834,16 +1820,6 @@ BEGIN
     description => 'Tool for deleting a key store'
   );
 
-  drop_tool_if_exists(tool_name => 'LIST_APPLICATION_VIPS_TOOL');
-  DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
-    tool_name => 'LIST_APPLICATION_VIPS_TOOL',
-    attributes => '{
-      "instruction": "List application virtual IPs in a compartment.",
-      "function": "oci_autonomous_database_agents.list_application_vips_fn"
-    }',
-    description => 'Tool to list application VIPs'
-  );
-
   drop_tool_if_exists(tool_name => 'LIST_ACDS_TOOL');
   DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
     tool_name => 'LIST_ACDS_TOOL',
@@ -1864,16 +1840,16 @@ BEGIN
     description => 'Tool to list Autonomous Database backups'
   );
 
-  DBMS_OUTPUT.PUT_LINE('initilize_autonomous_database_tools completed.');
+  DBMS_OUTPUT.PUT_LINE('initialize_autonomous_database_tools completed.');
 EXCEPTION
   WHEN OTHERS THEN
-    DBMS_OUTPUT.PUT_LINE('Error in initilize_autonomous_database_tools: ' || SQLERRM);
+    DBMS_OUTPUT.PUT_LINE('Error in initialize_autonomous_database_tools: ' || SQLERRM);
     RAISE;
-END initilize_autonomous_database_tools;
+END initialize_autonomous_database_tools;
 /
 
 BEGIN
-  initilize_autonomous_database_tools;
+  initialize_autonomous_database_tools;
 END;
 /
 

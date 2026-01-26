@@ -1,65 +1,95 @@
--- Copyright (c) 2025 Oracle and/or its affiliates.
--- Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl/
-
--- ======================================================================
--- Purpose:
---   Install and configure an OCI Object Storage AI Agent using
---   DBMS_CLOUD_AI_AGENT (Select AI / Oracle AI Database).
---
---   This script:
---     • Grants required privileges to the target schema
---     • Creates an installer procedure in the target schema
---     • Registers an Object Storage AI Task, Agent, and Team
---     • Binds the Agent to a specified AI Profile
---     • Executes the installer to complete setup
---
--- Script Structure:
---   1) Initialization
---      - SQL*Plus settings, input prompts
---      - Target schema and AI profile selection
---
---   2) Grants
---      - Grant required DBMS_CLOUD and DBMS_CLOUD_AI_AGENT privileges
---
---   3) Installer Procedure Creation
---      - Creates &&INSTALL_SCHEMA..install_oci_objectstore_agent
---      - Drops and recreates:
---          • OCI Object Storage Task
---          • OCI Object Storage Agent
---          • OCI Object Storage Team
---
---   4) Task Registration
---      - Defines user intent handling and safe execution rules
---      - Registers all supported OCI Object Storage tools
---      - Enforces human-readable output and confirmation for destructive actions
---
---   5) Agent Registration
---      - Creates OCI_OBJECT_STORAGE_ADVISOR agent
---      - Associates the agent with the provided AI Profile
---      - Defines the agent role and behavior
---
---   6) Team Registration
---      - Creates OCI_OBJECTSTORE_TEAM
---      - Links the agent to the task in sequential execution mode
---
---   7) Execution
---      - Executes the installer procedure in the target schema
---
--- Usage:
---   sqlplus admin@db @oci_object_storage_ai_agent_install.sql
---
---   You will be prompted for:
---     • Target schema name
---     • AI Profile name to be used by the agent
---
--- Notes:
---   • Script is safe to re-run; existing tasks, agents, and teams
---     are dropped and recreated.
---   • Destructive Object Storage operations always require user confirmation.
---   • Tool names referenced in the task must exactly match
---     USER_CLOUD_AI_AGENT_TOOLS.TOOL_NAME values.
---
--- ======================================================================
+rem ============================================================================
+rem LICENSE
+rem   Copyright (c) 2025 Oracle and/or its affiliates.
+rem   Licensed under the Universal Permissive License (UPL), Version 1.0
+rem   https://oss.oracle.com/licenses/upl/
+rem
+rem NAME
+rem   oci_object_storage_agent.sql
+rem
+rem DESCRIPTION
+rem   Installer and configuration script for OCI Object Storage AI Agent
+rem   using DBMS_CLOUD_AI_AGENT (Select AI / Oracle AI Database).
+rem
+rem   This script performs an interactive installation of an
+rem   OCI Object Storage AI Agent by:
+rem     - Prompting for target schema and AI Profile
+rem     - Granting required privileges to the target schema
+rem     - Creating an installer procedure in the target schema
+rem     - Registering an OCI Object Storage Task with supported tools
+rem     - Creating an OCI Object Storage AI Agent bound to the AI Profile
+rem     - Creating an OCI Object Storage Team linking the agent and task
+rem     - Executing the installer procedure to complete setup
+rem
+rem RELEASE VERSION
+rem   1.0
+rem
+rem RELEASE DATE
+rem   26-Jan-2026
+rem
+rem MAJOR CHANGES IN THIS RELEASE
+rem   - Initial release
+rem   - Added OCI Object Storage task, agent, and team registration
+rem   - Interactive installer with schema and AI profile prompts
+rem
+rem SCRIPT STRUCTURE
+rem   1. Initialization:
+rem        - Enable SQL*Plus settings and error handling
+rem        - Prompt for target schema and AI profile
+rem
+rem   2. Grants:
+rem        - Grant DBMS_CLOUD_AI_AGENT and DBMS_CLOUD privileges
+rem          to the target schema
+rem
+rem   3. Installer Procedure Creation:
+rem        - Create INSTALL_OCI_OBJECTSTORE_AGENT procedure
+rem          in the target schema
+rem
+rem   4. AI Registration:
+rem        - Drop and create OCI_OBJECTSTORE_TASKS
+rem        - Drop and create OCI_OBJECT_STORAGE_ADVISOR agent
+rem        - Drop and create OCI_OBJECTSTORE_TEAM
+rem
+rem   5. Execution:
+rem        - Execute installer procedure with AI profile parameter
+rem
+rem INSTALL INSTRUCTIONS
+rem   1. Connect as ADMIN or a user with required privileges
+rem
+rem   2. Run the script using SQL*Plus or SQLcl:
+rem
+rem      sqlplus admin@db @oci_object_storage_agent.sql
+rem
+rem   3. Provide inputs when prompted:
+rem        - Target schema name
+rem        - AI Profile name
+rem
+rem   4. Verify installation by confirming:
+rem        - OCI_OBJECTSTORE_TASKS task exists
+rem        - OCI_OBJECT_STORAGE_ADVISOR agent is created
+rem        - OCI_OBJECTSTORE_TEAM team is registered
+rem
+rem PARAMETERS
+rem   INSTALL_SCHEMA (Prompted)
+rem     Target schema where the installer procedure,
+rem     task, agent, and team are created.
+rem
+rem   PROFILE_NAME (Prompted)
+rem     AI Profile name used to bind the OCI Object Storage agent.
+rem
+rem NOTES
+rem   - Script is safe to re-run; existing tasks, agents,
+rem     and teams are dropped and recreated.
+rem
+rem   - Destructive Object Storage operations require
+rem     explicit user confirmation as enforced by task instructions.
+rem
+rem   - Tool names referenced in the task must exactly match
+rem     USER_CLOUD_AI_AGENT_TOOLS.TOOL_NAME values.
+rem
+rem   - Script exits immediately on SQL errors.
+rem
+rem ============================================================================
 
 
 SET SERVEROUTPUT ON
@@ -185,9 +215,9 @@ BEGIN
                 "GET_WORK_REQUEST_TOOL",
                 "LIST_WORK_REQUEST_LOGS_TOOL",
                 "LIST_WORK_REQUEST_ERRORS_TOOL",
-                "CANCEL_WORK_REQUEST_TOOL",
-                "HUMAN_TOOL"
-          ]
+                "CANCEL_WORK_REQUEST_TOOL"
+          ],
+          "enable_human_tool": "true"
         }'
     );
     DBMS_OUTPUT.PUT_LINE('Created task OCI_OBJECTSTORE_TASKS');

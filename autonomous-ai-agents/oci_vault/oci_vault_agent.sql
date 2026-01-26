@@ -1,18 +1,93 @@
--- Copyright (c) 2025 Oracle and/or its affiliates.
--- Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl/
---
--- ======================================================================
--- Purpose:
---   Install and configure an OCI Vault AI Agent using
---   DBMS_CLOUD_AI_AGENT (Select AI / Oracle AI Database).
---
--- This script:
---   • Grants required privileges to the target schema
---   • Creates an installer procedure in the target schema
---   • Registers an OCI Vault Task, Agent, and Team
---   • Binds the Agent to a specified AI Profile
---   • Executes the installer to complete setup
--- ======================================================================
+rem ============================================================================
+rem LICENSE
+rem   Copyright (c) 2025 Oracle and/or its affiliates.
+rem   Licensed under the Universal Permissive License (UPL), Version 1.0
+rem   https://oss.oracle.com/licenses/upl/
+rem
+rem NAME
+rem   oci_vault_agent.sql
+rem
+rem DESCRIPTION
+rem   Installer and configuration script for OCI Vault AI Agent
+rem   using DBMS_CLOUD_AI_AGENT (Select AI / Oracle AI Database).
+rem
+rem   This script performs an interactive installation of an
+rem   OCI Vault AI Agent by:
+rem     - Prompting for target schema and AI Profile
+rem     - Granting required privileges to the target schema
+rem     - Creating an installer procedure in the target schema
+rem     - Registering an OCI Vault Task with supported Vault tools
+rem     - Creating an OCI Vault AI Agent bound to the specified AI Profile
+rem     - Creating an OCI Vault Team linking the agent and task
+rem     - Executing the installer procedure to complete setup
+rem
+rem RELEASE VERSION
+rem   1.0
+rem
+rem RELEASE DATE
+rem   26-Jan-2026
+rem
+rem MAJOR CHANGES IN THIS RELEASE
+rem   - Initial release
+rem   - Added OCI Vault task, agent, and team registration
+rem   - Interactive installer with schema and AI profile prompts
+rem
+rem SCRIPT STRUCTURE
+rem   1. Initialization:
+rem        - Enable output and error handling
+rem        - Prompt for target schema and AI profile
+rem
+rem   2. Grants:
+rem        - Grant DBMS_CLOUD_AI_AGENT and DBMS_CLOUD privileges
+rem          to the target schema
+rem
+rem   3. Installer Procedure Creation:
+rem        - Create INSTALL_OCI_VAULT_AGENT procedure
+rem          in the target schema
+rem
+rem   4. AI Registration:
+rem        - Drop and create OCI_VAULT_TASKS
+rem        - Drop and create OCI_VAULT_ADVISOR agent
+rem        - Drop and create OCI_VAULT_TEAM
+rem
+rem   5. Execution:
+rem        - Execute installer procedure with AI profile parameter
+rem
+rem INSTALL INSTRUCTIONS
+rem   1. Connect as ADMIN or a privileged user
+rem
+rem   2. Run the script using SQL*Plus or SQLcl:
+rem
+rem      sqlplus admin@db @oci_vault_agent.sql
+rem
+rem   3. Provide inputs when prompted:
+rem        - Target schema name
+rem        - AI Profile name
+rem
+rem   4. Verify installation by confirming:
+rem        - OCI_VAULT_TASKS task exists
+rem        - OCI_VAULT_ADVISOR agent is created
+rem        - OCI_VAULT_TEAM team is registered
+rem
+rem PARAMETERS
+rem   INSTALL_SCHEMA (Prompted)
+rem     Target schema where the installer procedure,
+rem     task, agent, and team are created.
+rem
+rem   PROFILE_NAME (Prompted)
+rem     AI Profile name used to bind the OCI Vault agent.
+rem
+rem NOTES
+rem   - Script is safe to re-run; existing tasks, agents,
+rem     and teams are dropped and recreated.
+rem
+rem   - Destructive Vault operations require user confirmation
+rem     as enforced by agent task instructions.
+rem
+rem   - Script exits immediately on SQL errors.
+rem
+rem ============================================================================
+
 
 SET SERVEROUTPUT ON
 SET VERIFY OFF
@@ -102,9 +177,9 @@ BEGIN
         "SCHEDULE_SECRET_VERSION_DELETION_TOOL",
         "CANCEL_SECRET_DELETION_TOOL",
         "CANCEL_SECRET_VERSION_DELETION_TOOL",
-        "CHANGE_SECRET_COMPARTMENT_TOOL",
-        "HUMAN_TOOL"
-      ]
+        "CHANGE_SECRET_COMPARTMENT_TOOL"
+      ],
+      "enable_human_tool": "true"
     }'
   );
   DBMS_OUTPUT.PUT_LINE('Created task OCI_VAULT_TASKS');

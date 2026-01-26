@@ -1,28 +1,74 @@
--- Copyright (c) 2025 Oracle and/or its affiliates.
--- Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl/
---
--- Installer script for OCI Network Load Balancer AI tools (Select AI Agent / Oracle AI Database)
---
--- Purpose:
---   Install a consolidated PL/SQL package and AI Agent tool registrations
---   to automate OCI Network Load Balancer operations via Select AI Agent (Oracle AI Database).
---
--- Script Structure
---   1) Initialization: grants, configuration setup.
---   2) Package deployment: &&INSTALL_SCHEMA.oci_network_load_balancer_agents (spec and body).
---   3) AI tool setup: creation of all Network Load Balancer agent tools.
---
--- Usage:
---   sqlplus admin@db @oci_network_load_balancer_tools.sql <INSTALL_SCHEMA> [CONFIG_JSON]
---
--- Notes:
---   - Optional CONFIG_JSON keys:
---       * use_resource_principal (boolean)
---       * credential_name (string)
---       * compartment_name (string)
---       * compartment_ocid (string)
---   - You may also update config in OCI_AGENT_CONFIG after install.
---
+rem ============================================================================
+rem LICENSE
+rem   Copyright (c) 2025 Oracle and/or its affiliates.
+rem   Licensed under the Universal Permissive License (UPL), Version 1.0
+rem   https://oss.oracle.com/licenses/upl/
+rem
+rem NAME
+rem   oci_network_load_balancer_tools.sql
+rem
+rem DESCRIPTION
+rem   Installer script for OCI Network Load Balancer AI tools
+rem   (Select AI Agent / Oracle AI Database).
+rem
+rem   This script installs a consolidated PL/SQL package and registers
+rem   AI Agent tools used to automate OCI Network Load Balancer operations
+rem   via Select AI Agent (Oracle AI Database).
+rem
+rem RELEASE VERSION
+rem   1.0
+rem
+rem RELEASE DATE
+rem   26-Jan-2026
+rem
+rem MAJOR CHANGES IN THIS RELEASE
+rem   - Initial release
+rem   - Added Network Load Balancer AI agent tool registrations
+rem
+rem SCRIPT STRUCTURE
+rem   1. Initialization:
+rem        - Grants
+rem        - Configuration setup
+rem
+rem   2. Package Deployment:
+rem        - &&INSTALL_SCHEMA.oci_network_load_balancer_agents
+rem          (package specification and body)
+rem
+rem   3. AI Tool Setup:
+rem        - Creation of all Network Load Balancer agent tools
+rem
+rem INSTALL INSTRUCTIONS
+rem   1. Connect as ADMIN or a user with required privileges
+rem   2. Run the script using SQL*Plus or SQLcl:
+rem
+rem      sqlplus admin@db @oci_network_load_balancer_tools.sql <INSTALL_SCHEMA> [CONFIG_JSON]
+rem
+rem   3. Verify installation by checking tool registration
+rem      and package compilation status.
+rem
+rem PARAMETERS
+rem   INSTALL_SCHEMA (Required)
+rem     Schema in which the package and tools will be created.
+rem
+rem   CONFIG_JSON (Optional)
+rem     JSON string used to configure OCI access.
+rem
+rem NOTES
+rem   - Optional CONFIG_JSON keys:
+rem       * use_resource_principal (boolean)
+rem       * credential_name (string)
+rem       * compartment_name (string)
+rem       * compartment_ocid (string)
+rem
+rem   - Configuration can also be updated post-install
+rem     in the OCI_AGENT_CONFIG table.
+rem
+rem   - This script is idempotent only if DROP logic
+rem     is explicitly enabled.
+rem
+rem
+rem ============================================================================
+
 
 SET SERVEROUTPUT ON
 SET VERIFY OFF
@@ -41,7 +87,7 @@ DEFINE INSTALL_CONFIG_JSON = NULL
 --   • Creates the OCI_AGENT_CONFIG table.
 --   • Parses the JSON config and persists credential, compartment, and RP flag.
 -------------------------------------------------------------------------------
-CREATE OR REPLACE PROCEDURE initilize_network_load_balancer_agent(
+CREATE OR REPLACE PROCEDURE initialize_network_load_balancer_agent(
   p_install_schema_name IN VARCHAR2,
   p_config_json         IN CLOB
 )
@@ -270,19 +316,19 @@ BEGIN
     p_compartment_ocid    => l_compartment_ocid
   );
 
-  DBMS_OUTPUT.PUT_LINE('initilize_network_load_balancer_agent completed for schema ' || l_schema_name);
+  DBMS_OUTPUT.PUT_LINE('initialize_network_load_balancer_agent completed for schema ' || l_schema_name);
 EXCEPTION
   WHEN OTHERS THEN
-    DBMS_OUTPUT.PUT_LINE('Fatal error in initilize_network_load_balancer_agent: ' || SQLERRM);
+    DBMS_OUTPUT.PUT_LINE('Fatal error in initialize_network_load_balancer_agent: ' || SQLERRM);
     RAISE;
-END initilize_network_load_balancer_agent;
+END initialize_network_load_balancer_agent;
 /
 
 -------------------------------------------------------------------------------
 -- Run the setup for the Network Load Balancer AI agent.
 -------------------------------------------------------------------------------
 BEGIN
-  initilize_network_load_balancer_agent(
+  initialize_network_load_balancer_agent(
     p_install_schema_name => '&&INSTALL_SCHEMA',
     p_config_json         => &&INSTALL_CONFIG_JSON
   );
@@ -1481,7 +1527,7 @@ END oci_network_load_balancer_agents;
 -- current schema. It drops any existing tool definitions and recreates them
 -- pointing to the latest implementations in &&INSTALL_SCHEMA.oci_network_load_balancer_agents.
 -------------------------------------------------------------------------------
-CREATE OR REPLACE PROCEDURE initilize_network_load_balancer_tools
+CREATE OR REPLACE PROCEDURE initialize_network_load_balancer_tools
 IS
   PROCEDURE drop_tool_if_exists (tool_name IN VARCHAR2) IS
     l_tool_count NUMBER;
@@ -1676,19 +1722,19 @@ BEGIN
     description => 'Tool for creating a backend set'
   );
 
-  DBMS_OUTPUT.PUT_LINE('initilize_network_load_balancer_tools completed.');
+  DBMS_OUTPUT.PUT_LINE('initialize_network_load_balancer_tools completed.');
 EXCEPTION
   WHEN OTHERS THEN
-    DBMS_OUTPUT.PUT_LINE('Error in initilize_network_load_balancer_tools: ' || SQLERRM);
+    DBMS_OUTPUT.PUT_LINE('Error in initialize_network_load_balancer_tools: ' || SQLERRM);
     RAISE;
-END initilize_network_load_balancer_tools;
+END initialize_network_load_balancer_tools;
 /
 
 -------------------------------------------------------------------------------
 -- Call the procedure to (re)create all OCI NLB AI Agent tools
 -------------------------------------------------------------------------------
 BEGIN
-  initilize_network_load_balancer_tools;
+  initialize_network_load_balancer_tools;
 END;
 /
 

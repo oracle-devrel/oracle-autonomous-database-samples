@@ -1,28 +1,76 @@
--- Copyright (c) 2025 Oracle and/or its affiliates.
--- Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl/
---
--- Installer script for OCI Object Storage AI tools (Select AI Agent / Oracle AI Database)
---
--- Purpose:
---   Install a consolidated PL/SQL package and AI Agent tool registrations
---   to automate OCI Object Storage operations via Select AI Agent (Oracle AI Database).
---
--- Script Structure
---   1) Initialization: grants, configuration setup.
---   2) Package deployment: &&INSTALL_SCHEMA.oci_object_storage_agents (spec and body).
---   3) AI tool setup: creation of all Object Storage agent tools.
---
--- Usage:
---     sqlplus admin@db @oci_object_storage_agent_install.sql <INSTALL_SCHEMA> [CONFIG_JSON]
---   Minimal:
---     sqlplus admin@db @oci_object_storage_agent_install.sql <INSTALL_SCHEMA>
---
--- Notes:
---   - Optional CONFIG_JSON keys:
---       * credential_name (string)              
---       * compartment_ocid (string)
---   - You may also update config in OCI_AGENT_CONFIG after install.
---
+rem ============================================================================
+rem LICENSE
+rem   Copyright (c) 2025 Oracle and/or its affiliates.
+rem   Licensed under the Universal Permissive License (UPL), Version 1.0
+rem   https://oss.oracle.com/licenses/upl/
+rem
+rem NAME
+rem   oci_object_storage_tools.sql
+rem
+rem DESCRIPTION
+rem   Installer script for OCI Object Storage AI tools
+rem   (Select AI Agent / Oracle AI Database).
+rem
+rem   This script installs a consolidated PL/SQL package and registers
+rem   AI Agent tools used to automate OCI Object Storage operations
+rem   via Select AI Agent (Oracle AI Database).
+rem
+rem RELEASE VERSION
+rem   1.0
+rem
+rem RELEASE DATE
+rem   26-Jan-2026
+rem
+rem MAJOR CHANGES IN THIS RELEASE
+rem   - Initial release
+rem   - Added Object Storage AI agent tool registrations
+rem
+rem SCRIPT STRUCTURE
+rem   1. Initialization:
+rem        - Grants
+rem        - Configuration setup
+rem
+rem   2. Package Deployment:
+rem        - &&INSTALL_SCHEMA.oci_object_storage_agents
+rem          (package specification and body)
+rem
+rem   3. AI Tool Setup:
+rem        - Creation of all Object Storage agent tools
+rem
+rem INSTALL INSTRUCTIONS
+rem   1. Connect as ADMIN or a user with required privileges
+rem
+rem   2. Run the script using SQL*Plus or SQLcl:
+rem
+rem      sqlplus admin@db @oci_object_storage_tools.sql <INSTALL_SCHEMA> [CONFIG_JSON]
+rem
+rem   3. Minimal install (uses defaults):
+rem
+rem      sqlplus admin@db @oci_object_storage_tools.sql <INSTALL_SCHEMA>
+rem
+rem   4. Verify installation by checking tool registration
+rem      and package compilation status.
+rem
+rem PARAMETERS
+rem   INSTALL_SCHEMA (Required)
+rem     Schema in which the package and tools will be created.
+rem
+rem   CONFIG_JSON (Optional)
+rem     JSON string used to configure OCI access.
+rem
+rem NOTES
+rem   - Optional CONFIG_JSON keys:
+rem       * credential_name (string)
+rem       * compartment_ocid (string)
+rem
+rem   - Configuration can also be updated post-install
+rem     in the OCI_AGENT_CONFIG table.
+rem
+rem   - This script is idempotent only if DROP logic
+rem     is explicitly enabled.
+rem
+rem
+rem ============================================================================
 
 
 SET SERVEROUTPUT ON
@@ -44,7 +92,7 @@ DEFINE INSTALL_CONFIG_JSON = NULL
 --   • Parses the JSON config and persists credential, compartment.
 -- Ensures the Object Storage agent is fully ready for tool execution.
 -------------------------------------------------------------------------------
-CREATE OR REPLACE PROCEDURE initilize_object_storage_agent(
+CREATE OR REPLACE PROCEDURE initialize_object_storage_agent(
   p_install_schema_name IN VARCHAR2,
   p_config_json         IN CLOB
 )
@@ -345,13 +393,13 @@ BEGIN
     p_compartment_ocid    => l_compartment_ocid
   );
 
-  DBMS_OUTPUT.PUT_LINE('initilize_object_storage_agent completed for schema ' || l_schema_name);
+  DBMS_OUTPUT.PUT_LINE('initialize_object_storage_agent completed for schema ' || l_schema_name);
 
 EXCEPTION
   WHEN OTHERS THEN
-    DBMS_OUTPUT.PUT_LINE('Fatal error in initilize_object_storage_agent: ' || SQLERRM);
+    DBMS_OUTPUT.PUT_LINE('Fatal error in initialize_object_storage_agent: ' || SQLERRM);
     RAISE;
-END initilize_object_storage_agent;
+END initialize_object_storage_agent;
 /
 
 -------------------------------------------------------------------------------
@@ -360,7 +408,7 @@ END initilize_object_storage_agent;
 -- and stores the runtime settings from the JSON config.
 -------------------------------------------------------------------------------
 BEGIN
-  initilize_object_storage_agent(
+  initialize_object_storage_agent(
     p_install_schema_name => '&&INSTALL_SCHEMA',
     p_config_json         => &&INSTALL_CONFIG_JSON
   );
@@ -4107,7 +4155,7 @@ END oci_object_storage_agents;
 -- tools using the latest package methods in &&INSTALL_SCHEMA,
 -------------------------------------------------------------------------------
 
-CREATE OR REPLACE PROCEDURE initilize_object_storage_tools
+CREATE OR REPLACE PROCEDURE initialize_object_storage_tools
 IS
     PROCEDURE drop_tool_if_exists (tool_name IN VARCHAR2) IS
       l_tool_count NUMBER;
@@ -4713,14 +4761,14 @@ BEGIN
     description => 'Tool to retrieve Object Storage namespace'
   );
 
-END initilize_object_storage_tools;
+END initialize_object_storage_tools;
 /
 
 -------------------------------------------------------------------------------
 -- Call the procedure to (re)create all OCI Vault AI Agent tools
 -------------------------------------------------------------------------------
 BEGIN
-  initilize_object_storage_tools;
+  initialize_object_storage_tools;
 END;
 /
 

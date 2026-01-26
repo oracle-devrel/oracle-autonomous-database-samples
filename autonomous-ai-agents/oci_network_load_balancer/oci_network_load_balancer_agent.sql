@@ -1,11 +1,98 @@
--- Copyright (c) 2025 Oracle and/or its affiliates.
--- Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl/
---
--- ======================================================================
--- Purpose:
---   Install and configure an OCI Network Load Balancer AI Agent using
---   DBMS_CLOUD_AI_AGENT (Select AI / Oracle AI Database).
--- ======================================================================
+rem ============================================================================
+rem LICENSE
+rem   Copyright (c) 2025 Oracle and/or its affiliates.
+rem   Licensed under the Universal Permissive License (UPL), Version 1.0
+rem   https://oss.oracle.com/licenses/upl/
+rem
+rem NAME
+rem   oci_network_load_balancer_agent.sql
+rem
+rem DESCRIPTION
+rem   Installer and configuration script for OCI Network Load Balancer
+rem   AI Agent using DBMS_CLOUD_AI_AGENT
+rem   (Select AI / Oracle AI Database).
+rem
+rem   This script performs an interactive installation of an
+rem   OCI Network Load Balancer AI Agent by:
+rem     - Prompting for target schema and AI Profile
+rem     - Granting required privileges to the target schema
+rem     - Creating an installer procedure in the target schema
+rem     - Registering an OCI Network Load Balancer Task
+rem     - Creating an OCI Network Load Balancer AI Agent
+rem       bound to the specified AI Profile
+rem     - Creating an OCI Network Load Balancer Team linking
+rem       the agent and task
+rem     - Executing the installer procedure to complete setup
+rem
+rem RELEASE VERSION
+rem   1.0
+rem
+rem RELEASE DATE
+rem   26-Jan-2026
+rem
+rem MAJOR CHANGES IN THIS RELEASE
+rem   - Initial release
+rem   - Added OCI Network Load Balancer task, agent, and team
+rem   - Interactive installer with schema and AI profile prompts
+rem
+rem SCRIPT STRUCTURE
+rem   1. Initialization:
+rem        - Enable SQL*Plus settings and error handling
+rem        - Prompt for target schema and AI profile
+rem
+rem   2. Grants:
+rem        - Grant DBMS_CLOUD_AI_AGENT and DBMS_CLOUD privileges
+rem          to the target schema
+rem
+rem   3. Installer Procedure Creation:
+rem        - Create INSTALL_OCI_NETWORK_LOAD_BALANCER_AGENT
+rem          procedure in the target schema
+rem
+rem   4. AI Registration:
+rem        - Drop and create OCI_NETWORK_LOAD_BALANCER_TASKS
+rem        - Drop and create OCI_NETWORK_LOAD_BALANCER_ADVISOR
+rem          agent
+rem        - Drop and create OCI_NETWORK_LOAD_BALANCER_TEAM
+rem
+rem   5. Execution:
+rem        - Execute installer procedure with AI profile parameter
+rem
+rem INSTALL INSTRUCTIONS
+rem   1. Connect as ADMIN or a user with required privileges
+rem
+rem   2. Run the script using SQL*Plus or SQLcl:
+rem
+rem      sqlplus admin@db @oci_network_load_balancer_agent.sql
+rem
+rem   3. Provide inputs when prompted:
+rem        - Target schema name
+rem        - AI Profile name
+rem
+rem   4. Verify installation by confirming:
+rem        - OCI_NETWORK_LOAD_BALANCER_TASKS task exists
+rem        - OCI_NETWORK_LOAD_BALANCER_ADVISOR agent is created
+rem        - OCI_NETWORK_LOAD_BALANCER_TEAM team is registered
+rem
+rem PARAMETERS
+rem   INSTALL_SCHEMA (Prompted)
+rem     Target schema where the installer procedure,
+rem     task, agent, and team are created.
+rem
+rem   PROFILE_NAME (Prompted)
+rem     AI Profile name used to bind the OCI Network Load
+rem     Balancer agent.
+rem
+rem NOTES
+rem   - Script is safe to re-run; existing tasks, agents,
+rem     and teams are dropped and recreated.
+rem
+rem   - Destructive Network Load Balancer operations require
+rem     explicit user confirmation as enforced by task instructions.
+rem
+rem   - Script exits immediately on SQL errors.
+rem
+rem ============================================================================
+
 
 SET SERVEROUTPUT ON
 SET VERIFY OFF
@@ -94,9 +181,9 @@ BEGIN
         "LIST_BACKENDS_TOOL",
         "LIST_NLB_HEALTHS_TOOL",
         "LIST_NLB_POLICIES_TOOL",
-        "LIST_NLB_PROTOCOLS_TOOL",
-        "HUMAN_TOOL"
-      ]
+        "LIST_NLB_PROTOCOLS_TOOL"
+      ],
+      "enable_human_tool": "true"
     }'
   );
   DBMS_OUTPUT.PUT_LINE('Created task OCI_NETWORK_LOAD_BALANCER_TASKS');

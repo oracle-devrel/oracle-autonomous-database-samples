@@ -1,11 +1,98 @@
--- Copyright (c) 2025 Oracle and/or its affiliates.
--- Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl/
---
--- ======================================================================
--- Purpose:
---   Install and configure an OCI Autonomous Database AI Agent using
---   DBMS_CLOUD_AI_AGENT (Select AI / Oracle AI Database).
--- ======================================================================
+rem ============================================================================
+rem LICENSE
+rem   Copyright (c) 2025 Oracle and/or its affiliates.
+rem   Licensed under the Universal Permissive License (UPL), Version 1.0
+rem   https://oss.oracle.com/licenses/upl/
+rem
+rem NAME
+rem   oci_autonomous_database_agent.sql
+rem
+rem DESCRIPTION
+rem   Installer and configuration script for OCI Autonomous Database
+rem   AI Agent using DBMS_CLOUD_AI_AGENT
+rem   (Select AI / Oracle AI Database).
+rem
+rem   This script performs an interactive installation of an
+rem   OCI Autonomous Database AI Agent by:
+rem     - Prompting for target schema and AI Profile
+rem     - Granting required privileges to the target schema
+rem     - Creating an installer procedure in the target schema
+rem     - Registering an OCI Autonomous Database Task
+rem     - Creating an OCI Autonomous Database AI Agent bound
+rem       to the specified AI Profile
+rem     - Creating an OCI Autonomous Database Team linking
+rem       the agent and task
+rem     - Executing the installer procedure to complete setup
+rem
+rem RELEASE VERSION
+rem   1.0
+rem
+rem RELEASE DATE
+rem   26-Jan-2026
+rem
+rem MAJOR CHANGES IN THIS RELEASE
+rem   - Initial release
+rem   - Added OCI Autonomous Database task, agent, and team
+rem   - Interactive installer with schema and AI profile prompts
+rem
+rem SCRIPT STRUCTURE
+rem   1. Initialization:
+rem        - Enable SQL*Plus settings and error handling
+rem        - Prompt for target schema and AI profile
+rem
+rem   2. Grants:
+rem        - Grant DBMS_CLOUD_AI_AGENT and DBMS_CLOUD privileges
+rem          to the target schema
+rem
+rem   3. Installer Procedure Creation:
+rem        - Create INSTALL_OCI_AUTONOMOUS_DATABASE_AGENT
+rem          procedure in the target schema
+rem
+rem   4. AI Registration:
+rem        - Drop and create OCI_AUTONOMOUS_DATABASE_TASKS
+rem        - Drop and create OCI_AUTONOMOUS_DATABASE_ADVISOR
+rem          agent
+rem        - Drop and create OCI_AUTONOMOUS_DATABASE_TEAM
+rem
+rem   5. Execution:
+rem        - Execute installer procedure with AI profile parameter
+rem
+rem INSTALL INSTRUCTIONS
+rem   1. Connect as ADMIN or a user with required privileges
+rem
+rem   2. Run the script using SQL*Plus or SQLcl:
+rem
+rem      sqlplus admin@db @oci_autonomous_database_agent.sql
+rem
+rem   3. Provide inputs when prompted:
+rem        - Target schema name
+rem        - AI Profile name
+rem
+rem   4. Verify installation by confirming:
+rem        - OCI_AUTONOMOUS_DATABASE_TASKS task exists
+rem        - OCI_AUTONOMOUS_DATABASE_ADVISOR agent is created
+rem        - OCI_AUTONOMOUS_DATABASE_TEAM team is registered
+rem
+rem PARAMETERS
+rem   INSTALL_SCHEMA (Prompted)
+rem     Target schema where the installer procedure,
+rem     task, agent, and team are created.
+rem
+rem   PROFILE_NAME (Prompted)
+rem     AI Profile name used to bind the OCI Autonomous
+rem     Database agent.
+rem
+rem NOTES
+rem   - Script is safe to re-run; existing tasks, agents,
+rem     and teams are dropped and recreated.
+rem
+rem   - Destructive Autonomous Database operations require
+rem     explicit user confirmation as enforced by task instructions.
+rem
+rem   - Script exits immediately on SQL errors.
+rem
+rem ============================================================================
+
 
 SET SERVEROUTPUT ON
 SET VERIFY OFF
@@ -19,7 +106,7 @@ PROMPT ======================================================
 ACCEPT SCHEMA_NAME CHAR PROMPT 'Enter target schema name: '
 DEFINE INSTALL_SCHEMA = '&SCHEMA_NAME'
 
--- AI Profile
+-- AI Profileda
 ACCEPT PROFILE_NAME CHAR PROMPT 'Enter AI Profile name to be used with the Agent: '
 DEFINE PROFILE_NAME = '&PROFILE_NAME'
 
@@ -93,11 +180,10 @@ BEGIN
         "LIST_DB_HOMES_TOOL",
         "SHRINK_AUTONOMOUS_DATABASE_TOOL",
         "DELETE_KEY_STORE_TOOL",
-        "LIST_APPLICATION_VIPS_TOOL",
         "LIST_ACDS_TOOL",
-        "LIST_ADB_BACKUPS_TOOL",
-        "HUMAN_TOOL"
-      ]
+        "LIST_ADB_BACKUPS_TOOL"
+      ],
+      "enable_human_tool": "true"
     }'
   );
   DBMS_OUTPUT.PUT_LINE('Created task OCI_AUTONOMOUS_DATABASE_TASKS');
