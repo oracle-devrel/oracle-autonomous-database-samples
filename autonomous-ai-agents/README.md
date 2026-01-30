@@ -1,4 +1,4 @@
-# Autonomous AI Agents for OCI (Oracle Autonomous Database)
+# Autonomous AI Agents for Oracle Autonomous Database
 
 ## Overview
 
