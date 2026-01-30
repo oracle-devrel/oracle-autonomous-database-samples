@@ -25,10 +25,10 @@ rem       the agent and task
 rem     - Executing the installer procedure to complete setup
 rem
 rem RELEASE VERSION
-rem   1.0
+rem   1.1
 rem
 rem RELEASE DATE
-rem   26-Jan-2026
+rem   30-Jan-2026
 rem
 rem MAJOR CHANGES IN THIS RELEASE
 rem   - Initial release
@@ -74,11 +74,11 @@ rem        - OCI_NETWORK_LOAD_BALANCER_ADVISOR agent is created
 rem        - OCI_NETWORK_LOAD_BALANCER_TEAM team is registered
 rem
 rem PARAMETERS
-rem   INSTALL_SCHEMA (Prompted)
+rem   INSTALL_SCHEMA (Prompted)(Mandatory)
 rem     Target schema where the installer procedure,
 rem     task, agent, and team are created.
 rem
-rem   PROFILE_NAME (Prompted)
+rem   PROFILE_NAME (Prompted)(Mandatory)
 rem     AI Profile name used to bind the OCI Network Load
 rem     Balancer agent.
 rem

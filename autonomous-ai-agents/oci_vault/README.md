@@ -1,8 +1,8 @@
-# OCI Vault AI Agent & Tools
+# Select AI - OCI Vault AI Agent & Tools
 
-## 🚀 Overview
+##  Overview
 
-The **OCI Vault AI Agent** enables secure, conversational management of **OCI Vault secrets and secret versions** using **Select AI (DBMS_CLOUD_AI_AGENT)** within Oracle Autonomous Database.
+The ** Select AI OCI Vault AI Agent** enables secure, conversational management of **OCI Vault secrets and secret versions** using **Select AI (DBMS_CLOUD_AI_AGENT)** within Oracle Autonomous Database.
 
 This agent is designed for **security‑critical workflows**, allowing users to safely create, inspect, rotate, move, and schedule deletion of secrets while enforcing **explicit confirmations, least‑privilege access, and human‑readable responses**.
 
@@ -10,7 +10,7 @@ It follows the same **Tools + Agent + Team** architecture used across other OCI 
 
 ---
 
-## 🧠 Why an OCI Vault AI Agent?
+##  Why an Select AI OCI Vault AI Agent?
 
 OCI Vault operations are sensitive and traditionally require:
 - Deep familiarity with OCI APIs
@@ -27,7 +27,7 @@ This AI agent improves safety and usability by:
 
 ---
 
-## 🧱 Architecture Overview
+##  Architecture Overview
 
 ```text
 User Request
@@ -47,7 +47,7 @@ Confirmed Vault Operation + Result
 
 ---
 
-## 📦 Repository Contents
+##  Repository Contents
 
 ```text
 .
@@ -68,7 +68,7 @@ Confirmed Vault Operation + Result
 
 ---
 
-## 🛠 Prerequisites
+## Prerequisites
 
 - Oracle Autonomous Database (23ai recommended)
 - Select AI enabled
@@ -78,7 +78,7 @@ Confirmed Vault Operation + Result
 
 ---
 
-## ⚙️ Installation – Tools
+##  Installation – Tools
 
 Run as ADMIN (or privileged user):
 
@@ -108,7 +108,7 @@ sqlplus admin@db @oci_vault_tools.sql
 
 ---
 
-## 🧩 Available AI Tools (High‑Level)
+##  Available AI Tools (High‑Level)
 
 ### 🔍 Discovery & Inventory
 - List subscribed regions
@@ -116,30 +116,30 @@ sqlplus admin@db @oci_vault_tools.sql
 - Resolve compartment OCID
 - List secrets (metadata only)
 
-### 🔐 Secret & Version Inspection
+###  Secret & Version Inspection
 - Get secret metadata
 - List secret versions
 - Get specific secret version details
 
-### 🔄 Creation & Rotation
+###  Creation & Rotation
 - Create new secrets
 - Rotate secrets (new CURRENT version)
 - Update metadata, tags, and rules
 
-### 🗑 Deletion & Recovery Control
+###  Deletion & Recovery Control
 - Schedule secret deletion
 - Schedule secret version deletion
 - Cancel scheduled deletions
 
-### 📦 Organization & Governance
+###  Organization & Governance
 - Change secret compartment
 - Inspect agent configuration
 
-> ⚠️ Secret payloads are **never returned** by any tool.
+>  Secret payloads are **never returned** by any tool.
 
 ---
 
-## 🤖 Installation – Agent & Team
+##  Installation – Agent & Team
 
 Run:
 
@@ -161,7 +161,7 @@ sqlplus admin@db @oci_vault_agent.sql
 
 ---
 
-## 🧠 Task Intelligence Highlights
+##  Task Intelligence Highlights
 
 The Vault task enforces:
 - Intent detection before execution
@@ -172,7 +172,7 @@ The Vault task enforces:
 
 ---
 
-## 🧱 Extending the Vault Agent
+##  Extending the Vault Agent
 
 ### Recommended Pattern
 
@@ -188,7 +188,7 @@ Bind permissions via AI profiles.**
 
 ---
 
-## 🔄 Safe Re‑Execution
+##  Safe Re‑Execution
 
 All scripts are **safe to re‑run**:
 - Tasks, agents, and teams are dropped and recreated
@@ -197,7 +197,7 @@ All scripts are **safe to re‑run**:
 
 ---
 
-## 📌 Best Practices
+##  Best Practices
 
 - Use Resource Principal whenever possible
 - Separate read‑only and admin Vault agents
@@ -207,7 +207,7 @@ All scripts are **safe to re‑run**:
 
 ---
 
-## 📜 License
+##  License
 
 Universal Permissive License (UPL) 1.0  
 https://oss.oracle.com/licenses/upl/

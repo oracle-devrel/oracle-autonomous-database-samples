@@ -1,8 +1,8 @@
-# OCI Object Storage AI Agent & Tools
+# Select AI - OCI Object Storage AI Agent & Tools
 
-## 🚀 Overview
+##  Overview
 
-The **OCI Object Storage AI Agent** enables natural-language–driven automation and advisory capabilities for **OCI Object Storage**, powered by **Select AI (DBMS_CLOUD_AI_AGENT)**.
+The **Select AI - OCI Object Storage AI Agent** enables natural-language–driven automation and advisory capabilities for **OCI Object Storage**, powered by **Select AI (DBMS_CLOUD_AI_AGENT)**.
 
 This agent allows users to manage buckets, objects, lifecycle policies, retention rules, replication, multipart uploads, and work requests using **conversational instructions**, while enforcing **safety, confirmations, and clarity**.
 
@@ -10,7 +10,7 @@ The design follows a **Tools + Agent + Team** architecture, making it scalable, 
 
 ---
 
-## 🧠 Why This Object Storage Agent Matters
+##  Why This Object Storage Agent Matters
 
 Traditional Object Storage operations require:
 - Deep knowledge of OCI APIs
@@ -27,7 +27,7 @@ This AI agent improves reliability by:
 
 ---
 
-## 🧱 Architecture Overview
+##  Architecture Overview
 
 ```text
 User Request
@@ -47,7 +47,7 @@ Confirmed Operation + Result
 
 ---
 
-## 📦 Repository Contents
+##  Repository Contents
 
 ```text
 .
@@ -68,7 +68,7 @@ Confirmed Operation + Result
 
 ---
 
-## 🛠 Prerequisites
+##  Prerequisites
 
 - Oracle Autonomous Database (23ai recommended)
 - Select AI enabled
@@ -78,7 +78,7 @@ Confirmed Operation + Result
 
 ---
 
-## ⚙️ Installation – Tools
+##  Installation – Tools
 
 Run as ADMIN (or privileged user):
 
@@ -97,35 +97,35 @@ sqlplus admin@db @oci_object_storage_tools.sql
 
 ---
 
-## 🧩 Available AI Tools (High-Level)
+##  Available AI Tools (High-Level)
 
-### 🔍 Discovery & Metadata
+###  Discovery & Metadata
 - List subscribed regions
 - List compartments
 - Derive Object Storage namespace
 - List buckets
 - Get bucket details
 
-### 🪣 Bucket Management
+###  Bucket Management
 - Create, update, delete buckets
 - Enable/disable versioning
 - Manage public access
 - Re-encrypt buckets
 - Configure lifecycle policies
 
-### 📦 Object Operations
+###  Object Operations
 - List, get, head, put, delete objects
 - Rename and copy objects
 - Restore archived objects
 - Multipart upload (create, upload part, commit, abort)
 
-### 🔐 Security & Access
+###  Security & Access
 - Pre-authenticated requests (create, list, delete)
 - Retention rules (create, update, delete)
 - Replication policies
 - Namespace metadata updates
 
-### 🛠 Work Requests & Monitoring
+###  Work Requests & Monitoring
 - List work requests
 - Get work request details
 - View logs and errors
@@ -133,7 +133,7 @@ sqlplus admin@db @oci_object_storage_tools.sql
 
 ---
 
-## 🤖 Installation – Agent & Team
+##  Installation – Agent & Team
 
 Run:
 
@@ -155,7 +155,7 @@ sqlplus admin@db @oci_object_storage_agent.sql
 
 ---
 
-## 🧠 Task Intelligence Highlights
+##  Task Intelligence Highlights
 
 The task enforces:
 - Intent detection before execution
@@ -167,7 +167,7 @@ The task enforces:
 
 ---
 
-## 🧱 Extending & Generalizing the Agent
+##  Extending & Generalizing the Agent
 
 ### Recommended Pattern
 
@@ -183,7 +183,7 @@ Bind permissions via AI profiles.**
 
 ---
 
-## 🔄 Safe Re-Execution
+##  Safe Re-Execution
 
 All scripts are **safe to re-run**:
 - Tasks, agents, and teams are dropped and recreated
@@ -192,7 +192,7 @@ All scripts are **safe to re-run**:
 
 ---
 
-## 📌 Best Practices
+##  Best Practices
 
 - Always confirm bucket and object deletions
 - Prefer Resource Principal in OCI environments
@@ -202,7 +202,7 @@ All scripts are **safe to re-run**:
 
 ---
 
-## 📜 License
+##  License
 
 Universal Permissive License (UPL) 1.0  
 https://oss.oracle.com/licenses/upl/

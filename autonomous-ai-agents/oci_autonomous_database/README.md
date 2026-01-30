@@ -1,8 +1,8 @@
-# OCI Autonomous Database AI Agent & Tools
+# Select AI - OCI Autonomous Database AI Agent & Tools
 
-## 🚀 Overview
+##  Overview
 
-The **OCI Autonomous Database AI Agent** enables natural-language–driven provisioning, management, and advisory operations for **Oracle Autonomous Databases on OCI**, powered by **Select AI (DBMS_CLOUD_AI_AGENT)**.
+The **Select AI - OCI Autonomous Database AI Agent** enables natural-language–driven provisioning, management, and advisory operations for **Oracle Autonomous Databases on OCI**, powered by **Select AI (DBMS_CLOUD_AI_AGENT)**.
 
 Unlike traditional scripts or consoles, this agent allows users to:
 - Provision and manage Autonomous Databases conversationally
@@ -14,7 +14,7 @@ This repository provides a **clean separation between Tools and Agent orchestrat
 
 ---
 
-## 🧠 Why This Agent Is Powerful
+##  Why This Agent Is Powerful
 
 Compared to manual OCI operations or simple chat-based automation, this agent:
 
@@ -27,7 +27,7 @@ Compared to manual OCI operations or simple chat-based automation, this agent:
 
 ---
 
-## 🧱 Architecture Overview
+##  Architecture Overview
 
 ```text
 User Request
@@ -46,7 +46,7 @@ Confirmed OCI Operation + Result
 
 ---
 
-## 📦 Repository Contents
+##  Repository Contents
 
 ```text
 .
@@ -67,17 +67,17 @@ Confirmed OCI Operation + Result
 
 ---
 
-## 🛠 Prerequisites
+##  Prerequisites
 
-- Oracle Autonomous Database (23ai recommended)
+- Oracle Autonomous Database
 - Select AI enabled
 - OCI credential or Resource Principal
 - Access to OCI compartments with ADB permissions
-- ADMIN or equivalent privileged user
+- ADMIN user
 
 ---
 
-## ⚙️ Installation – Tools
+##  Installation – Tools
 
 Run as ADMIN (or privileged user):
 
@@ -106,7 +106,7 @@ sqlplus admin@db @oci_autonomous_database_tools.sql
 
 ---
 
-## 🧩 Available AI Tools (High Level)
+##  Available AI Tools (High Level)
 
 ### 🔍 Discovery & Metadata
 - List subscribed regions
@@ -115,7 +115,7 @@ sqlplus admin@db @oci_autonomous_database_tools.sql
 - List Autonomous Databases
 - Get Autonomous Database details
 
-### 🚀 Provisioning & Lifecycle
+###  Provisioning & Lifecycle
 - Provision Autonomous Database
 - Start / Stop / Restart database
 - Scale CPU and storage
@@ -123,14 +123,14 @@ sqlplus admin@db @oci_autonomous_database_tools.sql
 - Shrink database
 - Delete Autonomous Database (confirmed)
 
-### 🛠 Configuration & Updates
+###  Configuration & Updates
 - Update database attributes
 - Manage power model
 - Modify workload and edition
 - Update network and security settings
 - Manage tags
 
-### 🧰 Maintenance & Backup
+###  Maintenance & Backup
 - List maintenance run history
 - List Autonomous Database backups
 - List DB homes
@@ -139,7 +139,7 @@ sqlplus admin@db @oci_autonomous_database_tools.sql
 
 ---
 
-## 🤖 Installation – Agent & Team
+##  Installation – Agent & Team
 
 Run:
 
@@ -161,7 +161,7 @@ sqlplus admin@db @oci_autonomous_database_agent.sql
 
 ---
 
-## 🧠 Task Intelligence Highlights
+##  Task Intelligence Highlights
 
 The task enforces:
 
@@ -173,7 +173,7 @@ The task enforces:
 
 ---
 
-## 🧱 Extending & Generalizing the Agent
+##  Extending & Generalizing the Agent
 
 ### Recommended Pattern
 
@@ -189,7 +189,7 @@ Bind profiles at agent level.**
 
 ---
 
-## 🔄 Safe Re-Execution
+##  Safe Re-Execution
 
 All scripts are **safe to re-run**:
 - Tasks, agents, and teams are dropped and recreated
@@ -198,7 +198,7 @@ All scripts are **safe to re-run**:
 
 ---
 
-## 📌 Best Practices
+##  Best Practices
 
 - Always use confirmation for destructive actions
 - Prefer Resource Principal in OCI environments
@@ -208,7 +208,7 @@ All scripts are **safe to re-run**:
 
 ---
 
-## 📜 License
+##  License
 
 Universal Permissive License (UPL) 1.0  
 https://oss.oracle.com/licenses/upl/

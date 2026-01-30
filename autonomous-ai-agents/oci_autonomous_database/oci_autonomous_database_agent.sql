@@ -25,15 +25,16 @@ rem       the agent and task
 rem     - Executing the installer procedure to complete setup
 rem
 rem RELEASE VERSION
-rem   1.0
+rem   1.1
 rem
 rem RELEASE DATE
-rem   26-Jan-2026
+rem   30-Jan-2026
 rem
 rem MAJOR CHANGES IN THIS RELEASE
 rem   - Initial release
 rem   - Added OCI Autonomous Database task, agent, and team
 rem   - Interactive installer with schema and AI profile prompts
+rem   - Bug Fixes
 rem
 rem SCRIPT STRUCTURE
 rem   1. Initialization:

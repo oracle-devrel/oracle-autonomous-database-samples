@@ -16,14 +16,15 @@ rem   AI Agent tools used to automate OCI Object Storage operations
 rem   via Select AI Agent (Oracle AI Database).
 rem
 rem RELEASE VERSION
-rem   1.0
+rem   1.1
 rem
 rem RELEASE DATE
-rem   26-Jan-2026
+rem   30-Jan-2026
 rem
 rem MAJOR CHANGES IN THIS RELEASE
 rem   - Initial release
 rem   - Added Object Storage AI agent tool registrations
+rem   - Bug fixes
 rem
 rem SCRIPT STRUCTURE
 rem   1. Initialization:

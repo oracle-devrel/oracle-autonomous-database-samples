@@ -1,8 +1,8 @@
-# OCI Network Load Balancer AI Agent & Tools
+#  Select AI - OCI Network Load Balancer AI Agent & Tools 
 
-## 🚀 Overview
+## Overview
 
-The **OCI Network Load Balancer (NLB) AI Agent** enables safe, conversational management of **OCI Network Load Balancers** using **Select AI (DBMS_CLOUD_AI_AGENT)** in Oracle Autonomous Database.
+The **Select AI - OCI Network Load Balancer (NLB) AI Agent** enables safe, conversational management of **OCI Network Load Balancers** using **Select AI (DBMS_CLOUD_AI_AGENT)** in Oracle Autonomous Database.
 
 It allows users to **list, create, update, and delete Network Load Balancers**, along with their **listeners, backend sets, and health status**, while enforcing **explicit confirmation for destructive operations**.
 
@@ -10,7 +10,7 @@ This agent follows the same **Tools + Agent + Team** architecture used across ot
 
 ---
 
-## 🧠 Why an OCI Network Load Balancer AI Agent?
+##  Why an Select AI OCI Network Load Balancer AI Agent?
 
 Managing Network Load Balancers typically requires:
 - Deep understanding of OCI networking concepts
@@ -27,7 +27,7 @@ This AI agent improves safety and productivity by:
 
 ---
 
-## 🧱 Architecture Overview
+##  Architecture Overview
 
 ```text
 User Request
@@ -47,7 +47,7 @@ Confirmed NLB Operation + Result
 
 ---
 
-## 📦 Repository Contents
+##  Repository Contents
 
 ```text
 .
@@ -66,17 +66,17 @@ Confirmed NLB Operation + Result
 
 ---
 
-## 🛠 Prerequisites
+##  Prerequisites
 
-- Oracle Autonomous Database (23ai recommended)
+- Oracle Autonomous Database 
 - Select AI enabled
 - OCI Network Load Balancer permissions
 - OCI credential or Resource Principal
-- ADMIN or equivalent privileged user
+- ADMIN
 
 ---
 
-## ⚙️ Installation – Agent & Team
+##  Installation – Agent & Team
 
 Run as ADMIN (or privileged user):
 
@@ -99,7 +99,7 @@ sqlplus admin@db @oci_network_load_balancer_agent.sql
 
 ---
 
-## 🤖 Objects Created
+##  Objects Created
 
 | Object | Name |
 |------|------|
@@ -109,41 +109,41 @@ sqlplus admin@db @oci_network_load_balancer_agent.sql
 
 ---
 
-## 🧩 Available AI Tools (High-Level)
+##  Available AI Tools (High-Level)
 
-### 🌍 Discovery
+###  Discovery
 - List subscribed regions
 - List compartments
 
-### 📦 Network Load Balancer Management
+###  Network Load Balancer Management
 - List Network Load Balancers
 - Create Network Load Balancer
 - Update Network Load Balancer
 - Delete Network Load Balancer
 
-### 🎧 Listener Management
+###  Listener Management
 - List listeners
 - Get listener details
 - Create listener
 - Update listener
 - Delete listener
 
-### 🧰 Backend & Health
+###  Backend & Health
 - Create backend sets
 - List backend sets
 - List backends
 - Inspect health checks
 
-### 📊 Metadata & Capabilities
+###  Metadata & Capabilities
 - List supported NLB policies
 - List supported protocols
 - Review NLB health summaries
 
-> ⚠️ All destructive operations require **explicit user confirmation**.
+>  All destructive operations require **explicit user confirmation**.
 
 ---
 
-## 🧠 Task Intelligence Highlights
+##  Task Intelligence Highlights
 
 The Network Load Balancer task enforces:
 - Intent detection before execution
@@ -154,7 +154,7 @@ The Network Load Balancer task enforces:
 
 ---
 
-## 🧱 Extending the NLB Agent
+##  Extending the NLB Agent
 
 ### Recommended Pattern
 
@@ -170,7 +170,7 @@ Bind permissions via AI profiles.**
 
 ---
 
-## 🔄 Safe Re-Execution
+##  Safe Re-Execution
 
 All scripts are **safe to re-run**:
 - Tasks, agents, and teams are dropped and recreated
@@ -179,7 +179,7 @@ All scripts are **safe to re-run**:
 
 ---
 
-## 📌 Best Practices
+##  Best Practices
 
 - Use Resource Principal whenever possible
 - Separate read-only and admin NLB agents
@@ -189,7 +189,7 @@ All scripts are **safe to re-run**:
 
 ---
 
-## 📜 License
+## License
 
 Universal Permissive License (UPL) 1.0  
 https://oss.oracle.com/licenses/upl/
