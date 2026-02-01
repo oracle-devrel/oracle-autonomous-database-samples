@@ -2,9 +2,13 @@
 
 ##  Overview
 
-The ** Select AI OCI Vault AI Agent** enables secure, conversational management of **OCI Vault secrets and secret versions** using **Select AI (DBMS_CLOUD_AI_AGENT)** within Oracle Autonomous Database.
+## OCI Vaults
 
-This agent is designed for **security‑critical workflows**, allowing users to safely create, inspect, rotate, move, and schedule deletion of secrets while enforcing **explicit confirmations, least‑privilege access, and human‑readable responses**.
+OCI Vaults is a secure key and secrets management service in Oracle Cloud Infrastructure that helps you centrally store, manage, and control access to sensitive data such as encryption keys, secrets, certificates, and passwords. It supports customer-managed encryption keys backed by Hardware Security Modules (HSMs), enabling strong security, compliance, key rotation, and fine-grained access control for OCI resources and applications.
+
+The ** Select AI OCI Vault AI Agent** enables secure, conversational management of **OCI Vault secrets and secret versions** using **Select AI (DBMS_CLOUD_AI_AGENT)** within Oracle Autonomous AI Database.
+
+This agent is designed for **security‑critical workflows**, allowing users to create, inspect, rotate, move, and schedule deletion of secrets while enforcing **explicit confirmations, least‑privilege access, and human‑readable responses**.
 
 It follows the same **Tools + Agent + Team** architecture used across other OCI service agents in this repository.
 
@@ -17,13 +21,6 @@ OCI Vault operations are sensitive and traditionally require:
 - Correct handling of secret versions and stages
 - Careful scheduling of deletions
 - Manual guardrails for destructive actions
-
-This AI agent improves safety and usability by:
-- Detecting **user intent** before acting
-- Asking **clarifying questions** for ambiguous requests
-- Enforcing **confirmation for destructive operations**
-- Never exposing secret payloads in responses
-- Returning **auditable, structured metadata**
 
 ---
 
@@ -70,7 +67,7 @@ Confirmed Vault Operation + Result
 
 ## Prerequisites
 
-- Oracle Autonomous Database (23ai recommended)
+- Oracle Autonomous AI Database
 - Select AI enabled
 - OCI Vault access
 - OCI credential or Resource Principal
@@ -89,13 +86,13 @@ sqlplus admin@db @oci_vault_tools.sql
 ### Optional Configuration JSON
 
 ```json
-{
+{ 
   "credential_name": "OCI_CRED",
   "compartment_name": "MY_COMPARTMENT"
 }
 ```
 
-> Configuration is stored securely in `SELECTAI_AGENT_CONFIG`  
+> Configuration is stored securely in table `SELECTAI_AGENT_CONFIG`  
 > and can be updated post‑installation.
 
 ### What This Script Does
@@ -110,7 +107,7 @@ sqlplus admin@db @oci_vault_tools.sql
 
 ##  Available AI Tools (High‑Level)
 
-### 🔍 Discovery & Inventory
+###  Discovery & Inventory
 - List subscribed regions
 - List compartments
 - Resolve compartment OCID
@@ -154,10 +151,10 @@ sqlplus admin@db @oci_vault_agent.sql
 ### Objects Created
 
 | Object | Name |
-|------|------|
-| Task | OCI_VAULT_TASKS |
-| Agent | OCI_VAULT_ADVISOR |
-| Team | OCI_VAULT_TEAM |
+|--------|------|
+| Task   | OCI_VAULT_TASKS |
+| Agent  | OCI_VAULT_ADVISOR |
+| Team   | OCI_VAULT_TEAM |
 
 ---
 
@@ -167,7 +164,6 @@ The Vault task enforces:
 - Intent detection before execution
 - Mandatory confirmation for destructive actions
 - Human‑readable formatting of responses
-- Safe sequencing of Vault operations
 - Strict separation of metadata vs secret material
 
 ---
@@ -177,35 +173,58 @@ The Vault task enforces:
 ### Recommended Pattern
 
 **Keep Vault API logic inside tools.  
-Define safety rules in tasks.  
+Define rules in tasks.  
 Bind permissions via AI profiles.**
 
 ### Example Extensions
 - Read‑only secrets audit agent
 - Automated secret rotation agent
 - Compliance & lifecycle enforcement agent
-- Multi‑compartment governance agent
-
----
-
-##  Safe Re‑Execution
-
-All scripts are **safe to re‑run**:
-- Tasks, agents, and teams are dropped and recreated
-- Secrets are never modified implicitly
-- Destructive operations always require confirmation
 
 ---
 
 ##  Best Practices
 
-- Use Resource Principal whenever possible
 - Separate read‑only and admin Vault agents
 - Prefer scheduled deletion over immediate removal
 - Rotate secrets regularly using versioning
-- Audit secret metadata instead of values
 
 ---
+
+## Example Prompts
+
+After creating the OCI Vault AI Agent, users can interact with it using prompts such as:
+
+### Discovery & Metadata
+- “Get the Object Storage namespace for the Mumbai region.”
+- “Resolve Vault namespace and compartment metadata for the Mumbai region.”
+- “Get the OCID for the compartment named `Security`.”
+- “List all compartments available for Vault operations.”
+
+### Secrets Management
+- “Create a secret named `db-password` in vault `<vault_ocid>` using key `<key_ocid>` in the Mumbai region.”
+- “Create a secret named `api-token` with description `API access token` in the Mumbai region.”
+- “Get details of the secret with OCID `<secret_ocid>`.”
+- “List all secrets in the Mumbai region.”
+
+### Secret Versions
+- “List all versions of the secret `<secret_ocid>` in the Mumbai region.”
+- “Get version 2 of the secret `<secret_ocid>`.”
+- “Update the secret `<secret_ocid>` with a new value.”
+- “Update the description of the secret `<secret_ocid>`.”
+
+### Secret Deletion & Recovery
+- “Schedule deletion of the secret `<secret_ocid>` after 7 days.”
+- “Schedule deletion of version 1 of the secret `<secret_ocid>`.”
+- “Cancel the scheduled deletion of the secret `<secret_ocid>`.”
+- “Cancel the scheduled deletion of version 1 of the secret `<secret_ocid>`.”
+
+### Compartment Management
+- “Move the secret `<secret_ocid>` to a different compartment.”
+
+### Agent Configuration
+- “Get the AI agent configuration for schema `ADMIN`, table `AGENT_CONFIG`, and agent name `vault-agent`.”
+
 
 ##  License
 
@@ -214,12 +233,11 @@ https://oss.oracle.com/licenses/upl/
 
 ---
 
-## ✨ Final Thought
+## ✨ Final Thoughts
 
-The OCI Vault AI Agent turns secret management into a **guided, auditable, and safe conversational workflow**, ensuring that security‑critical operations remain controlled while still benefiting from automation.
+The OCI Vault AI Agent turns secret management into a **guided conversational workflow**, ensuring that security‑critical operations remain controlled while still benefiting from automation.
 
 Designed for:
 - Security & platform teams
 - Compliance automation
 - Enterprise secret governance
-- Safe cloud operations

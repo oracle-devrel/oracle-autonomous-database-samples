@@ -9,11 +9,11 @@ rem   oci_autonomous_database_tools.sql
 rem
 rem DESCRIPTION
 rem   Installer script for OCI Autonomous Database AI tools
-rem   (Select AI Agent / Oracle AI Database).
+rem   (Select AI Agent / Oracle Autonomous AI Database).
 rem
 rem   This script installs a consolidated PL/SQL package and registers
 rem   AI Agent tools used to automate OCI Autonomous Database operations
-rem   via Select AI Agent (Oracle AI Database).
+rem   via Select AI Agent (Oracle Autonomous AI Database).
 rem
 rem RELEASE VERSION
 rem   1.1

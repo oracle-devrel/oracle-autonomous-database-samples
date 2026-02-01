@@ -2,9 +2,13 @@
 
 ##  Overview
 
+## OCI Object Storage
+
+OCI Object Storage is a highly scalable and durable storage service in Oracle Cloud Infrastructure that enables you to securely store and retrieve unstructured data such as files, backups, logs, and media. It offers high availability, strong security with encryption, lifecycle management, and seamless integration with OCI services and applications.
+
 The **Select AI - OCI Object Storage AI Agent** enables natural-language–driven automation and advisory capabilities for **OCI Object Storage**, powered by **Select AI (DBMS_CLOUD_AI_AGENT)**.
 
-This agent allows users to manage buckets, objects, lifecycle policies, retention rules, replication, multipart uploads, and work requests using **conversational instructions**, while enforcing **safety, confirmations, and clarity**.
+This agent allows users to manage buckets, objects, lifecycle policies, retention rules, replication, multipart uploads, and work requests using **conversational instructions**, while enforcing ** confirmations, and clarity**.
 
 The design follows a **Tools + Agent + Team** architecture, making it scalable, auditable, and easy to extend.
 
@@ -86,6 +90,12 @@ Run as ADMIN (or privileged user):
 sqlplus admin@db @oci_object_storage_tools.sql
 ```
 
+### Input Parameters required to run.
+- Target schema name (Schema where to the agent team needs to be installed)
+- Cloud Config Parameters.
+  - OCI Credentials - Required to access to Object Storage buckets.
+  - Compartment Name 
+
 > Configuration (credential, region, compartment) can be provided during install or later via `SELECTAI_AGENT_CONFIG`.
 
 ### What This Script Does
@@ -141,9 +151,9 @@ Run:
 sqlplus admin@db @oci_object_storage_agent.sql
 ```
 
-### Prompts
-- Target schema name
-- AI Profile name
+### Input Parameters required to run.
+- Target schema name (Schema where to the agent team needs to be installed)
+- AI Profile name (Select AI Profile name that needs to be used with the Agent)
 
 ### Objects Created
 
@@ -163,7 +173,6 @@ The task enforces:
 - Mandatory confirmation for destructive actions
 - Automatic namespace resolution
 - Human-readable formatting of outputs
-- Safe automation of Object Storage operations
 
 ---
 
@@ -183,24 +192,80 @@ Bind permissions via AI profiles.**
 
 ---
 
-##  Safe Re-Execution
-
-All scripts are **safe to re-run**:
-- Tasks, agents, and teams are dropped and recreated
-- No Object Storage resources are modified implicitly
-- Destructive actions always require confirmation
-
----
-
 ##  Best Practices
 
 - Always confirm bucket and object deletions
-- Prefer Resource Principal in OCI environments
-- Separate read-only and admin agents
 - Use lifecycle rules instead of manual cleanup
 - Monitor work requests for long-running operations
 
 ---
+
+## Example Prompts
+
+After creating the OCI Object Storage AI Agent, users can interact with it using prompts such as:
+
+### Buckets & Namespace
+- “List all Object Storage buckets in the Mumbai region.”
+- “Get details of the bucket named `finance-reports` in the Mumbai region.”
+- “Check whether the bucket `finance-reports` exists in the Mumbai region.”
+- “Get the Object Storage namespace for the Mumbai region.”
+- “Create a new bucket named `archive-bucket` in the Mumbai region.”
+- “Delete the bucket named `archive-bucket` in the Mumbai region.”
+
+### Objects
+- “List all objects in the bucket `finance-reports` in the Mumbai region.”
+- “Get the object `q1-report.pdf` from the bucket `finance-reports`.”
+- “Upload an object named `summary.json` to the bucket `finance-reports` with content type `application/json`.”
+- “Delete the object `old-report.pdf` from the bucket `finance-reports`.”
+- “Rename the object `draft.txt` to `final.txt` in the bucket `finance-reports`.”
+- “Copy the object `q1-report.pdf` from the bucket `finance-reports` to the bucket `finance-archive` in the Hyderabad region.”
+
+### Object Metadata & Versions
+- “Get metadata for the object `q1-report.pdf` in the bucket `finance-reports`.”
+- “List all versions of objects in the bucket `finance-reports`.”
+
+### Multipart Uploads
+- “Create a multipart upload for the object `large-video.mp4` in the bucket `media-files`.”
+- “List all active multipart uploads in the bucket `media-files`.”
+- “List uploaded parts for multipart upload ID `<upload_id>` of object `large-video.mp4`.”
+
+### Bucket Configuration
+- “Enable versioning and object events for the bucket `finance-reports`.”
+- “Make the bucket `finance-reports` writable.”
+- “Apply a lifecycle policy to delete objects older than 30 days in the bucket `finance-reports`.”
+- “Delete the lifecycle policy for the bucket `finance-reports`.”
+
+### Retention Rules
+- “List all retention rules for the bucket `finance-reports`.”
+- “Create a retention rule to retain objects for 7 days in the bucket `finance-reports`.”
+- “Get details of retention rule with ID `<retention_rule_id>`.”
+- “Update the retention rule `<retention_rule_id>` to retain objects for 14 days.”
+- “Delete the retention rule `<retention_rule_id>`.”
+
+### Pre-Authenticated Requests (PAR)
+- “List all pre-authenticated requests for the bucket `finance-reports`.”
+- “Get details of the pre-authenticated request with ID `<par_id>`.”
+- “Delete the pre-authenticated request with ID `<par_id>`.”
+
+### Replication
+- “List all replication policies for the bucket `finance-reports`.”
+- “Create a replication policy to replicate the bucket `finance-reports` to `finance-reports-dr` in the Hyderabad region.”
+- “Get details of replication policy with ID `<replication_id>`.”
+- “Delete the replication policy with ID `<replication_id>`.”
+- “List all replication source buckets for the bucket `finance-reports`.”
+
+### Encryption & Security
+- “Re-encrypt the bucket `finance-reports`.”
+- “Re-encrypt the object `q1-report.pdf` in the bucket `finance-reports` using a new KMS key.”
+
+### Object Restore
+- “Restore the object `archived-report.pdf` from Archive Storage for 24 hours.”
+- “Restore version `<version_id>` of the object `archived-report.pdf`.”
+
+### Work Requests & Operations
+- “List all Object Storage work requests in the Mumbai region.”
+- “Get details of the work request with ID `<work_request_id>`.”
+
 
 ##  License
 
@@ -211,7 +276,7 @@ https://oss.oracle.com/licenses/upl/
 
 ## ✨ Final Thought
 
-This OCI Object Storage AI Agent transforms Object Storage from an API-driven service into a **guided, conversational automation platform**, combining safety, clarity, and power.
+This OCI Object Storage AI Agent transforms Object Storage from an API-driven service into a **guided, conversational automation platform**, combining  clarity, and power.
 
 Designed for:
 - Cloud platform teams

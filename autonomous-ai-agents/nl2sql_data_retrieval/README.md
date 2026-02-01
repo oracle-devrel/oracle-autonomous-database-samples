@@ -1,6 +1,6 @@
-# Select AI - NL2SQL Data Retrieval Agent for Oracle Autonomous Database
+# Select AI - NL2SQL Data Retrieval Agent for Oracle Autonomous AI Database
 
-## Why This Select AI - NL2SQL Agent Is Better Than Plain Select AI NL2SQL
+## How the NL2SQL agent improves upon Select AI NL2SQL
 
 Oracle Select AI already provides Natural Language to SQL (NL2SQL), but **real-world data retrieval often fails** due to:
 
@@ -34,7 +34,7 @@ into a **single autonomous agent workflow**.
 | Chart generation | ❌ | ✅ |
 | Config-driven & extensible | ❌ | ✅ |
 
-> **Result:** Higher accuracy, fewer hallucinations, safer SQL, and richer analytical answers.
+> **Result:** Higher accuracy, fewer hallucinations, accurate SQL, and richer analytical answers.
 
 ---
 
@@ -56,7 +56,7 @@ Agent Reasoning
 Final Verified Answer + Sources
 ```
 
-The agent dynamically selects tools, retries intelligently, and produces **auditable and explainable outputs**.
+The agent dynamically selects tools, retries intelligently, and produces **explainable outputs**.
 
 ---
 
@@ -66,7 +66,7 @@ The agent dynamically selects tools, retries intelligently, and produces **audit
 .
 ├── nl2sql_data_retrieval_tools.sql
 │   ├── PL/SQL utility functions
-│   ├── OCI Vault integration
+│   ├── OCI Vault integration for Websearch credentials
 │   ├── Web search enablement
 │   └── AI tool registration
 │
@@ -83,10 +83,10 @@ The agent dynamically selects tools, retries intelligently, and produces **audit
 
 ##  Prerequisites
 
-- Oracle Autonomous Database
+- Oracle Autonomous AI Database
 - Select AI enabled
-- OCI Vault configured (Option for websearch)
-- Google Custom Search API enabled (Option for websearch)
+- OCI Vault configured (Optional for websearch)
+- Google Custom Search API enabled (Optional for websearch)
 - Run as ADMIN 
 
 ---
@@ -126,6 +126,12 @@ Run as ADMIN (or privileged user):
 ```sql
 sqlplus admin@db @nl2sql_data_retrieval_tools.sql
 ```
+### Input Parameters required to run.
+- Target schema name (Schema where to the agent team needs to be installed)
+- Cloud Config Parameters required for Websearch (This is mandatory to enable Websearch)
+  - Google Search API Keys needs to be stored in OCI Vault
+  - Vault Secret OCID's.
+  - OCI Region name where Vault is created.
 
 ### Example Configuration JSON
 
@@ -134,8 +140,7 @@ sqlplus admin@db @nl2sql_data_retrieval_tools.sql
   "credential_name": "OCI_CRED",
   "vault_region": "eu-frankfurt-1",
   "api_key_vault_secret_ocid": "ocid1.vaultsecret.oc1..aaaa",
-  "cxid_vault_secret_ocid": "ocid1.vaultsecret.oc1..bbbb",
-  "ai_profile": "MY_AI_PROFILE"
+  "cxid_vault_secret_ocid": "ocid1.vaultsecret.oc1..bbbb"
 }
 ```
 
@@ -144,14 +149,14 @@ sqlplus admin@db @nl2sql_data_retrieval_tools.sql
 - Grants required DBMS_CLOUD and Select AI privileges  
 - Creates `SELECTAI_AGENT_CONFIG`  
 - Installs `NL2SQL_DATA_RETRIEVAL_FUNCTIONS`  
-- Registers all AI agent tools  
+- Registers all AI agent tools.
 
 ---
 
 ##  Installed Tools Explained
 
 ### 1️⃣ SQL_TOOL
-**Purpose:** Generate SQL from natural language and execute it safely.
+**Purpose:** Generate SQL from natural language and run it safely.
 
 **Fail-safe behavior:**
 - SQL generation failure → feedback returned to the LLM  
@@ -214,17 +219,18 @@ Run:
 sqlplus admin@db @nl2sql_data_retrieval_agent.sql
 ```
 
-### Prompts
-- Target schema name  
-- AI Profile name  
+### Input Parameters required to run.
+- Target schema name (Schema where to the agent team needs to be installed)
+- AI Profile name (Select AI Profile name that needs to be used with the Agent)
+
 
 ### Objects Created
 
 | Object | Name |
-|------|------|
-| Task | NL2SQL_DATA_RETRIEVAL_TASK |
+|-------|------|
+| Task  | NL2SQL_DATA_RETRIEVAL_TASK  |
 | Agent | NL2SQL_DATA_RETRIEVAL_AGENT |
-| Team | NL2SQL_DATA_RETRIEVAL_TEAM |
+| Team  | NL2SQL_DATA_RETRIEVAL_TEAM  |
 
 ---
 
@@ -252,7 +258,6 @@ Specialize agents using tasks.**
 |----|-----------|--------|
 | Data Retrieval Team | All tools | General analytics |
 | Finance Analytics Team | SQL + RANGE | Financial reporting |
-| Metadata Explorer Team | DISTINCT | Schema exploration |
 | Research Agent Team | WEBSEARCH | External intelligence |
 | Visualization Team | SQL + CHART | Dashboards & insights |
 
@@ -262,24 +267,22 @@ Specialize agents using tasks.**
 - Agents bind AI profiles  
 - Teams orchestrate workflows  
 
----
+### Example prompts
+After creating the NL2SQL Data Retrieval Agent team, you can interact with it using prompts such as:
 
-## Safe Re-Execution
-
-All scripts are **idempotent**:
-- Tools are dropped and recreated  
-- Tasks, agents, and teams are refreshed  
-- Secrets remain in OCI Vault  
+- “How can you help?”
+- Ask questions related to the database tables associated with the selected profile.
+- To generate visualizations, explicitly mention the chart type, for example:
+  “Generate a bar chart for the result.” (any supported chart type can be used)
+- To perform a web search, ask relevant questions after configuring the required credentials.
 
 ---
 
 ##  Best Practices
 
 - Use `DISTINCT_VALUES_CHECK` before filtering text columns  
-- Use `RANGE_VALUES_CHECK` for DATE and NUMBER columns  
-- Always verify web content with `GET_URL_CONTENT`  
-- Maintain separate AI profiles per environment  
-- Rotate Vault secrets without code changes  
+- Use `RANGE_VALUES_CHECK` for DATE and NUMBER columns    
+- Maintain separate AI profiles per environment   
 
 ---
 
@@ -290,7 +293,7 @@ https://oss.oracle.com/licenses/upl/
 
 ---
 
-## ✨ Final Thought
+## ✨ Final Thoughts
 
 This NL2SQL Data Retrieval Agent elevates Select AI from a **SQL generator** to a **true autonomous data analyst** — capable of reasoning, validating, retrying, enriching, and visualizing data with confidence.
 

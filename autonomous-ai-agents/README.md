@@ -1,9 +1,9 @@
 
-# Select AI Agents on Oracle Autonomous Database
+# Select AI Agents on Oracle Autonomous AI Database
 
 ## Overview
 
-This repository provides a **generic, extensible framework for building Select AI Agents on Oracle Autonomous Database** using the **Select AI Agent framework**.
+This repository provides a **generic, extensible framework for building Select AI Agents on Oracle Autonomous AI Database** using the **Select AI Agent framework**.
 
 Select AI Agents enable natural language interactions with enterprise data by combining large language models (LLMs), database-resident tools, and orchestration logic directly inside Oracle Database. Agents can reason over user input, invoke tools, and return structured, explainable results — all while keeping data governance, security, and execution within the database.
 
@@ -13,20 +13,20 @@ The agents in this repository are **generic Select AI agents**. While some examp
 
 ## What is a Select AI Agent?
 
-Select AI Agents are part of the Oracle Autonomous Database Select AI framework. A Select AI Agent:
+Select AI Agents are part of the Oracle Autonomous AI Database Select AI framework. A Select AI Agent:
 
 - Accepts natural language input from users
 - Uses an LLM to reason about the request
 - Invokes database-resident tools (PL/SQL functions)
 - Executes logic securely inside the database
-- Returns structured and auditable responses
+- Returns structured responses
 
 Key characteristics of the Select AI Agent framework include:
 
-- Native integration with Oracle Database
+- Native integration with Oracle Autonomous AI Database
 - Tool execution through PL/SQL
 - Support for tasks, agents, and teams
-- Centralized governance and auditing
+- Centralized governance and monitoring
 - Flexibility to build domain-specific or generic agents
 
 For full details, refer to the official documentation:
@@ -103,7 +103,7 @@ This repository is intended for:
 - Data engineers
 - Architects
 - Platform teams
-- AI practitioners working with Oracle Database
+- AI practitioners working with Oracle Autonomous AI Database
 
 Anyone looking to build secure, database-native AI agents using Select AI can use this repository as a starting point.
 
@@ -112,5 +112,4 @@ Anyone looking to build secure, database-native AI agents using Select AI can us
 ## License
 
 This project is licensed under the **Universal Permissive License (UPL), Version 1.0**.
-
 See: https://oss.oracle.com/licenses/upl/

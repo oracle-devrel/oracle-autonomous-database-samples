@@ -78,7 +78,7 @@ rem   PROFILE_NAME (Prompted)
 rem     AI Profile name used to bind the OCI Vault agent.
 rem
 rem NOTES
-rem   - Script is safe to re-run; existing tasks, agents,
+rem   - Script can be re-run; existing tasks, agents,
 rem     and teams are dropped and recreated.
 rem
 rem   - Destructive Vault operations require user confirmation
@@ -111,7 +111,7 @@ PROMPT Using AI Profile     : &&PROFILE_NAME
 PROMPT ------------------------------------------------------
 
 ----------------------------------------------------------------
--- 1. Grants (safe to re-run)
+-- 1. Grants 
 ----------------------------------------------------------------
 BEGIN
   DBMS_OUTPUT.PUT_LINE('Granting required privileges to &&INSTALL_SCHEMA ...');

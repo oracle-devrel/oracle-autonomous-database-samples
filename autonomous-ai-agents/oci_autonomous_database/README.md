@@ -6,7 +6,7 @@ The **Select AI - OCI Autonomous Database AI Agent** enables natural-language–
 
 Unlike traditional scripts or consoles, this agent allows users to:
 - Provision and manage Autonomous Databases conversationally
-- Safely execute lifecycle operations with confirmations
+- Run lifecycle operations with confirmations
 - Discover OCI resources dynamically (regions, compartments, databases)
 - Automate complex OCI workflows through reusable AI tools
 
@@ -23,7 +23,6 @@ Compared to manual OCI operations or simple chat-based automation, this agent:
 - Requires **explicit confirmation for destructive actions**
 - Uses **OCI-native APIs** through PL/SQL wrappers
 - Produces **human-readable outputs**, not raw JSON dumps
-- Is **idempotent and safe to re-run**
 
 ---
 
@@ -85,6 +84,12 @@ Run as ADMIN (or privileged user):
 sqlplus admin@db @oci_autonomous_database_tools.sql
 ```
 
+### Input Parameters required to run.
+- Target schema name (Schema where to the agent team needs to be installed)
+- Cloud Config Parameters.
+  - OCI Credentials - Required to access to Object Storage buckets.
+  - Compartment Name 
+  
 ### Optional Configuration JSON
 
 ```json
@@ -147,16 +152,16 @@ Run:
 sqlplus admin@db @oci_autonomous_database_agent.sql
 ```
 
-### Prompts
-- Target schema name
-- AI Profile name
+### Input Parameters required to run.
+- Target schema name (Schema where to the agent team needs to be installed)
+- AI Profile name (Select AI Profile name that needs to be used with the Agent)
 
 ### Objects Created
 
 | Object | Name |
 |------|------|
 | Task | OCI_AUTONOMOUS_DATABASE_TASKS |
-| Agent | OCI_AUTONOMOUS_DATABASE_ADVISOR |
+| Agent| OCI_AUTONOMOUS_DATABASE_ADVISOR |
 | Team | OCI_AUTONOMOUS_DATABASE_TEAM |
 
 ---
@@ -169,7 +174,6 @@ The task enforces:
 - Clarifying questions for incomplete input
 - Mandatory confirmation for destructive actions
 - Human-readable formatting of OCI outputs
-- Safe automation of OCI operations
 
 ---
 
@@ -189,15 +193,6 @@ Bind profiles at agent level.**
 
 ---
 
-##  Safe Re-Execution
-
-All scripts are **safe to re-run**:
-- Tasks, agents, and teams are dropped and recreated
-- OCI configuration is preserved
-- No duplicate OCI resources are created accidentally
-
----
-
 ##  Best Practices
 
 - Always use confirmation for destructive actions
@@ -208,6 +203,45 @@ All scripts are **safe to re-run**:
 
 ---
 
+## Example Prompts
+
+After creating the Oracle Autonomous Database AI Agent, users can interact with it using prompts such as:
+
+### Discovery & Setup
+- “List all OCI regions I am subscribed to.”
+- “Show all compartments in my tenancy.”
+
+### Provisioning Autonomous Databases
+- “Help me to Provision a new Autonomous Transaction Processing database"
+
+### Listing & Inspecting Databases
+- “List all Autonomous Databases in the `Finance` compartment in the Mumbai region.”
+- “Get detailed information for the Autonomous Database with OCID `<db_ocid>`.”
+
+### Power & Lifecycle Management
+- “Start the Autonomous Database with OCID `<db_ocid>` in the Mumbai region.”
+- “Stop the Autonomous Database with OCID `<db_ocid>`.”
+- “Restart the Autonomous Database with OCID `<db_ocid>`.”
+
+### Scaling & Resource Management
+- “Increase the CPU count of the Autonomous Database `<db_ocid>` to 8 cores.”
+- “Update the storage size of the Autonomous Database `<db_ocid>` to 2 TB.”
+- “Shrink the Autonomous Database `<db_ocid>` to optimize storage usage.”
+
+### Configuration Updates
+- “Enable auto-scaling and update the display name for the Autonomous Database `<db_ocid>`.”
+- “Update backup retention to 30 days for the Autonomous Database `<db_ocid>`.”
+
+### Maintenance & Backups
+- “Show maintenance run history for maintenance run ID `<maintenance_id>`.”
+- “List all backups for the Autonomous Database `<db_ocid>` in the `Finance` compartment.”
+
+### Supporting Resources
+- “List all key stores in the `Finance` compartment.”
+- “List all DB homes in the `Finance` compartment.”
+
+
+
 ##  License
 
 Universal Permissive License (UPL) 1.0  
@@ -215,9 +249,9 @@ https://oss.oracle.com/licenses/upl/
 
 ---
 
-## ✨ Final Thought
+## ✨ Final Thoughts
 
-This OCI Autonomous Database AI Agent turns OCI operations into a **guided, conversational, and safe experience**, blending human judgment with automation.
+This OCI Autonomous Database AI Agent turns OCI operations into a **guided, conversational**, blending human judgment with automation.
 
 It is designed for:
 - Platform teams

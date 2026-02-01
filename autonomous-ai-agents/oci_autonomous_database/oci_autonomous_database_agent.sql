@@ -10,7 +10,7 @@ rem
 rem DESCRIPTION
 rem   Installer and configuration script for OCI Autonomous Database
 rem   AI Agent using DBMS_CLOUD_AI_AGENT
-rem   (Select AI / Oracle AI Database).
+rem   (Select AI / Oracle Autonomous AI Database).
 rem
 rem   This script performs an interactive installation of an
 rem   OCI Autonomous Database AI Agent by:
@@ -231,9 +231,9 @@ BEGIN
   );
   DBMS_OUTPUT.PUT_LINE('Created team OCI_AUTONOMOUS_DATABASE_TEAM');
 
-  DBMS_OUTPUT.PUT_LINE('--------------------------------------------');
+  DBMS_OUTPUT.PUT_LINE('-------------------------------------------------');
   DBMS_OUTPUT.PUT_LINE('OCI Autonomous Database AI installation COMPLETE');
-  DBMS_OUTPUT.PUT_LINE('--------------------------------------------');
+  DBMS_OUTPUT.PUT_LINE('-------------------------------------------------');
 END install_oci_autonomous_database_agent;
 /
 

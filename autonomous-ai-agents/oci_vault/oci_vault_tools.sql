@@ -9,11 +9,11 @@ rem   oci_vault_tools.sql
 rem
 rem DESCRIPTION
 rem   Installer script for OCI Vault AI tools
-rem   (Select AI Agent / Oracle AI Database).
+rem   (Select AI Agent / Oracle Autonomous AI Database).
 rem
 rem   This script installs a consolidated PL/SQL package and registers
 rem   AI Agent tools used to automate OCI Vault operations
-rem   via Select AI Agent (Oracle AI Database).
+rem   via Select AI Agent (Oracle Autonomous AI Database).
 rem
 rem RELEASE VERSION
 rem   1.1
@@ -1785,7 +1785,7 @@ BEGIN
             "instruction": "Create a new secret in OCI Vault using the specified vault and key, establishing its initial CURRENT version with the provided plaintext. Use for onboarding new credentials or initializing managed secrets.",
             "function": "oci_vault_agents.create_secret"
             }',
-        description => 'Tool for creating a secret in OCI Vault (Select AI Agent / Oracle AI Database)'
+        description => 'Tool for creating a secret in OCI Vault (Select AI Agent / Oracle Autonomous AI Database)'
     );
 
     ------------------------------------------------------------------------
@@ -1799,7 +1799,7 @@ BEGIN
             "instruction": "Retrieve existing secret metadata to inspect its state, associations, and timing details. Use for monitoring and diagnostics; this tool does not expose secret material.",
             "function": "oci_vault_agents.get_secret"
             }',
-        description => 'Tool for fetching an OCI Vault secret (Select AI Agent / Oracle AI Database)'
+        description => 'Tool for fetching an OCI Vault secret (Select AI Agent / Oracle Autonomous AI Database)'
     );
 
     DBMS_OUTPUT.PUT_LINE('create_vault_tools completed.');
