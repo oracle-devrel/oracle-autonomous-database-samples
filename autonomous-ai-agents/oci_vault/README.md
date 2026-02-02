@@ -2,9 +2,9 @@
 
 ##  Overview
 
-## OCI Vaults
+## OCI Vault
 
-OCI Vaults is a secure key and secrets management service in Oracle Cloud Infrastructure that helps you centrally store, manage, and control access to sensitive data such as encryption keys, secrets, certificates, and passwords. It supports customer-managed encryption keys backed by Hardware Security Modules (HSMs), enabling strong security, compliance, key rotation, and fine-grained access control for OCI resources and applications.
+OCI Vault is a secure key and secrets management service in Oracle Cloud Infrastructure that helps you centrally store, manage, and control access to sensitive data such as encryption keys, secrets, certificates, and passwords. It supports customer-managed encryption keys backed by Hardware Security Modules (HSMs), enabling strong security, compliance, key rotation, and fine-grained access control for OCI resources and applications.
 
 The ** Select AI OCI Vault AI Agent** enables secure, conversational management of **OCI Vault secrets and secret versions** using **Select AI (DBMS_CLOUD_AI_AGENT)** within Oracle Autonomous AI Database.
 
