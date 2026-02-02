@@ -1,4 +1,4 @@
-# Select AI - OCI Autonomous Database AI Agent & Tools
+# Select AI - OCI Autonomous Database AI Agent and Tools
 
 ##  Overview
 
@@ -33,12 +33,12 @@ User Request
    ↓
 OCI Autonomous Database Task
    ↓
-Agent Reasoning & Validation
+Agent Reasoning and Validation
    ├── Discovery Tools (Regions, Compartments, Databases)
    ├── Provisioning Tools
    ├── Lifecycle Management Tools
-   ├── Configuration & Scaling Tools
-   └── Maintenance & Backup Tools
+   ├── Configuration and Scaling Tools
+   └── Maintenance and Backup Tools
    ↓
 Confirmed OCI Operation + Result
 ```
@@ -51,7 +51,7 @@ Confirmed OCI Operation + Result
 .
 ├── oci_autonomous_database_tools.sql
 │   ├── PL/SQL OCI wrapper package
-│   ├── OCI authentication & config handling
+│   ├── OCI authentication and config handling
 │   ├── Autonomous Database lifecycle functions
 │   └── AI tool registrations
 │
@@ -84,7 +84,7 @@ Run as ADMIN (or privileged user):
 sqlplus admin@db @oci_autonomous_database_tools.sql
 ```
 
-### Input Parameters required to run.
+### Input Parameters required to run
 - Target schema name (Schema where to the agent team needs to be installed)
 - Cloud Config Parameters.
   - OCI Credentials - Required to access to Object Storage buckets.
@@ -113,14 +113,14 @@ sqlplus admin@db @oci_autonomous_database_tools.sql
 
 ##  Available AI Tools (High Level)
 
-### 🔍 Discovery & Metadata
+### 🔍 Discovery and Metadata
 - List subscribed regions
 - List compartments
 - Resolve compartment OCID by name
 - List Autonomous Databases
 - Get Autonomous Database details
 
-###  Provisioning & Lifecycle
+###  Provisioning and Lifecycle
 - Provision Autonomous Database
 - Start / Stop / Restart database
 - Scale CPU and storage
@@ -128,14 +128,14 @@ sqlplus admin@db @oci_autonomous_database_tools.sql
 - Shrink database
 - Delete Autonomous Database (confirmed)
 
-###  Configuration & Updates
+###  Configuration and Updates
 - Update database attributes
 - Manage power model
 - Modify workload and edition
 - Update network and security settings
 - Manage tags
 
-###  Maintenance & Backup
+###  Maintenance and Backup
 - List maintenance run history
 - List Autonomous Database backups
 - List DB homes
@@ -144,7 +144,7 @@ sqlplus admin@db @oci_autonomous_database_tools.sql
 
 ---
 
-##  Installation – Agent & Team
+##  Installation – Agent and Team
 
 Run:
 
@@ -177,7 +177,7 @@ The task enforces:
 
 ---
 
-##  Extending & Generalizing the Agent
+##  Extending and Generalizing the Agent
 
 ### Recommended Pattern
 
@@ -207,23 +207,23 @@ Bind profiles at agent level.**
 
 After creating the Oracle Autonomous Database AI Agent, users can interact with it using prompts such as:
 
-### Discovery & Setup
+### Discovery and Setup
 - “List all OCI regions I am subscribed to.”
 - “Show all compartments in my tenancy.”
 
 ### Provisioning Autonomous Databases
 - “Help me to Provision a new Autonomous Transaction Processing database"
 
-### Listing & Inspecting Databases
+### Listing and Inspecting Databases
 - “List all Autonomous Databases in the `Finance` compartment in the Mumbai region.”
 - “Get detailed information for the Autonomous Database with OCID `<db_ocid>`.”
 
-### Power & Lifecycle Management
+### Power and Lifecycle Management
 - “Start the Autonomous Database with OCID `<db_ocid>` in the Mumbai region.”
 - “Stop the Autonomous Database with OCID `<db_ocid>`.”
 - “Restart the Autonomous Database with OCID `<db_ocid>`.”
 
-### Scaling & Resource Management
+### Scaling and Resource Management
 - “Increase the CPU count of the Autonomous Database `<db_ocid>` to 8 cores.”
 - “Update the storage size of the Autonomous Database `<db_ocid>` to 2 TB.”
 - “Shrink the Autonomous Database `<db_ocid>` to optimize storage usage.”
@@ -232,7 +232,7 @@ After creating the Oracle Autonomous Database AI Agent, users can interact with 
 - “Enable auto-scaling and update the display name for the Autonomous Database `<db_ocid>`.”
 - “Update backup retention to 30 days for the Autonomous Database `<db_ocid>`.”
 
-### Maintenance & Backups
+### Maintenance and Backups
 - “Show maintenance run history for maintenance run ID `<maintenance_id>`.”
 - “List all backups for the Autonomous Database `<db_ocid>` in the `Finance` compartment.”
 

@@ -64,6 +64,67 @@ The repository is organized to align with the Select AI Agent framework:
 
 ---
 
+## Agent Configuration (`SELECTAI_AGENT_CONFIG`)
+
+### Overview
+
+Select AI agents use a shared configuration table named `SELECTAI_AGENT_CONFIG` to store **agent-specific configuration parameters**.
+
+The table is generic and can be used by any Select AI agent (for example, NL2SQL data retrieval agents or other domain-specific agents). Each agent persists only the configuration keys it requires, while default behavior applies when values are not provided.
+
+---
+
+### Column Description
+
+| Column | Description |
+|------|------------|
+| `ID` | System-generated unique identifier |
+| `KEY` | Configuration parameter name |
+| `VALUE` | Configuration value (stored as CLOB) |
+| `AGENT` | Logical name of the Select AI agent(Available in tools) |
+
+Configuration entries are uniquely identified by the combination of `KEY` and `AGENT`.
+
+---
+
+### Writing Configuration Entries
+
+Configuration values are written during agent installation or setup.  
+Only explicitly provided values are persisted; agents apply internal defaults when values are absent.
+
+---
+
+### Example Configuration Entries
+
+#### NL2SQL Data Retrieval Agent
+
+```sql
+INSERT INTO SELECTAI_AGENT_CONFIG ("KEY", "VALUE", "AGENT")
+VALUES ('ENABLE_RESOURCE_PRINCIPAL', 'YES', 'NL2SQL_DATA_RETRIEVAL_AGENT');
+
+INSERT INTO SELECTAI_AGENT_CONFIG ("KEY", "VALUE", "AGENT")
+VALUES ('CREDENTIAL_NAME', 'MY_DB_CREDENTIAL', 'NL2SQL_DATA_RETRIEVAL_AGENT');
+```
+
+### JSON-Based Configuration Input
+
+Agent installers may accept configuration as JSON input.
+
+Example:
+
+```{
+  "use_resource_principal": true,
+  "credential_name": "MY_DB_CREDENTIAL"
+}
+```
+
+The installer parses the JSON and stores the relevant values in SELECTAI_AGENT_CONFIG.
+
+### Reading Configuration at Runtime
+
+At runtime, agents read their configuration from SELECTAI_AGENT_CONFIG and consume it as structured JSON. This allows configuration changes without modifying agent code.
+
+
 ## Supported Use Cases
 
 This framework can be used to build Select AI agents for:

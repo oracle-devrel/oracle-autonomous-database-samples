@@ -1,4 +1,4 @@
-#  Select AI - OCI Network Load Balancer AI Agent & Tools 
+#  Select AI - OCI Network Load Balancer AI Agent and Tools 
 
 ## Overview
 
@@ -38,12 +38,12 @@ User Request
    ↓
 OCI Network Load Balancer Task
    ↓
-Agent Reasoning & Validation
-   ├── Region & Compartment Discovery
-   ├── NLB Inventory & Inspection
+Agent Reasoning and Validation
+   ├── Region and Compartment Discovery
+   ├── NLB Inventory and Inspection
    ├── Listener Management
-   ├── Backend Set & Backend Inspection
-   ├── Health & Policy Discovery
+   ├── Backend Set and Backend Inspection
+   ├── Health and Policy Discovery
    └── Destructive Action Confirmation
    ↓
 Confirmed NLB Operation + Result
@@ -80,7 +80,7 @@ Confirmed NLB Operation + Result
 
 ---
 
-##  Installation – Agent & Team
+##  Installation – Agent and Team
 
 Run as ADMIN (or privileged user):
 
@@ -88,7 +88,7 @@ Run as ADMIN (or privileged user):
 sqlplus admin@db @oci_network_load_balancer_agent.sql
 ```
 
-### Input Parameters required to run.
+### Input Parameters required to run
 - Target schema name (Schema where to the agent team needs to be installed)
 - AI Profile name (Select AI Profile name that needs to be used with the Agent)
 
@@ -132,13 +132,13 @@ sqlplus admin@db @oci_network_load_balancer_agent.sql
 - Update listener
 - Delete listener
 
-###  Backend & Health
+###  Backend and Health
 - Create backend sets
 - List backend sets
 - List backends
 - Inspect health checks
 
-###  Metadata & Capabilities
+###  Metadata and Capabilities
 - List supported NLB policies
 - List supported protocols
 - Review NLB health summaries
@@ -167,7 +167,7 @@ Bind permissions via AI profiles.**
 
 ### Example Extensions
 - Read-only NLB inventory agent
-- Health monitoring & diagnostics agent
+- Health monitoring and diagnostics agent
 - Automated NLB provisioning agent
 - Multi-compartment governance agent
 
@@ -187,7 +187,7 @@ Bind permissions via AI profiles.**
 
 After creating the OCI Network Load Balancer AI Agent, users can interact with it using prompts such as:
 
-### Discovery & Setup
+### Discovery and Setup
 - “List all OCI regions I am subscribed to.”
 - “Show all compartments in my tenancy.”
 
@@ -195,7 +195,7 @@ After creating the OCI Network Load Balancer AI Agent, users can interact with i
 - “Create a public Network Load Balancer named `orders-nlb` in the `Finance` compartment in the Mumbai region with a TCP listener on port 443, a backend set using ROUND_ROBIN policy, and health checks enabled.”
 - “Create a private Network Load Balancer in the `Finance` compartment with preserved source IP and IPv4 enabled.”
 
-### Listing & Inspecting Network Load Balancers
+### Listing and Inspecting Network Load Balancers
 - “List all Network Load Balancers in the `Finance` compartment in the Mumbai region.”
 - “Get details of the Network Load Balancer with OCID `<nlb_ocid>`.”
 
@@ -206,12 +206,12 @@ After creating the OCI Network Load Balancer AI Agent, users can interact with i
 - “Update the listener `https-listener` to use a different backend set.”
 - “Delete the listener named `https-listener` from the Network Load Balancer `<nlb_ocid>`.”
 
-### Backend Sets & Backends
+### Backend Sets and Backends
 - “List all backend sets for the Network Load Balancer `<nlb_ocid>`.”
 - “Create a backend set named `orders-backend-set` with ROUND_ROBIN policy on port 8080.”
 - “List all backends in the backend set `orders-backend-set` for the Network Load Balancer `<nlb_ocid>`.”
 
-### Health, Policies & Protocols
+### Health, Policies and Protocols
 - “Show health status of all Network Load Balancers in the `Finance` compartment.”
 - “List all supported Network Load Balancer policies.”
 - “List all supported Network Load Balancer protocols.”
@@ -234,12 +234,12 @@ https://oss.oracle.com/licenses/upl/
 
 ---
 
-## ✨ Final Thought
+## ✨ Final Thoughts
 
 The OCI Network Load Balancer AI Agent transforms complex networking operations into a **guided, and auditable conversational workflow**, reducing risk while accelerating infrastructure management.
 
 Designed for:
-- Platform & networking teams
+- Platform and networking teams
 - Cloud operations engineers
 - Secure infrastructure automation
 - Enterprise OCI environments

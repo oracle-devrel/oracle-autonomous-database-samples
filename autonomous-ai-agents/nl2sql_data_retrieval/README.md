@@ -32,7 +32,7 @@ into a **single autonomous agent workflow**.
 | External web search | ❌ | ✅ |
 | URL content validation | ❌ | ✅ |
 | Chart generation | ❌ | ✅ |
-| Config-driven & extensible | ❌ | ✅ |
+| Config-driven and extensible | ❌ | ✅ |
 
 > **Result:** Higher accuracy, fewer hallucinations, accurate SQL, and richer analytical answers.
 
@@ -100,10 +100,10 @@ All credentials are resolved **securely at runtime from OCI Vault**.
 - https://console.cloud.google.com
 
 ### Step 2: Enable Custom Search API
-- APIs & Services → Library → **Custom Search API**
+- APIs and Services → Library → **Custom Search API**
 
 ### Step 3: Create API Key
-- APIs & Services → Credentials → **Create API Key**
+- APIs and Services → Credentials → **Create API Key**
 
 ### Step 4: Create Custom Search Engine (CX)
 - https://programmablesearchengine.google.com  
@@ -126,7 +126,7 @@ Run as ADMIN (or privileged user):
 ```sql
 sqlplus admin@db @nl2sql_data_retrieval_tools.sql
 ```
-### Input Parameters required to run.
+### Input Parameters required to run
 - Target schema name (Schema where to the agent team needs to be installed)
 - Cloud Config Parameters required for Websearch (This is mandatory to enable Websearch)
   - Google Search API Keys needs to be stored in OCI Vault
@@ -211,7 +211,7 @@ sqlplus admin@db @nl2sql_data_retrieval_tools.sql
 
 ---
 
-##  Installation – Agent & Team
+##  Installation – Agent and Team
 
 Run:
 
@@ -259,7 +259,7 @@ Specialize agents using tasks.**
 | Data Retrieval Team | All tools | General analytics |
 | Finance Analytics Team | SQL + RANGE | Financial reporting |
 | Research Agent Team | WEBSEARCH | External intelligence |
-| Visualization Team | SQL + CHART | Dashboards & insights |
+| Visualization Team | SQL + CHART | Dashboards and insights |
 
 ### Why This Scales Well
 - Tools are reusable  

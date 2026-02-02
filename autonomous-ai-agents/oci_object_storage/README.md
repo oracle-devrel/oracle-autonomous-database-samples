@@ -1,4 +1,4 @@
-# Select AI - OCI Object Storage AI Agent & Tools
+# Select AI - OCI Object Storage AI Agent and Tools
 
 ##  Overview
 
@@ -38,12 +38,12 @@ User Request
    ↓
 OCI Object Storage Task
    ↓
-Agent Reasoning & Validation
+Agent Reasoning and Validation
    ├── Discovery Tools (Regions, Compartments, Namespace)
    ├── Bucket Management Tools
    ├── Object Operations Tools
-   ├── Lifecycle & Retention Tools
-   ├── Replication & Encryption Tools
+   ├── Lifecycle and Retention Tools
+   ├── Replication and Encryption Tools
    └── Work Request Monitoring Tools
    ↓
 Confirmed Operation + Result
@@ -57,7 +57,7 @@ Confirmed Operation + Result
 .
 ├── oci_object_storage_tools.sql
 │   ├── PL/SQL OCI Object Storage wrapper package
-│   ├── Authentication & namespace resolution
+│   ├── Authentication and namespace resolution
 │   ├── Bucket, object, lifecycle, replication APIs
 │   └── AI tool registrations
 │
@@ -90,7 +90,7 @@ Run as ADMIN (or privileged user):
 sqlplus admin@db @oci_object_storage_tools.sql
 ```
 
-### Input Parameters required to run.
+### Input Parameters required to run
 - Target schema name (Schema where to the agent team needs to be installed)
 - Cloud Config Parameters.
   - OCI Credentials - Required to access to Object Storage buckets.
@@ -109,7 +109,7 @@ sqlplus admin@db @oci_object_storage_tools.sql
 
 ##  Available AI Tools (High-Level)
 
-###  Discovery & Metadata
+###  Discovery and Metadata
 - List subscribed regions
 - List compartments
 - Derive Object Storage namespace
@@ -129,13 +129,13 @@ sqlplus admin@db @oci_object_storage_tools.sql
 - Restore archived objects
 - Multipart upload (create, upload part, commit, abort)
 
-###  Security & Access
+###  Security and Access
 - Pre-authenticated requests (create, list, delete)
 - Retention rules (create, update, delete)
 - Replication policies
 - Namespace metadata updates
 
-###  Work Requests & Monitoring
+###  Work Requests and Monitoring
 - List work requests
 - Get work request details
 - View logs and errors
@@ -143,7 +143,7 @@ sqlplus admin@db @oci_object_storage_tools.sql
 
 ---
 
-##  Installation – Agent & Team
+##  Installation – Agent and Team
 
 Run:
 
@@ -151,17 +151,17 @@ Run:
 sqlplus admin@db @oci_object_storage_agent.sql
 ```
 
-### Input Parameters required to run.
+### Input Parameters required to run
 - Target schema name (Schema where to the agent team needs to be installed)
 - AI Profile name (Select AI Profile name that needs to be used with the Agent)
 
 ### Objects Created
 
 | Object | Name |
-|------|------|
-| Task | OCI_OBJECTSTORE_TASKS |
-| Agent | OCI_OBJECT_STORAGE_ADVISOR |
-| Team | OCI_OBJECTSTORE_TEAM |
+|--------|------|
+| Task   | OCI_OBJECTSTORE_TASKS |
+| Agent  | OCI_OBJECT_STORAGE_ADVISOR |
+| Team   | OCI_OBJECTSTORE_TEAM |
 
 ---
 
@@ -176,7 +176,7 @@ The task enforces:
 
 ---
 
-##  Extending & Generalizing the Agent
+##  Extending and Generalizing the Agent
 
 ### Recommended Pattern
 
@@ -204,7 +204,7 @@ Bind permissions via AI profiles.**
 
 After creating the OCI Object Storage AI Agent, users can interact with it using prompts such as:
 
-### Buckets & Namespace
+### Buckets and Namespace
 - “List all Object Storage buckets in the Mumbai region.”
 - “Get details of the bucket named `finance-reports` in the Mumbai region.”
 - “Check whether the bucket `finance-reports` exists in the Mumbai region.”
@@ -220,7 +220,7 @@ After creating the OCI Object Storage AI Agent, users can interact with it using
 - “Rename the object `draft.txt` to `final.txt` in the bucket `finance-reports`.”
 - “Copy the object `q1-report.pdf` from the bucket `finance-reports` to the bucket `finance-archive` in the Hyderabad region.”
 
-### Object Metadata & Versions
+### Object Metadata and Versions
 - “Get metadata for the object `q1-report.pdf` in the bucket `finance-reports`.”
 - “List all versions of objects in the bucket `finance-reports`.”
 
@@ -254,7 +254,7 @@ After creating the OCI Object Storage AI Agent, users can interact with it using
 - “Delete the replication policy with ID `<replication_id>`.”
 - “List all replication source buckets for the bucket `finance-reports`.”
 
-### Encryption & Security
+### Encryption and Security
 - “Re-encrypt the bucket `finance-reports`.”
 - “Re-encrypt the object `q1-report.pdf` in the bucket `finance-reports` using a new KMS key.”
 
@@ -262,7 +262,7 @@ After creating the OCI Object Storage AI Agent, users can interact with it using
 - “Restore the object `archived-report.pdf` from Archive Storage for 24 hours.”
 - “Restore version `<version_id>` of the object `archived-report.pdf`.”
 
-### Work Requests & Operations
+### Work Requests and Operations
 - “List all Object Storage work requests in the Mumbai region.”
 - “Get details of the work request with ID `<work_request_id>`.”
 
@@ -274,7 +274,7 @@ https://oss.oracle.com/licenses/upl/
 
 ---
 
-## ✨ Final Thought
+## ✨ Final Thoughts
 
 This OCI Object Storage AI Agent transforms Object Storage from an API-driven service into a **guided, conversational automation platform**, combining  clarity, and power.
 
