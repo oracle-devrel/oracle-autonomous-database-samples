@@ -1,25 +1,36 @@
-# Autonomous AI Agents for OCI (Oracle Autonomous Database)
+
+# Select AI Agents on Oracle Autonomous AI Database
 
 ## Overview
 
-This repository provides a **modular, extensible framework** for building **OCI AI Agents** using **Oracle Autonomous Database** and **`DBMS_CLOUD_AI_AGENT` (Select AI)**.
+This repository provides a **generic, extensible framework for building Select AI Agents on Oracle Autonomous AI Database** using the **Select AI Agent framework**.
 
-Each OCI service (Vault, Object Storage, Autonomous Database, Network Load Balancer, etc.) is implemented using a **two-layer model**:
+Select AI Agents enable natural language interactions with enterprise data by combining large language models (LLMs), database-resident tools, and orchestration logic directly inside Oracle Database. Agents can reason over user input, invoke tools, and return structured, explainable results — all while keeping data governance, security, and execution within the database.
 
-- **Tools Layer**
-  - Installs reusable PL/SQL functions
-  - Registers them as AI tools
-- **Agent Layer**
-  - Creates sample tasks, agents, and teams
-  - Consumes the tools created in the Tools layer
+The agents in this repository are **generic Select AI agents**. While some examples may interact with Oracle services, the framework itself is not limited to any specific domain or platform and can support many different types of agents and workflows.
 
-### Benefits of This Design
+---
 
-- Reuse tools across multiple agents
-- Allow end users to create custom agents and tasks
-- Clear separation of:
-  - Infrastructure logic
-  - AI orchestration logic
+## What is a Select AI Agent?
+
+Select AI Agents are part of the Oracle Autonomous AI Database Select AI framework. A Select AI Agent:
+
+- Accepts natural language input from users
+- Uses an LLM to reason about the request
+- Invokes database-resident tools (PL/SQL functions)
+- Executes logic securely inside the database
+- Returns structured responses
+
+Key characteristics of the Select AI Agent framework include:
+
+- Native integration with Oracle Autonomous AI Database
+- Tool execution through PL/SQL
+- Support for tasks, agents, and teams
+- Centralized governance and monitoring
+- Flexibility to build domain-specific or generic agents
+
+For full details, refer to the official documentation:
+https://docs.oracle.com/en-us/iaas/autonomous-database-serverless/doc/select-ai-agent.html
 
 ---
 
@@ -27,274 +38,139 @@ Each OCI service (Vault, Object Storage, Autonomous Database, Network Load Balan
 
 ### 1. Two-Layer Architecture
 
-Each OCI service is implemented using **two SQL scripts**:
+Each agent implementation follows a two-layer model using separate SQL scripts.
 
-| Layer | Script Pattern | Purpose |
-|------|---------------|---------|
-| Tools Layer | `*_tools.sql` | Installs core PL/SQL logic and registers AI tools |
-| Agent Layer | `*_agent.sql` | Creates a sample Task, Agent, and Team using those tools |
+| Layer        | Script Pattern   | Purpose |
+|--------------|-----------------|---------|
+| Tools Layer  | `*_tools.sql`   | Installs core PL/SQL logic and registers Select AI tools |
+| Agent Layer  | `*_agent.sql`   | Creates a sample Task, Agent, and Team using those tools |
 
-This design ensures:
-- Tools are reusable across multiple agents
-- Agent behavior remains customizable
+This design provides:
 
----
+- **Tools** that are reusable across multiple agents  
+- **Agents** as examples for customizable behavior
 
-## Tools Scripts (`*_tools.sql`)
-
-### Purpose
-
-Tools scripts are responsible for **infrastructure and capability enablement**.
-
-**Example:**
-- `oci_vault_tools.sql`
+The clear separation between tools and agents allows infrastructure logic to remain stable while agent behavior can be easily adapted or extended.
 
 ---
 
-### What a Tools Script Does
+## Repository Structure
 
-A tools script typically performs the following steps:
+The repository is organized to align with the Select AI Agent framework:
 
-#### 1. Grant Required Privileges
-
-- Grants access to:
-  - `DBMS_CLOUD`
-  - `DBMS_CLOUD_AI`
-  - `DBMS_CLOUD_AI_AGENT`
-  - Relevant OCI typed API packages
-- Privileges are scoped to the **target schema**
+- Tools scripts define and register reusable PL/SQL functions
+- Agent scripts demonstrate how those tools are composed into tasks, agents, and teams
+- Additional agents can be created without modifying existing tools
 
 ---
 
-#### 2. Create Configuration Table
+## Agent Configuration (`SELECTAI_AGENT_CONFIG`)
 
-Creates a generic configuration table:
+### Overview
+
+Select AI agents use a shared configuration table named `SELECTAI_AGENT_CONFIG` to store **agent-specific configuration parameters**.
+
+The table is generic and can be used by any Select AI agent (for example, NL2SQL data retrieval agents or other domain-specific agents). Each agent persists only the configuration keys it requires, while default behavior applies when values are not provided.
+
+---
+
+### Column Description
+
+| Column | Description |
+|------|------------|
+| `ID` | System-generated unique identifier |
+| `KEY` | Configuration parameter name |
+| `VALUE` | Configuration value (stored as CLOB) |
+| `AGENT` | Logical name of the Select AI agent(Available in tools) |
+
+Configuration entries are uniquely identified by the combination of `KEY` and `AGENT`.
+
+---
+
+### Writing Configuration Entries
+
+Configuration values are written during agent installation or setup.  
+Only explicitly provided values are persisted; agents apply internal defaults when values are absent.
+
+---
+
+### Example Configuration Entries
+
+#### NL2SQL Data Retrieval Agent
 
 ```sql
-OCI_AGENT_CONFIG
+INSERT INTO SELECTAI_AGENT_CONFIG ("KEY", "VALUE", "AGENT")
+VALUES ('ENABLE_RESOURCE_PRINCIPAL', 'YES', 'NL2SQL_DATA_RETRIEVAL_AGENT');
+
+INSERT INTO SELECTAI_AGENT_CONFIG ("KEY", "VALUE", "AGENT")
+VALUES ('CREDENTIAL_NAME', 'MY_DB_CREDENTIAL', 'NL2SQL_DATA_RETRIEVAL_AGENT');
 ```
 
-**Stores configuration such as:**
-- Credential name
-- Compartment name / OCID
-- Resource principal enablement
+### JSON-Based Configuration Input
 
-> Configuration is **agent-specific** and persisted for runtime use.
+Agent installers may accept configuration as JSON input.
 
----
+Example:
 
-#### 3. Initialize Configuration
-
-- Parses optional JSON configuration input
-- Enables resource principal authentication if requested
-- Persists configuration values
-
----
-
-#### 4. Create PL/SQL Package
-
-**Example package:**
-
-```sql
-oci_vault_agents
+```{
+  "use_resource_principal": true,
+  "credential_name": "MY_DB_CREDENTIAL"
+}
 ```
 
-**Package responsibilities:**
-- Implements core OCI API logic
-- Calls OCI APIs using `DBMS_CLOUD_OCI_*`
-- Each function:
-  - Returns **CLOB JSON**
-  - Includes:
-    - Status codes
-    - Headers
-    - Response payloads
+The installer parses the JSON and stores the relevant values in SELECTAI_AGENT_CONFIG.
+
+### Reading Configuration at Runtime
+
+At runtime, agents read their configuration from SELECTAI_AGENT_CONFIG and consume it as structured JSON. This allows configuration changes without modifying agent code.
+
+
+## Supported Use Cases
+
+This framework can be used to build Select AI agents for:
+
+- Natural language to SQL (NL2SQL)
+- Data retrieval and analytics
+- Database administration and monitoring
+- Operational workflows
+- Custom enterprise automation
+
+Agents can target database-only workflows, service integrations, or mixed enterprise use cases.
 
 ---
 
-#### 5. Register AI Tools
+## Compatibility and Release Support
 
-- Uses `DBMS_CLOUD_AI_AGENT.CREATE_TOOL`
-- Maps each PL/SQL function to an AI tool
-- Adds rich instructions describing:
-  - When to use the tool
-  - Safety rules (e.g. no secret exposure)
-  - Expected behavior
+Select AI capabilities vary by database release. For details on supported features across Autonomous Database and compatible non-Autonomous Database releases, refer to the official Select AI Capability Matrix:
+
+https://docs.oracle.com/en/database/oracle/oracle-database/26/saicm/select-ai-capability-matrix.pdf
 
 ---
 
-### Key Characteristics of Tools
+## Getting Started
 
-- Service-specific but **agent-agnostic**
-- Reusable by any task or agent
-- Safe to re-run (drop & recreate logic)
-- Designed for **human-readable AI responses**
-
----
-
-## Agent Scripts (`*_agent.sql`)
-
-### Purpose
-
-Agent scripts create **example AI agents** demonstrating how to use the tools.
-
-**Example:**
-- `oci_vault_agent.sql`
+1. Run the Tools layer scripts to install and register Select AI tools.
+2. Run the Agent layer scripts to create sample tasks, agents, and teams.
+3. Customize existing agents or create new ones by composing available tools.
+4. Extend the framework by adding new tools and agent definitions.
 
 ---
 
-### What an Agent Script Does
+## Intended Audience
 
-#### 1. Interactive Execution
+This repository is intended for:
 
-Prompts for:
-- Target schema name
-- AI Profile name
+- Database developers
+- Data engineers
+- Architects
+- Platform teams
+- AI practitioners working with Oracle Autonomous AI Database
 
-This makes scripts **portable across environments**.
-
----
-
-#### 2. Grant Required Privileges
-
-Grants:
-- `DBMS_CLOUD_AI_AGENT`
-- `DBMS_CLOUD`
-
-To the target schema.
-
----
-
-#### 3. Create Installer Procedure
-
-- Creates an installer procedure in the target schema
-- Keeps all agent logic **schema-local**
-
----
-
-#### 4. Create AI Task
-
-Defines:
-- User intent detection
-- Allowed tools
-- Safety rules
-- Formatting expectations
-
-Enforces:
-- Confirmation for destructive actions
-- Human-readable output
-
----
-
-#### 5. Create AI Agent
-
-- Binds the agent to the specified AI Profile
-- Defines the agent’s role and behavior
-
----
-
-#### 6. Create AI Team
-
-- Links the agent and task
-- Uses **sequential execution**
-
----
-
-#### 7. Execute Installer
-
-- Runs the installer procedure
-- Completes agent setup
-
----
-
-### Key Characteristics of Agents
-
-- Agents are **examples**, not hard dependencies
-- End users can:
-  - Modify tasks
-  - Create new agents
-  - Create multiple teams
-- Tools remain unchanged and reusable
-
----
-
-## Example: OCI Vault
-
-### Files
-
-| File | Description |
-|-----|------------|
-| `oci_vault_tools.sql` | Installs Vault PL/SQL package, config table, and AI tools |
-| `oci_vault_agent.sql` | Creates a sample Vault task, agent, and team |
-
----
-
-### Supported Capabilities
-
-The Vault tools support:
-
-- List secrets
-- Get secret metadata
-- Create secrets
-- Update secrets / rotate versions
-- List secret versions
-- Get specific secret versions
-- Schedule and cancel deletions
-- Change secret compartment
-
-**All operations:**
-- Use persisted configuration
-- Require confirmation for destructive actions
-- Never expose secret payloads unintentionally
-
----
-
-## Installation Order (Recommended)
-
-For each OCI service:
-
-1. Run `*_tools.sql`
-2. Run `*_agent.sql` (optional, for sample agent)
-
-### Example (OCI Vault)
-
-```sql
--- Step 1: Install tools
-sqlplus admin@db @oci_vault_tools.sql <INSTALL_SCHEMA>
-
--- Step 2: Install sample agent
-sqlplus admin@db @oci_vault_agent.sql
-```
-
----
-
-## Customization & Extension
-
-- Create your own tasks, agents, and teams
-- Tools remain stable and reusable
-- Multiple agents can share the same tools
-- Configuration can be updated in:
-
-```sql
-OCI_AGENT_CONFIG
-```
-
----
-
-## Error Handling & Safety
-
-- Scripts exit immediately on SQL errors
-- All destructive OCI operations require confirmation
-- Tools return structured JSON containing:
-  - Status
-  - Headers
-  - Payload
-- Fully re-runnable with safe drop-and-create logic
+Anyone looking to build secure, database-native AI agents using Select AI can use this repository as a starting point.
 
 ---
 
 ## License
 
 This project is licensed under the **Universal Permissive License (UPL), Version 1.0**.
-
-See:
-https://oss.oracle.com/licenses/upl/
+See: https://oss.oracle.com/licenses/upl/
