@@ -178,25 +178,11 @@ The task enforces:
 
 ##  Extending and Generalizing the Agent
 
-### Recommended Pattern
-
-**Keep OCI logic inside tools.  
-Define behavior in tasks.  
-Bind permissions via AI profiles.**
-
 ### Example Extensions
 - Read-only Object Storage audit agent
 - Lifecycle and cost-optimization agent
 - Cross-region replication advisor
 - Security-focused retention enforcement agent
-
----
-
-##  Best Practices
-
-- Always confirm bucket and object deletions
-- Use lifecycle rules instead of manual cleanup
-- Monitor work requests for long-running operations
 
 ---
 

@@ -16,13 +16,13 @@ rem   AI Agent tools used to refine the Select AI NL2SQL operations
 rem   via Select AI Agent (Oracle AI Database).
 rem
 rem RELEASE VERSION
-rem   1.0
+rem   1.1
 rem
 rem RELEASE DATE
-rem   30-Jan-2026
+rem   6-Feb-2026
 rem
 rem MAJOR CHANGES IN THIS RELEASE
-rem   - Initial release
+rem   - Run compatibility with Web SQL Developer
 rem
 rem SCRIPT STRUCTURE
 rem   1. Initialization:
@@ -30,7 +30,7 @@ rem        - Grants
 rem        - Configuration setup
 rem
 rem   2. Package Deployment:
-rem        - &&INSTALL_SCHEMA.nl2sql_data_retrieval_agents
+rem        - &&SCHEMA_NAME.nl2sql_data_retrieval_agents
 rem          (package specification and body)
 rem
 rem   3. AI Tool Setup:
@@ -38,16 +38,14 @@ rem        - Creation of all NL2SQl data retrieval agent tools
 rem
 rem INSTALL INSTRUCTIONS
 rem   1. Connect as ADMIN or a user with required privileges
-rem   2. Run the script using SQL*Plus or SQLcl:
-rem
-rem      sqlplus admin@db @nl2sql_data_retrieval_tools.sql <INSTALL_SCHEMA>
-rem
+rem   2. Run the script using websqldeveloper/SQL Developer
 rem   3. Verify installation by checking tool registration
 rem      and package compilation status.
 rem
 rem PARAMETERS
-rem   INSTALL_SCHEMA (Required)
+rem   SCHEMA_NAME (Required)
 rem     Schema in which the package and tools will be created.
+rem
 rem ----------------------------------------------------------------------------
 rem GOOGLE CUSTOM SEARCH – SETUP INSTRUCTIONS
 rem ----------------------------------------------------------------------------
@@ -108,8 +106,8 @@ SET VERIFY OFF
 -- ============================================================================
 
 -- First argument: Schema Name (Required)
-ACCEPT SCHEMA_NAME CHAR PROMPT 'Enter schema name (required): '
-DEFINE INSTALL_SCHEMA = '&SCHEMA_NAME'
+VAR v_schema VARCHAR2(128)
+EXEC :v_schema := '&SCHEMA_NAME';
 
 -- Second argument: NL2SQL Data Retrieval Agent configuration (Required)
 PROMPT
@@ -131,10 +129,9 @@ PROMPT   "cxid_vault_secret_ocid":"ocid1.vaultsecret.oc1..aaaa",
 PROMPT   "api_key_vault_secret_ocid":"ocid1.vaultsecret.oc1..bbbb"
 PROMPT }
 PROMPT
-PROMPT
 
-ACCEPT INSTALL_CONFIG_JSON CHAR PROMPT 'Enter INSTALL_CONFIG_JSON (optional and can be set later in SELECTAI_AGENT_CONFIG table): '
-DEFINE INSTALL_CONFIG_JSON = '&INSTALL_CONFIG_JSON'
+VAR v_config VARCHAR2(256)
+EXEC :v_config := '&CONFIG_JSON';
 
 
 CREATE OR REPLACE PROCEDURE initialize_nl2sql_data_retrieval_agent(
@@ -145,11 +142,11 @@ IS
   l_use_rp              BOOLEAN := NULL;
   l_schema_name         VARCHAR2(128);
   c_nlb_agent CONSTANT  VARCHAR2(64) := 'NL2SQL_DATA_RETRIEVAL_AGENT';
-  l_credential_name   VARCHAR2(100);
-  l_oci_region        VARCHAR2(100);   
-  l_vault_secret_id1  VARCHAR2(512);
-  l_vault_secret_id2  VARCHAR2(512);
-  l_ai_profile        VARCHAR2(100);
+  l_credential_name     VARCHAR2(100);
+  l_oci_region          VARCHAR2(100);   
+  l_vault_secret_id1    VARCHAR2(512);
+  l_vault_secret_id2    VARCHAR2(512);
+  l_ai_profile          VARCHAR2(100);
 
   TYPE priv_list_t IS VARRAY(200) OF VARCHAR2(4000);
   l_priv_list CONSTANT priv_list_t := priv_list_t(
@@ -401,15 +398,20 @@ END initialize_nl2sql_data_retrieval_agent;
 -- Run the setup for the NL2SQL data retrieval AI agent.
 -------------------------------------------------------------------------------
 BEGIN
+
   initialize_nl2sql_data_retrieval_agent(
-    p_install_schema_name => '&&INSTALL_SCHEMA',
-    p_config_json         => '&&INSTALL_CONFIG_JSON'
+    p_install_schema_name => :v_schema,
+    p_config_json         => :v_config
   );
+
 END;
 /
 
-
-alter session set current_schema = &&INSTALL_SCHEMA;
+BEGIN
+  EXECUTE IMMEDIATE
+    'ALTER SESSION SET CURRENT_SCHEMA = ' || :v_schema;
+END;
+/
 
 ------------------------------------------------------------------------
 -- Package specification
@@ -965,7 +967,7 @@ END nl2sql_data_retrieval_functions;
 ------------------------------------------------------------------------------------------
 -- This procedure installs or refreshes the NL2SQL data retrieval Agent tools in the
 -- current schema. It drops any existing tool definitions and recreates them
--- pointing to the latest implementations in &&INSTALL_SCHEMA.nl2sql_data_retrieval_agents.
+-- pointing to the latest implementations in &&SCHEMA_NAME.nl2sql_data_retrieval_agents.
 ------------------------------------------------------------------------------------------
 
 CREATE OR REPLACE PROCEDURE initialize_nl2sql_data_retrieval_tools

@@ -19,11 +19,10 @@ rem RELEASE VERSION
 rem   1.1
 rem
 rem RELEASE DATE
-rem   30-Jan-2026
+rem   06-Feb-2026
 rem
 rem MAJOR CHANGES IN THIS RELEASE
-rem   - Initial release
-rem   - Added OCI Vault AI agent tool registrations
+rem - Run compatibility with Web SQL Developer
 rem
 rem SCRIPT STRUCTURE
 rem   1. Initialization:
@@ -31,7 +30,7 @@ rem        - Grants
 rem        - Configuration setup
 rem
 rem   2. Package Deployment:
-rem        - &&INSTALL_SCHEMA.oci_vault_agents
+rem        - &&SCHEMA_NAME.oci_vault_agents
 rem          (package specification and body)
 rem
 rem   3. AI Tool Setup:
@@ -40,19 +39,13 @@ rem
 rem INSTALL INSTRUCTIONS
 rem   1. Connect as ADMIN or a user with required privileges
 rem
-rem   2. Run the script using SQL*Plus or SQLcl:
+rem   2. Run the script using SQL Developer / Web SQL Developer.
 rem
-rem      sqlplus admin@db @oci_vault_agent_install.sql <INSTALL_SCHEMA> [CONFIG_JSON]
-rem
-rem   3. Minimal install (uses defaults):
-rem
-rem      sqlplus admin@db @oci_vault_tools.sql <INSTALL_SCHEMA>
-rem
-rem   4. Verify installation by checking tool registration
+rem   3. Verify installation by checking tool registration
 rem      and package compilation status.
 rem
 rem PARAMETERS
-rem   INSTALL_SCHEMA (Required)
+rem   SCHEMA_NAME (Required)
 rem     Schema in which the package and tools will be created.
 rem
 rem   CONFIG_JSON (Optional)
@@ -76,9 +69,8 @@ rem ============================================================================
 SET SERVEROUTPUT ON
 SET VERIFY OFF
 
--- First argument: Schema Name (Required)
-ACCEPT SCHEMA_NAME CHAR PROMPT 'Enter schema name: '
-DEFINE INSTALL_SCHEMA = '&SCHEMA_NAME'
+VAR v_schema VARCHAR2(128)
+EXEC :v_schema := '&SCHEMA_NAME';
 
 -- Second argument: JSON config (Optional)
 PROMPT
@@ -93,8 +85,8 @@ PROMPT Press ENTER to skip this step.
 PROMPT If not provided now, the configuration can be added later in the SELECTAI_AGENT_CONFIG table.
 PROMPT
 
-ACCEPT INSTALL_CONFIG_JSON CHAR PROMPT 'Enter INSTALL_CONFIG_JSON (optional): '
-DEFINE INSTALL_CONFIG_JSON = '&INSTALL_CONFIG_JSON'
+VAR v_config VARCHAR2(256)
+EXEC :v_config := '&CONFIG_JSON';
 
 -------------------------------------------------------------------------------
 -- Initializes the OCI Vault AI Agent. This procedure:
@@ -357,19 +349,25 @@ EXCEPTION
     RAISE;
 END initialize_vault_agent;
 /
+
 -------------------------------------------------------------------------------
 -- Call initialize_vault_agent procedure
 -------------------------------------------------------------------------------
 BEGIN
+
   initialize_vault_agent(
-    p_install_schema_name => '&&INSTALL_SCHEMA',
-    p_config_json         => '&&INSTALL_CONFIG_JSON'
+    p_install_schema_name => :v_schema,
+    p_config_json         => :v_config
   );
+
 END;
 /
 
-
-alter session set current_schema = &&INSTALL_SCHEMA;
+BEGIN
+  EXECUTE IMMEDIATE
+    'ALTER SESSION SET CURRENT_SCHEMA = ' || :v_schema;
+END;
+/
 
 ------------------------------------------------------------------------
 -- Package specification
