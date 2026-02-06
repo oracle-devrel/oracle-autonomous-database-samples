@@ -20,22 +20,6 @@ This **NL2SQL Data Retrieval Agent** addresses these limitations by combining:
 
 into a **single autonomous agent workflow**.
 
-###  Key Advantages Over Plain NL2SQL
-
-| Capability | Plain Select AI NL2SQL | This Agent |
-|----------|------------------------|------------|
-| SQL generation | ✅ | ✅ |
-| Automatic retry on failure | ❌ | ✅ |
-| Distinct value discovery | ❌ | ✅ |
-| Range discovery (DATE / NUMBER) | ❌ | ✅ |
-| Predicate refinement | ❌ | ✅ |
-| External web search | ❌ | ✅ |
-| URL content validation | ❌ | ✅ |
-| Chart generation | ❌ | ✅ |
-| Config-driven and extensible | ❌ | ✅ |
-
-> **Result:** Higher accuracy, fewer hallucinations, accurate SQL, and richer analytical answers.
-
 ---
 
 ##  Architecture Overview

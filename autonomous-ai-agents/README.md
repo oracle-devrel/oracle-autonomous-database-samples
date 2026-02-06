@@ -64,6 +64,17 @@ The repository is organized to align with the Select AI Agent framework:
 
 ---
 
+## Creating a Select AI Profile
+
+Before using Autonomous Database AI agents, you must create a Select AI profile using DBMS_CLOUD_AI.
+
+Oracle provides several examples demonstrating how to create AI profiles for different providers and models. See the documentation below and follow one of the examples to create your profile:
+
+Select AI profile management documentation:
+https://docs.oracle.com/en-us/iaas/autonomous-database-serverless/doc/select-ai-manage-profiles.html#GUID-3721296F-14A1-428A-B464-7FA25E9EC8F3
+
+Start by reviewing the examples in this documentation and create a profile appropriate for your environment (OCI Generative AI, OpenAI, Azure OpenAI, etc.). The profile name you create will be used later when configuring AI agents.
+
 ## Agent Configuration (`SELECTAI_AGENT_CONFIG`)
 
 ### Overview

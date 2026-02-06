@@ -22,10 +22,10 @@ rem     - Creating an NL2SQL Team linking the agent and task
 rem     - Executing the installer procedure to complete setup
 rem
 rem RELEASE VERSION
-rem   1.0
+rem   1.1
 rem
 rem RELEASE DATE
-rem   30-Jan-2026
+rem   06-Feb-2026
 rem
 rem MAJOR CHANGES IN THIS RELEASE
 rem   - Initial release
@@ -93,34 +93,35 @@ rem ============================================================================
 
 SET SERVEROUTPUT ON
 SET VERIFY OFF
-WHENEVER SQLERROR EXIT SQL.SQLCODE
 
 PROMPT ======================================================
 PROMPT NL2SQL Data Retrieval Agent Installer
 PROMPT ======================================================
 
--- Target schema (MANDATORY)
-ACCEPT SCHEMA_NAME CHAR PROMPT 'Enter target schema name (required): '
-DEFINE INSTALL_SCHEMA = '&SCHEMA_NAME'
+-- Target schema
+VAR v_schema VARCHAR2(128)
+EXEC :v_schema := '&SCHEMA_NAME';
 
--- AI Profile (MANDATORY)
-ACCEPT PROFILE_NAME CHAR PROMPT 'Enter AI Profile name (required): '
-DEFINE PROFILE_NAME = '&PROFILE_NAME'
+-- AI Profile
+VAR v_ai_profile_name VARCHAR2(128)
+EXEC :v_ai_profile_name := '&AI_PROFILE_NAME';
 
-
-PROMPT ------------------------------------------------------
-PROMPT Installing into schema: &&INSTALL_SCHEMA
-PROMPT Using AI Profile      : &&PROFILE_NAME
-PROMPT ------------------------------------------------------
 
 ----------------------------------------------------------------
 -- 1. Grants (safe to re-run)
 ----------------------------------------------------------------
+DECLARE
+  l_sql VARCHAR2(500);
 BEGIN
-  DBMS_OUTPUT.PUT_LINE('Granting required privileges to &&INSTALL_SCHEMA ...');
-  EXECUTE IMMEDIATE 'GRANT EXECUTE ON DBMS_CLOUD_AI_AGENT TO &&INSTALL_SCHEMA';
-  EXECUTE IMMEDIATE 'GRANT EXECUTE ON DBMS_CLOUD_AI TO &&INSTALL_SCHEMA';
-  EXECUTE IMMEDIATE 'GRANT EXECUTE ON DBMS_CLOUD TO &&INSTALL_SCHEMA';
+  l_sql := 'GRANT EXECUTE ON DBMS_CLOUD_AI_AGENT TO ' || :v_schema;
+  EXECUTE IMMEDIATE l_sql;
+
+  l_sql := 'GRANT EXECUTE ON DBMS_CLOUD_AI TO ' || :v_schema;
+  EXECUTE IMMEDIATE l_sql;
+
+  l_sql := 'GRANT EXECUTE ON DBMS_CLOUD TO ' || :v_schema;
+  EXECUTE IMMEDIATE l_sql;
+
   DBMS_OUTPUT.PUT_LINE('Grants completed.');
 END;
 /
@@ -129,9 +130,13 @@ END;
 ----------------------------------------------------------------
 -- 2. Create installer procedure in target schema
 ----------------------------------------------------------------
-PROMPT Creating installer procedure in &&INSTALL_SCHEMA ...
+BEGIN
+  EXECUTE IMMEDIATE
+    'ALTER SESSION SET CURRENT_SCHEMA = ' || :v_schema;
+END;
+/
 
-CREATE OR REPLACE PROCEDURE &&INSTALL_SCHEMA..data_retrieval_agent (
+CREATE OR REPLACE PROCEDURE data_retrieval_agent (
   p_profile_name IN VARCHAR2
 )
 AUTHID DEFINER
@@ -139,7 +144,6 @@ AS
 BEGIN
   DBMS_OUTPUT.PUT_LINE('--------------------------------------------');
   DBMS_OUTPUT.PUT_LINE('Starting Data Retrieval Agent Team installation');
-  DBMS_OUTPUT.PUT_LINE('Schema : ' || USER);
   DBMS_OUTPUT.PUT_LINE('--------------------------------------------');
   
   ------------------------------------------------------------
@@ -165,7 +169,7 @@ BEGIN
     END;
     
   ------------------------------------------------------------
-  -- DROP & CREATE TASK
+  -- DROP and CREATE TASK
   ------------------------------------------------------------
   BEGIN
     DBMS_CLOUD_AI_AGENT.DROP_TASK('NL2SQL_DATA_RETRIEVAL_TASK');
@@ -215,7 +219,7 @@ BEGIN
   DBMS_OUTPUT.PUT_LINE('Created task NL2SQL_DATA_RETRIEVAL_TASK');
 
   ------------------------------------------------------------
-  -- DROP & CREATE AGENT
+  -- DROP and CREATE AGENT
   ------------------------------------------------------------
   BEGIN
     DBMS_CLOUD_AI_AGENT.DROP_AGENT('NL2SQL_DATA_RETRIEVAL_AGENT');
@@ -240,7 +244,7 @@ BEGIN
   DBMS_OUTPUT.PUT_LINE('Created agent NL2SQL_DATA_RETRIEVAL_AGENT');
 
   ------------------------------------------------------------
-  -- DROP & CREATE TEAM
+  -- DROP and CREATE TEAM
   ------------------------------------------------------------
   BEGIN
     DBMS_CLOUD_AI_AGENT.DROP_TEAM('NL2SQL_DATA_RETRIEVAL_TEAM');
@@ -259,7 +263,6 @@ BEGIN
         '}'
   );
 
-  
   DBMS_OUTPUT.PUT_LINE('Created team NL2SQL_DATA_RETRIEVAL_TEAM');
 
   DBMS_OUTPUT.PUT_LINE('------------------------------------------------');
@@ -274,7 +277,7 @@ END data_retrieval_agent;
 ----------------------------------------------------------------
 PROMPT Executing installer procedure ...
 BEGIN
-  &&INSTALL_SCHEMA..data_retrieval_agent('&&PROFILE_NAME');
+  data_retrieval_agent(p_profile_name => :v_ai_profile_name);
 END;
 /
 
@@ -283,10 +286,3 @@ PROMPT Installation finished successfully
 PROMPT ======================================================
 
 alter session set current_schema = ADMIN;
-
-
-
-
-
-
-

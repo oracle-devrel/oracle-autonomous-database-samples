@@ -28,7 +28,7 @@ rem RELEASE VERSION
 rem   1.1
 rem
 rem RELEASE DATE
-rem   30-Jan-2026
+rem   06-Feb-2026
 rem
 rem MAJOR CHANGES IN THIS RELEASE
 rem   - Initial release
@@ -96,32 +96,34 @@ rem ============================================================================
 
 SET SERVEROUTPUT ON
 SET VERIFY OFF
-WHENEVER SQLERROR EXIT SQL.SQLCODE
 
 PROMPT ======================================================
 PROMPT OCI Network Load Balancer AI Agent Installer
 PROMPT ======================================================
 
 -- Target schema
-ACCEPT SCHEMA_NAME CHAR PROMPT 'Enter target schema name: '
-DEFINE INSTALL_SCHEMA = '&SCHEMA_NAME'
+VAR v_schema VARCHAR2(128)
+EXEC :v_schema := '&SCHEMA_NAME';
 
 -- AI Profile
-ACCEPT PROFILE_NAME CHAR PROMPT 'Enter AI Profile name to be used with the Agent: '
-DEFINE PROFILE_NAME = '&PROFILE_NAME'
-
-PROMPT ------------------------------------------------------
-PROMPT Installing into schema: &&INSTALL_SCHEMA
-PROMPT Using AI Profile     : &&PROFILE_NAME
-PROMPT ------------------------------------------------------
+VAR v_ai_profile_name VARCHAR2(128)
+EXEC :v_ai_profile_name := '&AI_PROFILE_NAME';
 
 ----------------------------------------------------------------
 -- 1. Grants (safe to re-run)
 ----------------------------------------------------------------
+DECLARE
+  l_sql VARCHAR2(500);
 BEGIN
-  DBMS_OUTPUT.PUT_LINE('Granting required privileges to &&INSTALL_SCHEMA ...');
-  EXECUTE IMMEDIATE 'GRANT EXECUTE ON DBMS_CLOUD_AI_AGENT TO &&INSTALL_SCHEMA';
-  EXECUTE IMMEDIATE 'GRANT EXECUTE ON DBMS_CLOUD TO &&INSTALL_SCHEMA';
+  l_sql := 'GRANT EXECUTE ON DBMS_CLOUD_AI_AGENT TO ' || :v_schema;
+  EXECUTE IMMEDIATE l_sql;
+
+  l_sql := 'GRANT EXECUTE ON DBMS_CLOUD_AI TO ' || :v_schema;
+  EXECUTE IMMEDIATE l_sql;
+
+  l_sql := 'GRANT EXECUTE ON DBMS_CLOUD TO ' || :v_schema;
+  EXECUTE IMMEDIATE l_sql;
+
   DBMS_OUTPUT.PUT_LINE('Grants completed.');
 END;
 /
@@ -129,9 +131,13 @@ END;
 ----------------------------------------------------------------
 -- 2. Create installer procedure in target schema
 ----------------------------------------------------------------
-PROMPT Creating installer procedure in &&INSTALL_SCHEMA ...
+BEGIN
+  EXECUTE IMMEDIATE
+    'ALTER SESSION SET CURRENT_SCHEMA = ' || :v_schema;
+END;
+/
 
-CREATE OR REPLACE PROCEDURE &&INSTALL_SCHEMA..install_oci_network_load_balancer_agent (
+CREATE OR REPLACE PROCEDURE install_oci_network_load_balancer_agent (
   p_profile_name IN VARCHAR2
 )
 AUTHID DEFINER
@@ -139,11 +145,10 @@ AS
 BEGIN
   DBMS_OUTPUT.PUT_LINE('--------------------------------------------');
   DBMS_OUTPUT.PUT_LINE('Starting OCI Network Load Balancer AI installation');
-  DBMS_OUTPUT.PUT_LINE('Schema : ' || USER);
   DBMS_OUTPUT.PUT_LINE('--------------------------------------------');
 
   ------------------------------------------------------------
-  -- DROP & CREATE TASK
+  -- DROP and CREATE TASK
   ------------------------------------------------------------
   BEGIN
     DBMS_CLOUD_AI_AGENT.DROP_TASK('OCI_NETWORK_LOAD_BALANCER_TASKS');
@@ -189,7 +194,7 @@ BEGIN
   DBMS_OUTPUT.PUT_LINE('Created task OCI_NETWORK_LOAD_BALANCER_TASKS');
 
   ------------------------------------------------------------
-  -- DROP & CREATE AGENT
+  -- DROP and CREATE AGENT
   ------------------------------------------------------------
   BEGIN
     DBMS_CLOUD_AI_AGENT.DROP_AGENT('OCI_NETWORK_LOAD_BALANCER_ADVISOR');
@@ -211,7 +216,7 @@ BEGIN
   DBMS_OUTPUT.PUT_LINE('Created agent OCI_NETWORK_LOAD_BALANCER_ADVISOR');
 
   ------------------------------------------------------------
-  -- DROP & CREATE TEAM
+  -- DROP and CREATE TEAM
   ------------------------------------------------------------
   BEGIN
     DBMS_CLOUD_AI_AGENT.DROP_TEAM('OCI_NETWORK_LOAD_BALANCER_TEAM');
@@ -241,9 +246,11 @@ END install_oci_network_load_balancer_agent;
 ----------------------------------------------------------------
 PROMPT Executing installer procedure ...
 BEGIN
-  &&INSTALL_SCHEMA..install_oci_network_load_balancer_agent('&&PROFILE_NAME');
+  install_oci_network_load_balancer_agent(p_profile_name => :v_ai_profile_name);
 END;
 /
+
+alter session set current_schema = ADMIN;
 
 PROMPT ======================================================
 PROMPT Installation finished successfully
