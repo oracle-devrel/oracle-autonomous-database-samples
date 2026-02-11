@@ -1,0 +1,6 @@
+26.2.1.2 - 05 February 2005
+ + Added support to query the TTS Backup Utility version
+ + Updated RMAN and Data Pump job names to include the project name
+ + Added validation to ensure the tablespace list remains unaltered across backups
+ + Added support for resumable TTS backups
+ + Improved password handling for ZDM-based workflows

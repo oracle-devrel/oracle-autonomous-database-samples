@@ -112,8 +112,7 @@ Leave these a blank unless really needed.
 
 ***DVREALM_USER*** - (OPTIONAL INPUT) Required only if Database Vault is enabled and configured in the source database. Specify a Database Vault realm owner or authorized user required to access objects protected by Database Vault during the backup process. If not provided and Database Vault is enabled, backup will fail with an error.
 
-***DVREALM_PASSWORD*** - (OPTIONAL INPUT) Required only if Database Vault is enabled and configured in the source.Password for the specified DVREALM_USER. If not provided and Database Vault is enabled, backup will fail with an error.
-
+***DVREALM_PASSWORD*** - (RUNTIME INPUT) Required only if Database Vault is enabled and configured in the source. Password for the specified DVREALM_USER. If not provided and Database Vault is enabled, backup will fail with an error. Provide as CLI runtime input when prompted. This prompt appears only if DVREALM_USER is provided.
 
 **Backup Utility Sample Inputs**
 ```
@@ -175,7 +174,6 @@ Leave these a blank unless really needed.
   TRANSPORT_TABLES_PROTECTED_BY_OLS_POLICIES=FALSE
   TRANSPORT_DB_PROTECTED_BY_DATABASE_VAULT=FALSE
   DVREALM_USER=
-  DVREALM_PASSWORD=
 ```
 
 Run the TTS Backup Tool from the project directory as below. User will be prompted for database password and optional TDE wallet store password.
@@ -190,6 +188,14 @@ Run the TTS Backup Tool from the project directory as below. User will be prompt
 ```
 
 The tool will take backups of the tablespace datafiles and create a metadata bundle. Both backups and the bundle will be uploaded to the provided OCI Object Storage buckets or FSS Mount Targets. Backup Utility will output an URL to OCI Object Storage metadata bundle or FSS Mount Target path for metadata bundle. User should note the given URL/Path as that will be needed as migration input when creating Autonomous AI Database for the migration.
+
+**TTS Backup Utility Version**
+
+To check the version of the TTS Backup Utility being used, run the command below
+
+```
+  $ python3 tts-backup.py --version
+```
 
 ### Create Dynamic Group and Policy
 
@@ -222,7 +228,7 @@ The operation will first create the database and then trigger migration operatio
 
 ### Incremental Migration
 
-If user is performing an incremental migration operation, repeat Backup Tablespaces step at source database for each incremental using the same set of inputs. Backup Utility will output a new OCI Object Storage URL / FSS Mount Target path corresponding to that increment. Use the OCI Object Storage URL to update the Autonomous AI Database created with the first backup above. Set FINAL_BACKUP=TRUE in the input file before performing final backup.
+If user is performing an incremental migration operation, repeat Backup Tablespaces step at source database for each incremental using the same set of inputs. Do not alter the tablespace list during incremental backups. Use the Tablespace list provided during first backup. Backup Utility will output a new OCI Object Storage URL / FSS Mount Target path corresponding to that increment. Use the OCI Object Storage URL to update the Autonomous AI Database created with the first backup above. Set FINAL_BACKUP=TRUE in the input file before performing final backup.
 
 ### Modify Autonomous AI Database with Migration inputs
 
@@ -314,7 +320,7 @@ Open tts-backup-env.txt file downloaded to the project directory and provide the
 
 ***DVREALM_USER*** - (OPTIONAL INPUT) Required only if Database Vault is enabled and configured in the source database. Specify a Database Vault realm owner or authorized user required to access objects protected by Database Vault during the backup process. If not provided and Database Vault is enabled, backup will fail with an error.
 
-***DVREALM_PASSWORD*** - (OPTIONAL INPUT) Required only if Database Vault is enabled and configured in the source.Password for the specified DVREALM_USER. If not provided and Database Vault is enabled, backup will fail with an error.
+***DVREALM_PASSWORD*** - (RUNTIME INPUT) Required only if Database Vault is enabled and configured in the source. Password for the specified DVREALM_USER. If not provided and Database Vault is enabled, backup will fail with an error. Provide as CLI runtime input when prompted. This prompt appears only if DVREALM_USER is provided.
 
 **Backup Utility Sample Inputs**
 ```
@@ -371,7 +377,6 @@ Open tts-backup-env.txt file downloaded to the project directory and provide the
   TRANSPORT_TABLES_PROTECTED_BY_OLS_POLICIES=FALSE
   TRANSPORT_DB_PROTECTED_BY_DATABASE_VAULT=FALSE
   DVREALM_USER=
-  DVREALM_PASSWORD=
 ```
 
 Run the TTS Backup Tool from the project directory as below. User will be prompted for database password and optional TDE wallet store password.
@@ -386,6 +391,14 @@ Run the TTS Backup Tool from the project directory as below. User will be prompt
 ```
 
 The tool will take backups of the tablespace datafiles and create a metadata bundle. Both backups and the bundle will be uploaded to backup and metadata directories under the File System - Export path. Backup Utility will output an URL to FSS file path for the metadata bundle. User should note the given FSS file path as that will be needed as migration input when creating Autonomous AI Database for the migration.
+
+**TTS Backup Utility Version**
+
+To check the version of the TTS Backup Utility being used, run the command below
+
+```
+  $ python3 tts-backup.py --version
+```
 
 ### Create Autonomous AI Database with Migration inputs
 
@@ -405,7 +418,7 @@ The operation will first create the database and then trigger migration operatio
 
 ### Incremental Migration
 
-If user is performing an incremental migration operation, repeat Backup Tablespaces step at source database for each incremental using the same set of inputs. Backup Utility will output a new OCI Object Storage URL / FSS Mount Target path corresponding to that increment. Use the FSS file path to update the Autonomous AI Database created with the first backup above. Set FINAL_BACKUP=TRUE in the input file before performing final backup.
+If user is performing an incremental migration operation, repeat Backup Tablespaces step at source database for each incremental using the same set of inputs. Do not alter the tablespace list during incremental backups. Use the Tablespace list provided during first backup. Backup Utility will output a new OCI Object Storage URL / FSS Mount Target path corresponding to that increment. Use the FSS file path to update the Autonomous AI Database created with the first backup above. Set FINAL_BACKUP=TRUE in the input file before performing final backup.
 
 ### Modify Autonomous AI Database with Migration inputs
 
