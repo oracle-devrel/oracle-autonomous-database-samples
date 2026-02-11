@@ -26,13 +26,37 @@ from datetime import datetime
 print = functools.partial(print, flush=True)
 print_stderr = functools.partial(print, file=sys.stderr, flush=True)
 
+# stdin key value
+# input : ['DBPASSWORD':'value1','TDE_WALLET_STORE_PASSWORD':'value2','DVREALM_PASSWORD':'value3']
+# TODO : Encrypt and Decrypt the password
+def parse_stdin_kv(line):
+    data = {}
+    line = line.strip("[]")
+    for item in line.split(","):
+        if ":" in item:
+            k, v = item.split(":", 1)
+            data[k.strip("'").upper()] = v.strip("'")
+    return data
+
 def secure_input(prompt):
   # Interactive shell (e.g., manual input)
-  if sys.stdin.isatty():  
+  if sys.stdin.isatty():
     return getpass.getpass(prompt)
   # Non-interactive (e.g., piped from echo or file)
-  else:  
+  else:
     return sys.stdin.readline().strip()
+
+def get_tts_tool_version(filename):
+  """
+    Reads the first line of the version file and returns the version number.
+    Returns 'unknown' if the file is missing.
+  """
+  try:
+    with open(filename, "r") as f:
+        first_line = f.readline().strip()
+    return first_line.split()[0]
+  except (FileNotFoundError, IndexError):
+    return "unknown"
 
 # Check if the current Python version meets the minimum requirement.
 def check_python_version(min_version):
@@ -42,6 +66,23 @@ def check_python_version(min_version):
 # Return the absolute path of the directory containing the script.
 def scriptpath():
   return os.path.dirname(os.path.realpath(__file__))
+
+def log_start_time():
+    """
+    Logs the start time
+    """
+    start_time = datetime.utcnow()
+    print(f"Start Time (UTC): {start_time}")
+    return start_time
+
+def log_end_time(start_time):
+    """
+    Logs the end time
+    """
+    end_time = datetime.utcnow()
+    elapsed = end_time - start_time
+    print(f"Complete Time (UTC): {end_time}")
+    print(f"Elapsed Time: {elapsed}\n")
 
 # Return the single quotes comma-seperated item_list as string
 def split_into_lines(items, to_upper=True, chunk_size=10):
@@ -120,15 +161,21 @@ class Environment:
     print_stderr("=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=")
     print_stderr("optional arguments allowed : --IGNORE_NON_FATAL_ERRORS, --JDK8_PATH")
     print_stderr("runtime required inputs    : DBPASSWORD")
-    print_stderr("runtime optional inputs    : TDE_WALLET_STORE_PASSWORD")
+    print_stderr("runtime optional inputs    : TDE_WALLET_STORE_PASSWORD, DVREALM_PASSWORD")
     print_stderr("=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=")
     print_stderr("Provide inputs during runtime manually - ")
     print_stderr("        Usage: python3 " + sys.argv[0] + " [OPTIONS]")
     print_stderr("        Example: python3 " + sys.argv[0] + " --IGNORE_NON_FATAL_ERRORS=<True/False> --JDK8_PATH=<path to jdk8> ")
     print_stderr("")
     print_stderr("Or provide inputs via standard input (e.g., for automation):")
-    print_stderr("        Usage: echo -e \"<DBPASSWORD>\\n<TDE_WALLET_STORE_PASSWORD>\" | python3 " + sys.argv[0] + " [OPTIONS]")
-    print_stderr("        (If TDE not applicable) Usage: echo -e \"<DBPASSWORD>\" | python3 " + sys.argv[0] + " [OPTIONS]")
+    print_stderr("        (TDE and DV applicable):")
+    print_stderr("        echo -e \"<DBPASSWORD>\\n<TDE_WALLET_STORE_PASSWORD>\\n<DVREALM_PASSWORD>\" | python3 " + sys.argv[0] + " [OPTIONS]")
+    print_stderr("        (TDE applicable, DV not applicable):")
+    print_stderr("        echo -e \"<DBPASSWORD>\\n<TDE_WALLET_STORE_PASSWORD>\" | python3 " + sys.argv[0] + " [OPTIONS]")
+    print_stderr("        (TDE not applicable, DV applicable):")
+    print_stderr("        echo -e \"<DBPASSWORD>\\n\\n<DVREALM_PASSWORD>\" | python3 " + sys.argv[0] + " [OPTIONS]")
+    print_stderr("        (TDE and DV not applicable):")
+    print_stderr("        echo -e \"<DBPASSWORD>\" | python3 " + sys.argv[0] + " [OPTIONS]")
     print_stderr("=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=")
     print_stderr("        ARGUMENTS DESCRIPTION      ")
     print_stderr("=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=")
@@ -166,22 +213,6 @@ class Environment:
     """Load environment variables from the config file and set them as class attributes."""
     self._env.read(self.env_file)
     self._defaults = self._env['DEFAULT']
-
-    # Intialise Runtime Input vars...
-    runtime_vars = ['DBPASSWORD', 'TDE_WALLET_STORE_PASSWORD']
-    for key in runtime_vars:
-      if key == "DBPASSWORD":
-        value = secure_input(f"Enter database password: ").strip()
-        if not value:
-          print(f"Missing required variable: {key}")
-          self.usage()
-      else:
-        value = secure_input(
-                f"Enter TDE wallet store password (optional) \n"
-                f"Required only if any of the tablespaces are TDE encrypted "
-                f"(leave empty and press Enter if not applicable): "
-            ).strip()
-      setattr(self, key, value)
     
     # Define and load required variables
     value_fss = self._defaults.get('TTS_FSS_CONFIG', '').strip()
@@ -243,12 +274,52 @@ class Environment:
     optional_vars = ['SCHEMAS', 'TABLESPACES', 'OCI_INSTALLER_PATH',
                      'OCI_PROXY_HOST', 'OCI_PROXY_PORT', 'CLUSTER_MODE',
                      'DRCC_REGION', 'DRY_RUN', 'EXCLUDE_TABLES', 'EXCLUDE_STATISTICS', 
-                     'TRANSPORT_TABLES_PROTECTED_BY_REDACTION_POLICIES', 'TRANSPORT_TABLES_PROTECTED_BY_OLS_POLICIES', 'TRANSPORT_DB_PROTECTED_BY_DATABASE_VAULT','DVREALM_USER', 'DVREALM_PASSWORD']
+                     'TRANSPORT_TABLES_PROTECTED_BY_REDACTION_POLICIES', 'TRANSPORT_TABLES_PROTECTED_BY_OLS_POLICIES',
+                     'TRANSPORT_DB_PROTECTED_BY_DATABASE_VAULT','DVREALM_USER',
+                     'ZDM_BASED_TRANSPORT']
     for var in optional_vars:
       value = self._defaults.get(var, '').strip()
       if value and (var == 'TABLESPACES' or var == 'SCHEMAS'):
         value = value.replace(" ", "")
       setattr(self, var, value)
+    
+    if getattr(self, 'ZDM_BASED_TRANSPORT').strip():
+      # Intialise Runtime Input vars... (ZDM Transport)
+      stdin_line = sys.stdin.readline().strip()
+      parsed = parse_stdin_kv(stdin_line) if stdin_line else {}
+      runtime_vars = ['DBPASSWORD', 'TDE_WALLET_STORE_PASSWORD', 'DVREALM_PASSWORD']
+      for key in runtime_vars:
+        if key == "DBPASSWORD":
+          value = parsed.get("DBPASSWORD", "")
+          if not value:
+            print(f"Missing required variable: {key}")
+        elif key == "TDE_WALLET_STORE_PASSWORD":
+          value = parsed.get("TDE_WALLET_STORE_PASSWORD", "")
+        else:
+          value = parsed.get("DVREALM_PASSWORD", "")
+        
+        setattr(self, key, value)
+    else:
+      # Intialise Runtime Input vars... (NON-ZDM Transport)
+      runtime_vars = ['DBPASSWORD', 'TDE_WALLET_STORE_PASSWORD']
+      if getattr(self, 'DVREALM_USER').strip():
+        runtime_vars.append('DVREALM_PASSWORD')
+      for key in runtime_vars:
+        if key == "DBPASSWORD":
+          value = secure_input(f"Enter database password: ").strip()
+          if not value:
+            print(f"Missing required variable: {key}")
+            self.usage()
+        elif key == "TDE_WALLET_STORE_PASSWORD":
+          value = secure_input(
+                  f"Enter TDE wallet store password (optional) \n"
+                  f"Required only if any of the tablespaces are TDE encrypted "
+                  f"(leave empty and press Enter if not applicable): "
+              ).strip()
+        else:
+          value = secure_input("Enter Database Vault password: ").strip()
+
+        setattr(self, key, value)
 
     # Load optional int variables; set to 0 if not found
     numeric_vars = ['PARALLELISM']
@@ -263,7 +334,7 @@ class Environment:
         print(f"Value Error for {var}: {e}. Expected an integer.")
 
     # Initialise CPU_COUNT  
-    setattr(self, 'CPU_COUNT', 0)  
+    setattr(self, 'CPU_COUNT', 0)
 
   def _preprocess(self):
     """Perform preprocessing tasks, removing files and setting default values."""
@@ -278,6 +349,7 @@ class Environment:
     setattr(self, 'TRANSPORT_TABLES_PROTECTED_BY_REDACTION_POLICIES', getattr(self, 'TRANSPORT_TABLES_PROTECTED_BY_REDACTION_POLICIES', 'FALSE') or 'FALSE')
     setattr(self, 'TRANSPORT_TABLES_PROTECTED_BY_OLS_POLICIES', getattr(self, 'TRANSPORT_TABLES_PROTECTED_BY_OLS_POLICIES', 'FALSE') or 'FALSE')
     setattr(self, 'TRANSPORT_DB_PROTECTED_BY_DATABASE_VAULT', getattr(self, 'TRANSPORT_DB_PROTECTED_BY_DATABASE_VAULT', 'FALSE') or 'FALSE')
+    setattr(self, 'ZDM_BASED_TRANSPORT', getattr(self, 'ZDM_BASED_TRANSPORT', 'FALSE') or 'FALSE')
 
     final_backup = getattr(self, 'FINAL_BACKUP').strip().upper()
     if final_backup not in ['TRUE', 'FALSE']:
@@ -295,6 +367,11 @@ class Environment:
     dvops_protection = getattr(self, 'TRANSPORT_DB_PROTECTED_BY_DATABASE_VAULT').strip().upper()
     if dvops_protection not in ['TRUE', 'FALSE']:
       raise ValueError(f"TRANSPORT_DB_PROTECTED_BY_DATABASE_VAULT value should be one of ['TRUE' , 'FALSE' , 'true' , 'false'] but value is {dvops_protection}.")
+    
+    zdm_transport = getattr(self, 'ZDM_BASED_TRANSPORT').strip().upper()
+    if zdm_transport not in ['TRUE', 'FALSE']:
+      raise ValueError(f"ZDM_BASED_TRANSPORT value should be one of ['TRUE' , 'FALSE' , 'true' , 'false'] but value is {zdm_transport}.")
+
 
     db_version = getattr(self, 'DB_VERSION').strip().lower()
     if db_version not in ['11g', '12c', '19c', '23ai']:
@@ -374,6 +451,7 @@ class Environment:
         project_data = json.load(f)
         setattr(self, 'BACKUP_LEVEL', project_data.get('backup_level'))
         setattr(self, 'INCR_SCN', project_data.get('incr_scn'))
+        setattr(self, 'level0_tablespaces', project_data.get('tablespaces'))
       print((f"Loaded existing project manifest file: {tts_project_file} \n"))
 
   def _setup_backup_directories(self):
@@ -640,6 +718,10 @@ class TTS_SRC_RUN_VALIDATIONS:
   def _validate_tablespaces(self, template):
     """Tablespace validation"""
     print("Validating tablespaces...")
+    if self._env.BACKUP_LEVEL != 0:
+      print("Check if tablespace list is changed during incremental backups")
+      self._validate_tablespaces_list()
+
     ts_array = self._env.TABLESPACES.split(',')
     ts_list = split_into_lines(self._env.TABLESPACES)
     ts_count = len(ts_array)
@@ -648,8 +730,6 @@ class TTS_SRC_RUN_VALIDATIONS:
 
     exc_tbl_list = split_into_lines(self._env.EXCLUDE_TABLES, False)
 
-    self._validate_tablespace_count(ts_list, ts_count)
-    
     print("Finding plsql objects that are not transported due to owner not in transport list")
     self._run_object_validation(template, ts_list, sc_list)
 
@@ -718,6 +798,26 @@ class TTS_SRC_RUN_VALIDATIONS:
         print(f" Review: {_log_file}\n")
         if self._env.DRY_RUN.strip().upper() == "FALSE":
           sys.exit(1)
+  
+  def _validate_tablespaces_list(self):
+    ts_array = self._env.TABLESPACES.split(',')
+    level0_ts_array = self._env.level0_tablespaces
+
+    ts_set = {ts.strip().upper() for ts in ts_array if ts.strip()}
+    level0_ts_set = {ts.strip().upper() for ts in level0_ts_array if ts.strip()}
+    missing_ts = sorted(level0_ts_set - ts_set)
+    new_ts = sorted(ts_set - level0_ts_set)
+
+    if not missing_ts and not new_ts:
+      return
+    if missing_ts:
+      print(f"Missing tablespaces from level_{self._env.BACKUP_LEVEL}_backup: {missing_ts}")
+    if new_ts:
+      print(f"New tablespaces added in level_{self._env.BACKUP_LEVEL}_backup: {new_ts}")
+    print(
+    "WARNING: The tablespace list specified during the level 0 backup must not be altered.")
+    print(f"Proceeding with the list specified during level 0: {level0_ts_set}")
+    self._env.TABLESPACES = ",".join(level0_ts_array)
 
   def _run_tablespace_validation_script(self, template, tablespace, sc_list, exc_tbl_list):
     """Run SQL validation for a single tablespace."""
@@ -837,12 +937,14 @@ class TTS_SRC_RUN_VALIDATIONS:
     with open(log_file, 'r') as log:
       dvrealm_output = log.read().strip()
     dvrealm_array = dvrealm_output.split(',')
-    
-    if int(dvrealm_array[0]) > 0 and int(dvrealm_array[1]) > 0 and int(dvrealm_array[2]) > 0: 
+
+    is_dv_enabled = all(int(x) > 0 for x in dvrealm_array[:3])
+    if is_dv_enabled: 
       if not self._env.DVREALM_USER.strip() or not self._env.DVREALM_PASSWORD.strip():
         print("[ERROR] Database Vault is enabled in the database. Please provide inputs for DVREALM_USER and DVREALM_PASSWORD.")
         if self._env.DRY_RUN.strip().upper() == "FALSE":
           exit(1)
+
    
       print("Validating of schemas protected by Database Vault realms...")
       sqlplus = SqlPlus(
@@ -1459,7 +1561,9 @@ class TTS_SRC_RMAN_BACKUP:
     encryption_on_clause = "set encryption on;"
     backup_set_transport = ""
     encryption_off_clause = ""
+    command_id_clause = ""
     tablespace_clause = self._env.encrypted_tablespaces
+    section_size_clause = ""
     
     if backup_type == "unencrypted":
       encryption_on_clause = f'set encryption on identified by "{self._env.DB_PROPS_ARRAY[0]}" only;'
@@ -1477,8 +1581,30 @@ class TTS_SRC_RMAN_BACKUP:
       if self._env.DB_VERSION != '11g':
         allow_inconsistent = "allow inconsistent"
 
-    if self._env.DB_VERSION != '11g':
+    # 11g -> for transport not supported, add section size clause
+    # 12c/19c : 
+    #   if src_platform = 13 : no need of for transport, add section size clause
+    #   else : for transport is required and
+    #     if version < 19.21 : section size not supported along with for transport
+    #     else : section size supported with for transport along with for transport
+    version_full_list = self._env.version_full.split('.')
+    if self._env.platform_id != 13 or (int(version_full_list[0]), int(version_full_list[1])) >= (19, 21):
       backup_set_transport = "for transport "
+    
+    if self._env.platform_id == 13 or (int(version_full_list[0]), int(version_full_list[1])) >= (19, 21):
+      section_size_clause = "section size 200G "
+
+    if self._env.DB_VERSION == '11g':
+      backup_set_transport = ""
+      section_size_clause = "section size 200G "
+
+    if section_size_clause == "":
+      print(
+          "WARNING: RMAN SECTION SIZE is not supported for cross-platform "
+          "transportable tablespace operations on this database version "
+          f"({self._env.version_full}). Proceeding without SECTION SIZE; "
+          "backup and restore performance may be impacted."
+      )
 
     # TODO
     # Generate dynamic section size based on parallelism
@@ -1508,7 +1634,7 @@ class TTS_SRC_RMAN_BACKUP:
     backup_string += (
       f"backup as {compressed} backupset {backup_set_transport}"
       f"{allow_inconsistent} {incremental_clause} "
-      f"section size 200G "
+      f"{section_size_clause}"
       f"tablespace {tablespace_clause.upper()} "
       f"format '{self._env.PROJECT_NAME}_%d_%U' "
       f"{tablespace_dump_clause};"
@@ -1523,6 +1649,11 @@ class TTS_SRC_RMAN_BACKUP:
       encryption_off_clause = "set encryption off;"
       encryption_on_clause = ""
     
+    if self._env.ZDM_BASED_TRANSPORT.upper() == "TRUE":
+      command_id_clause = f'{self._env.PROJECT_NAME}_ZDM_level_{self._env.BACKUP_LEVEL}_{backup_type}'
+    else:
+      command_id_clause = f'{self._env.PROJECT_NAME}_{backup_type}'
+    
     Configuration.substitutions = {
         'oracle_home': self._env.ORAHOME,
         'tts_dir_name': self._env.TTS_DIR_PATH,
@@ -1530,11 +1661,11 @@ class TTS_SRC_RMAN_BACKUP:
         'db_user': self._env.DBUSER,
         'db_password': self._env.DBPASSWORD,
         'l_conn_str': l_conn_str,
-        'project_name': self._env.PROJECT_NAME,
         'encryption_on_clause': encryption_on_clause,
         'encryption_off_clause': encryption_off_clause,
         'backup_string': backup_string,
         'channel_string': self._env.CHANNEL_STRING,
+        'command_id_clause': command_id_clause.upper(),
       }
     
     return_val = self._execute_command(template.get('tts_src_backup_tablespaces'), "RMAN")
@@ -1565,6 +1696,10 @@ class TTS_SRC_RMAN_BACKUP:
     
     l_conn_str = f"{self._env.HOSTNAME}:{self._env.LSNR_PORT}/{self._env.DB_SVC_NAME} AS SYSDBA"
 
+    job_name_str = ""
+    if self._env.ZDM_BASED_TRANSPORT.upper() == "TRUE":
+      job_name_str = f'JOB_NAME={self._env.PROJECT_NAME}_ZDM_schema_level_{self._env.BACKUP_LEVEL}'
+
     Configuration.substitutions = {
         'oracle_home': self._env.ORAHOME,
         'db_user': self._env.DBUSER,
@@ -1572,9 +1707,9 @@ class TTS_SRC_RMAN_BACKUP:
         'l_conn_str': l_conn_str,
         'schemas': self._env.SCHEMAS.upper(),
         'tts_dir_name': self._env.TTS_DIR_NAME,
+        'job_name_str': job_name_str.upper(),
       }
     expdp_command = ' '.join(line.strip() for line in template.get("tts_src_export_schema").splitlines() if line.strip())
-    print(expdp_command)
     return_val = self._execute_command(expdp_command, "EXPDP")
     expdp_log_file = "export.log"
     
@@ -1619,6 +1754,10 @@ class TTS_SRC_RMAN_BACKUP:
         exclude_clause = 'EXCLUDE=STATISTICS,INDEX_STATISTICS,TABLE_STATISTICS'
     elif xml_table_exclude_clause:
       exclude_clause = f'EXCLUDE={xml_table_exclude_clause}'
+    
+    job_name_str = ""
+    if self._env.ZDM_BASED_TRANSPORT.upper() == "TRUE":
+      job_name_str =  f'JOB_NAME={self._env.PROJECT_NAME}_ZDM_tablespace_level_{self._env.BACKUP_LEVEL}'
 
     expdp_log_file = 'validate_export_tablespace.log' if _validate else 'export_tablespace.log'
     Configuration.substitutions = {
@@ -1629,13 +1768,13 @@ class TTS_SRC_RMAN_BACKUP:
         'tablespaces': self._env.TABLESPACES.upper(),
         'tts_dir_name': self._env.TTS_DIR_NAME,
         'exclude_clause': exclude_clause,
+        'job_name_str': job_name_str.upper(),
         'dump_file': 'validate_tablespace.dmp' if _validate else 'tablespace.dmp',
         'expdp_log_file': expdp_log_file,
         'tts_closure_check': 'TTS_CLOSURE_CHECK=TEST_MODE' if _validate else '',
       }
 
     expdp_command = ' '.join(line.strip() for line in template.get("tts_src_export_tablespaces").splitlines() if line.strip())    
-    print(expdp_command)
     return_val = self._execute_command(expdp_command, "EXPDP")
     # Append logs to expdp log file
     self._append_log_to_backup(expdp_log_file)
@@ -1729,15 +1868,19 @@ class TTS_SRC_RMAN_BACKUP:
     project_data = {
       "project_name": self._env.PROJECT_NAME,
       "backup_level": new_backup_level,
-      "incr_scn": next_scn
+      "incr_scn": next_scn,
+      "tablespaces": ts_list
     }
+
+    if self._env.FINAL_BACKUP == "TRUE":
+      project_data['final_backup_complete'] = "TRUE"
 
     project_file_path = self._env.TTS_PROJECT_FILE
     with open(project_file_path, 'w') as project_file:
       json.dump(project_data, project_file, indent=2)
 
     print(f"Updated {self._env.TTS_PROJECT_FILE} Successful.")
-    
+
 
 
 class TTS_SRC_BUNDLE_MANAGER:
@@ -1903,8 +2046,19 @@ def main(args):
   Main entry function for the program
   """
   try:
+    version_file_name = os.path.join(scriptpath(), "version.txt")
+
+    tts_version = get_tts_tool_version(version_file_name)
+    
+    if "--version" in args:
+      print(f"TTS backup utility version: {tts_version}\n")
+      sys.exit(0)
+
     # Check if python version is >= 3
     check_python_version((3,6))
+
+    # Get tts-backup tool version
+    print(f"Using TTS backup utility version: {tts_version}\n")
     
     # Template for sql scripts
     template = Template(os.path.join(scriptpath(), 'ttsTemplate.txt'))
@@ -1914,8 +2068,7 @@ def main(args):
  
     ### STEP 1: RUN tablespace validations ###
     print("\n* Run tablespace validations...\n")
-    start_time = datetime.utcnow()
-    print(f"Start Time (UTC): {start_time}")
+    start_time = log_start_time()
     run_validations = TTS_SRC_RUN_VALIDATIONS(_env)
     _env.TABLESPACES = run_validations._get_tablespaces(template)
     _env.SCHEMAS = run_validations._get_schemas(template)
@@ -1928,32 +2081,37 @@ def main(args):
       run_validations._validate_dvrealm(template)
     run_validations._validate_schemas(template)
     run_validations._validate_tablespaces(template)
-    end_time = datetime.utcnow()
-    elapsed = end_time - start_time
-    print(f"Complete Time (UTC): {end_time}")
-    print(f"Elapsed Time: {elapsed}")
+    log_end_time(start_time)
 
     if _env.STORAGE_TYPE == 'OBJECT_STORAGE':
       ### STEP 2: Check storage buckets ###
       print("\n* Check backup and bundle storage buckets...\n")
+      start_time = log_start_time()
       storage_bucket_check = TTS_SRC_CHECK_STORAGE_BUCKETS(_env)
+      log_end_time(start_time)
 
       ### STEP 3: Create wallet to store backup credentials ###
       print("\n* Add credential alias to backup wallet...\n")
+      start_time = log_start_time()
       create_wallet = TTS_SRC_CREATE_WALLET(_env)
       _env.TTS_WALLET_CRED_ALIAS = create_wallet.tts_src_create_backup_wallet()
       if _env.TTS_WALLET_CRED_ALIAS is None:
         print("Failed to create wallet.\n")
         exit(1)
+      log_end_time(start_time)
 
     ### STEP 4: Gather data ###
     print("\n* Gather database, pdb and tablespace properties...\n")
+    start_time = log_start_time()
     gather_data = TTS_SRC_GATHER_DATA(_env)
     _env.DB_PROPS_ARRAY = gather_data.tts_src_gather_data(template)
     if _env.DB_PROPS_ARRAY is None:
       print("Failed to gather data.\n")
       exit(1)
+    log_end_time(start_time)
     
+    _env.platform_id = int(_env.DB_PROPS_ARRAY[4])
+    _env.version_full = _env.DB_PROPS_ARRAY[9]
     _env.bigfile_tablespaces = _env.DB_PROPS_ARRAY[15].replace(';', ',')
     _env.smallfile_tablespaces = _env.DB_PROPS_ARRAY[16].replace(';', ',')
     _env.encrypted_tablespaces = _env.DB_PROPS_ARRAY[17].replace(';', ',')
@@ -1967,89 +2125,121 @@ def main(args):
 
     ### STEP 5a: Create directory object ###
     print("\n* Create directory object...\n")
+    start_time = log_start_time()
     directory_manager = TTS_SRC_DIRECTORY_MANAGER(_env, template)
-    
+    log_end_time(start_time)
+
     if _env.DRY_RUN.strip().upper() != "TRUE":
       ### STEP 5b: Export TDE keys ###
       if _env.encrypted_tablespaces.strip():
         print("\n* Export TDE keys...\n")
+        start_time = log_start_time()
         tde_keys_exporter = TTS_SRC_TDE_KEY_EXPORTER(_env, template)
+        log_end_time(start_time)
 
       if _env.STORAGE_TYPE == 'OBJECT_STORAGE':
         ### Step 6: Copy wallet into all the hosts ###
         print("\n* Copy wallet into the host list...\n")
+        start_time = log_start_time()
         wallet_copier = TTS_SRC_WALLET_COPIER(_env)
+        log_end_time(start_time)
 
       ### Step 7a: Get SCN for next incremental backup just before the RMAN execution ###
       print("\n* Get SCNS for next incremental backup...\n")
+      start_time = log_start_time()
       _env.CHANNEL_STRING = ''
       rman_backup = TTS_SRC_RMAN_BACKUP(_env)
       rman_backup.tts_src_get_scn(template)
+      log_end_time(start_time)
 
       ### Step 7b: Build channel string for RMAN ###
       print("\n* Construct channel string...\n")
+      start_time = log_start_time()
       rman_backup.tts_src_get_channel()
-    
+      log_end_time(start_time)
+
       ### Step 7c: Perform RMAN Backup for Tablespace###
       rman_log_pattern = os.path.join(_env.TTS_DIR_PATH, 'rman_*.log')
       os.system(f'rm -rf {rman_log_pattern}')
       print(f"\n* Perform RMAN backup of {_env.TABLESPACES} tablespace datafiles and schema...\n")
 
-      start_time = datetime.utcnow()
-      print(f"Start Time (UTC): {start_time}")
+      start_time = log_start_time()
 
-      if len([ts for ts in _env.encrypted_tablespaces.split(',') if ts.strip()]) > 0:
-        print("Backup for encrypted tablespaces started\n")
-        if rman_backup.tts_src_backup_tablespaces("encrypted", template) == 1:
-          print("Backup for encrypted tablespaces Failed.\n")
-          exit(1)
-        print("Backup for encrypted tablespaces completed successfully\n")
+      # Read the projectFile to check if Final restore completed
+      tts_project_file = _env.TTS_PROJECT_FILE
+      with open(tts_project_file, 'r') as f:
+        project_data = json.load(f)
+        final_backup_complete = project_data.get('final_backup_complete', 'FALSE')
       
-      if len([ts for ts in _env.unencrypted_tablespaces.split(',') if ts.strip()]) > 0:
-        print("Backup for unencrypted tablespaces started\n")
-        if rman_backup.tts_src_backup_tablespaces("unencrypted", template) == 1:
-          print("Backup for unencrypted tablespaces Failed.\n")
-          exit(1)
-        print("Backup for unencrypted tablespaces completed successfully\n")
-
-      end_time = datetime.utcnow()
-      elapsed = end_time - start_time
-      print(f"Complete Time (UTC): {end_time}")
-      print(f"Elapsed Time: {elapsed}")
+      if _env.FINAL_BACKUP.upper() == "TRUE" and \
+        final_backup_complete == "TRUE":
+        print("Final Backup Completed, Proceeding with DATAPUMP Export\n")
+      else:
+        if len([ts for ts in _env.encrypted_tablespaces.split(',') if ts.strip()]) > 0:
+          print("Backup for encrypted tablespaces started\n")
+          if rman_backup.tts_src_backup_tablespaces("encrypted", template) == 1:
+            print("Backup for encrypted tablespaces Failed.\n")
+            exit(1)
+          print("Backup for encrypted tablespaces completed successfully\n")
+        
+        if len([ts for ts in _env.unencrypted_tablespaces.split(',') if ts.strip()]) > 0:
+          print("Backup for unencrypted tablespaces started\n")
+          if rman_backup.tts_src_backup_tablespaces("unencrypted", template) == 1:
+            print("Backup for unencrypted tablespaces Failed.\n")
+            exit(1)
+          print("Backup for unencrypted tablespaces completed successfully\n")
+        
+        if _env.FINAL_BACKUP.upper() == "TRUE":
+          project_data['final_backup_complete'] = "TRUE"
+          with open(tts_project_file, 'w') as f:
+            json.dump(project_data, f, indent=2)
+      log_end_time(start_time)
       
 
       ### STEP 7d: Export Schema ###
       if _env.FINAL_BACKUP.upper() == "TRUE":
         print(f"\n* Export {_env.SCHEMAS.upper()} schema using data pump...\n")
         # rman_backup.tts_src_export_schema()
+        start_time = log_start_time()
         if rman_backup.tts_src_export_schema(template) == 1:
           print("Export schema Failed.\n")
           exit(1)
+        log_end_time(start_time)
 
         print(f"\n* Export {_env.TABLESPACES.upper()} tablespaces schema using data pump...\n")
         # rman_backup.tts_src_export_tablespaces()
+        start_time = log_start_time()
         if rman_backup.tts_src_export_tablespaces(template) == 1:
           print("Export Tablespace schema Failed.\n")
           exit(1)
+        log_end_time(start_time)
 
       ### STEP 8: Create manifiest ###
       print("\n* Create manifest...\n")
+      start_time = log_start_time()
       rman_backup.tts_src_create_manifest()
+      log_end_time(start_time)
 
       ### STEP 9: Create transport bundle ###
       print("\n* Create transport bundle...\n")
+      start_time = log_start_time()
       bundle_manager = TTS_SRC_BUNDLE_MANAGER(_env)
+      log_end_time(start_time)
 
       ### STEP 10: Cleanup ###
       if _env.FINAL_BACKUP.upper() == "TRUE":
         print("\n* Final Backup, Dropped the project manifest json file...\n")
         os.remove(_env.TTS_PROJECT_FILE)
         print("\n* Dropped the TTS_DIR_NAME directory object...\n")
+        start_time = log_start_time()
         directory_manager.tts_src_drop_directory(template)
+        log_end_time(start_time)
 
       ### STEP 11: Upload bundle to object store ###
       print("\n* Upload transport bundle to object storage...\n")
+      start_time = log_start_time()
       bundle_manager.tts_src_upload_bundle()
+      log_end_time(start_time)
 
       if _env.STORAGE_TYPE == "FSS":
         print(f"ADB$TTS_BUNDLE_URL : {_env.TTS_FSS_CONFIG}/{_env.BUNDLE_FILE_NAME}")
@@ -2058,8 +2248,10 @@ def main(args):
       if _env.DB_VERSION != '11g':
         rman_backup = TTS_SRC_RMAN_BACKUP(_env)
         print(f"\n* Validation export for tablespaces metadata using datapump..\n")
+        start_time = log_start_time()
         if rman_backup.tts_src_export_tablespaces(template, True) == 1:
           print("Export Tablespace metadata Failed.\n")
+        log_end_time(start_time)
       print("TTS BACKUP TOOL : Dry Run Completed Successfully...")
 
   except FileNotFoundError as err_msg:

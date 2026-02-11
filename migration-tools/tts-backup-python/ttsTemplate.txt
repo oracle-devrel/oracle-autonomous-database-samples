@@ -517,7 +517,8 @@ tts_src_export_schema:
   DIRECTORY=${tts_dir_name} 
   DUMPFILE=schema.dmp 
   CONTENT=METADATA_ONLY 
-  CLUSTER=NO 
+  CLUSTER=NO
+  ${job_name_str}
   EXCLUDE=TABLE,INDEX 
   LOGFILE=export.log
 
@@ -529,6 +530,7 @@ tts_src_export_tablespaces:
   DUMPFILE=${dump_file}
   TRANSPORT_TABLESPACES=${tablespaces}
   ${exclude_clause}
+  ${job_name_str}
   CLUSTER=NO
   LOGFILE=${expdp_log_file}
   ${tts_closure_check}
@@ -537,7 +539,7 @@ tts_src_backup_tablespaces:
   ${oracle_home}/bin/rman << EOF | tee ${tts_dir_name}/backup_${backup_type}.log
   set echo on;
   connect target '${db_user}/${db_password}@${l_conn_str}';
-  set command id to '${project_name}_${backup_type}';
+  set command id to '${command_id_clause}';
   ${encryption_off_clause}
   set nocfau;
   ${encryption_on_clause}
