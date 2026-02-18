@@ -2809,9 +2809,12 @@ CREATE OR REPLACE PACKAGE BODY database_inspect AS
         'SELECT object_name, object_type, owner '  ||
         '  FROM ' || INSPECT_OBJECTS ||
         ' WHERE (:1 IS NULL OR UPPER(object_name) = :1) ' ||
+        '   AND UPPER(object_name) NOT LIKE ''DR$%'' ' ||
+        '   AND UPPER(object_name) NOT LIKE ''VECTOR$%'' ' || 
         '   AND (:2 IS NULL OR object_type        = :2) ' ||
         '   AND (:3 IS NULL OR UPPER(owner)       = :3) ' ||
-        '   AND agent_team_name = :4';
+        '   AND agent_team_name = :4 ' ||
+        ' ORDER BY UPPER(object_name), object_name, object_type, owner';
 
     OPEN l_cursor FOR l_stmt
         USING l_object_name, UPPER(l_object_name), 
