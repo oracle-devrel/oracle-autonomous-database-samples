@@ -1,56 +1,74 @@
-
-# Select AI Agents on Oracle Autonomous AI Database
+# Using Select AI Agent on Oracle Autonomous AI Database
 
 ## Overview
 
-This repository provides a **generic, extensible framework for building Select AI Agents on Oracle Autonomous AI Database** using the **Select AI Agent framework**.
+This repository provides a set of extensible AI agent templates built using Select AI Agent on Oracle Autonomous AI Database.
 
-Select AI Agents enable natural language interactions with enterprise data by combining large language models (LLMs), database-resident tools, and orchestration logic directly inside Oracle Database. Agents can reason over user input, invoke tools, and return structured, explainable results — all while keeping data governance, security, and execution within the database.
+Select AI Agent enables natural language interactions with enterprise data by combining large language models (LLMs), database-resident tools, and orchestration logic directly inside your database. Agents can reason over user input, invoke tools, and return structured, explainable results while keeping data governance, security, and execution within the database.
 
-The agents in this repository are **generic Select AI agents**. While some examples may interact with Oracle services, the framework itself is not limited to any specific domain or platform and can support many different types of agents and workflows.
+The agents in this repository are templates that you can create and customize for enterprise use cases. While some examples interact with Oracle services, the Select AI Agent framework is not limited to a specific domain and can support many types of agents and workflows.
+
+For product details, see:
+https://docs.oracle.com/en-us/iaas/autonomous-database-serverless/doc/select-ai-agent.html
 
 ---
 
 ## What is a Select AI Agent?
 
-Select AI Agents are part of the Oracle Autonomous AI Database Select AI framework. A Select AI Agent:
+Select AI Agent is part of Oracle Autonomous AI Database and extends core Select AI capabilities, including NL2SQL and RAG.
 
-- Accepts natural language input from users
+A Select AI Agent:
+
+- Accepts natural language input from users or programs
 - Uses an LLM to reason about the request
-- Invokes database-resident tools (PL/SQL functions)
-- Executes logic securely inside the database
-- Returns structured responses
+- Invokes built-in tools and custom tools (enabled using PL/SQL functions)
+- Performs logic securely inside the database
+- Returns agent responses
 
 Key characteristics of the Select AI Agent framework include:
 
-- Native integration with Oracle Autonomous AI Database
-- Tool execution through PL/SQL
-- Support for tasks, agents, and teams
+- Simple framework to build, deploy, and manage AI agents
+- Native database integration to reduce infrastructure and orchestration overhead
+- Support for preferred AI models and providers, including private endpoints
+- Autoscaling in Oracle Autonomous AI Database
+- Support for tools, tasks, agents, and teams
 - Centralized governance and monitoring
-- Flexibility to build domain-specific or generic agents
 
-For full details, refer to the official documentation:
-https://docs.oracle.com/en-us/iaas/autonomous-database-serverless/doc/select-ai-agent.html
+---
+
+## Simple Agent Execution Flow
+
+```text
+User -> Agent -> Task -> Tool (PL/SQL) -> Database -> Response
+```
+
+These concepts are represented as database-managed objects in the Select AI Agent framework.
+
+| Concept | Definition |
+|------|------------|
+| Agent | An actor with a defined role that performs tasks using the LLM specified in the AI profile. |
+| Task | A set of instructions that guides the LLM to use one or more tools to complete a step in a workflow. |
+| Tool | A capability invoked by a task to perform actions, such as querying databases, calling web services, or sending notifications. |
+| Agent Team | A group of agents with assigned tasks, serving as the unit for deploying and managing agent-based solutions. |
 
 ---
 
 ## Design Principles
 
-### 1. Two-Layer Architecture
+### Two-Layer Architecture
 
 Each agent implementation follows a two-layer model using separate SQL scripts.
 
-| Layer        | Script Pattern   | Purpose |
-|--------------|-----------------|---------|
-| Tools Layer  | `*_tools.sql`   | Installs core PL/SQL logic and registers Select AI tools |
-| Agent Layer  | `*_agent.sql`   | Creates a sample Task, Agent, and Team using those tools |
+| Layer | Script Pattern | Purpose |
+|------|----------------|---------|
+| Tools Layer | `*_tools.sql` | Installs core PL/SQL logic and registers Select AI tools |
+| Agent Layer | `*_agent.sql` | Creates sample Task, Agent, and Team objects using those tools |
 
 This design provides:
 
-- **Tools** that are reusable across multiple agents  
-- **Agents** as examples for customizable behavior
-
-The clear separation between tools and agents allows infrastructure logic to remain stable while agent behavior can be easily adapted or extended.
+- Reusable tools across multiple agents
+- Agent templates that can be customized for new domains and workflows
+- Clear separation between infrastructure logic and agent behavior
 
 ---
 
@@ -59,31 +77,45 @@ The clear separation between tools and agents allows infrastructure logic to rem
 The repository is organized to align with the Select AI Agent framework:
 
 - Tools scripts define and register reusable PL/SQL functions
-- Agent scripts demonstrate how those tools are composed into tasks, agents, and teams
+- Agent scripts compose tools into tasks, agents, and teams
 - Additional agents can be created without modifying existing tools
+
+---
+
+## Common Prerequisites for All Agents
+
+Before installing any agent in this repository, ensure the following baseline prerequisites are met:
+
+- Oracle Autonomous AI Database is provisioned
+- Select AI and `DBMS_CLOUD_AI_AGENT` are enabled
+- You are using `ADMIN` or another user with required privileges to create packages, grants, and agent objects
+- Required network access and credentials are available for any external integrations used by the agent
+- A Select AI profile is created using `DBMS_CLOUD_AI.CREATE_PROFILE`
+
+Each agent subfolder may include additional service-specific prerequisites.
 
 ---
 
 ## Creating a Select AI Profile
 
-Before using Autonomous Database AI agents, you must create a Select AI profile using DBMS_CLOUD_AI.
+Before using Select AI Agent objects, create a Select AI profile with `DBMS_CLOUD_AI.CREATE_PROFILE`.
 
-Oracle provides several examples demonstrating how to create AI profiles for different providers and models. See the documentation below and follow one of the examples to create your profile:
+A Select AI profile is a configuration object that defines the AI provider and models (LLM and transformer) used by Select AI. It also stores provider metadata, credential references, and behavior settings used at runtime.
 
-Select AI profile management documentation:
+Profile management documentation:
 https://docs.oracle.com/en-us/iaas/autonomous-database-serverless/doc/select-ai-manage-profiles.html#GUID-3721296F-14A1-428A-B464-7FA25E9EC8F3
 
-Start by reviewing the examples in this documentation and create a profile appropriate for your environment (OCI Generative AI, OpenAI, Azure OpenAI, etc.). The profile name you create will be used later when configuring AI agents.
+Create a profile appropriate for your environment (OCI Generative AI, OpenAI, Azure OpenAI, and others). The profile name is provided later when creating agent objects from `*_agent.sql`.
+
+---
 
 ## Agent Configuration (`SELECTAI_AGENT_CONFIG`)
 
 ### Overview
 
-Select AI agents use a shared configuration table named `SELECTAI_AGENT_CONFIG` to store **agent-specific configuration parameters**.
+`SELECTAI_AGENT_CONFIG` is a shared configuration table used by agent installers and runtime code to store agent-specific parameters.
 
-The table is generic and can be used by any Select AI agent (for example, NL2SQL data retrieval agents or other domain-specific agents). Each agent persists only the configuration keys it requires, while default behavior applies when values are not provided.
-
----
+Each agent stores only the keys it needs (for example, credential names, feature flags, compartment names, or integration endpoints). Defaults can still be applied by tool logic when optional values are not present.
 
 ### Column Description
 
@@ -91,23 +123,17 @@ The table is generic and can be used by any Select AI agent (for example, NL2SQL
 |------|------------|
 | `ID` | System-generated unique identifier |
 | `KEY` | Configuration parameter name |
-| `VALUE` | Configuration value (stored as CLOB) |
-| `AGENT` | Logical name of the Select AI agent(Available in tools) |
+| `VALUE` | Configuration value (stored as `CLOB`) |
+| `AGENT` | Logical agent name used to scope configuration |
 
 Configuration entries are uniquely identified by the combination of `KEY` and `AGENT`.
 
----
-
 ### Writing Configuration Entries
 
-Configuration values are written during agent installation or setup.  
-Only explicitly provided values are persisted; agents apply internal defaults when values are absent.
-
----
+Configuration values are written during installation or setup.  
+Only explicitly provided values are persisted.
 
 ### Example Configuration Entries
-
-#### NL2SQL Data Retrieval Agent
 
 ```sql
 INSERT INTO SELECTAI_AGENT_CONFIG ("KEY", "VALUE", "AGENT")
@@ -119,42 +145,52 @@ VALUES ('CREDENTIAL_NAME', 'MY_DB_CREDENTIAL', 'NL2SQL_DATA_RETRIEVAL_AGENT');
 
 ### JSON-Based Configuration Input
 
-Agent installers may accept configuration as JSON input.
+Agent installers may also accept configuration as JSON input:
 
-Example:
-
-```{
+```json
+{
   "use_resource_principal": true,
   "credential_name": "MY_DB_CREDENTIAL"
 }
 ```
 
-The installer parses the JSON and stores the relevant values in SELECTAI_AGENT_CONFIG.
+The installer parses the JSON and stores relevant values in `SELECTAI_AGENT_CONFIG`.
 
 ### Reading Configuration at Runtime
 
-At runtime, agents read their configuration from SELECTAI_AGENT_CONFIG and consume it as structured JSON. This allows configuration changes without modifying agent code.
+At runtime, agents read values from `SELECTAI_AGENT_CONFIG` and consume them as structured JSON. This allows configuration changes without modifying agent code.
 
+---
 
 ## Supported Use Cases
 
-This framework can be used to build Select AI agents for:
+This framework can be used to build Select AI Agent solutions for:
 
 - Natural language to SQL (NL2SQL)
 - Data retrieval and analytics
 - Database administration and monitoring
-- Operational workflows
-- Custom enterprise automation
-
-Agents can target database-only workflows, service integrations, or mixed enterprise use cases.
+- OCI and enterprise operational workflows
+- Custom automation with database-native controls
 
 ---
 
 ## Compatibility and Release Support
 
-Select AI capabilities vary by database release. For details on supported features across Autonomous Database and compatible non-Autonomous Database releases, refer to the official Select AI Capability Matrix:
+Select AI capabilities vary by database release. For supported features across Autonomous Database and compatible non-Autonomous releases, see the Select AI Capability Matrix:
 
 https://docs.oracle.com/en/database/oracle/oracle-database/26/saicm/select-ai-capability-matrix.pdf
+
+---
+
+## Database Inspect Agent Demo Video
+
+Watch this demo video to see the Database Inspect agent in action:
+
+[![Database Inspect Agent Demo Thumbnail](https://objectstorage.eu-frankfurt-1.oraclecloud.com/p/ZF8hVJGpN1RJDwOh1ZkRVJjKgzKdqYKuEDtIT1mekE18seU23DtZVbP5mHyJXQWm/n/dwcsdev/b/select_ai_agent_demo/o/Datbase_Inspect.png)](https://objectstorage.eu-frankfurt-1.oraclecloud.com/p/DqsbbE15HSHZv6LgeqS6yqi4OmxLaeO3ykwZ-DaKAM7yOZ3VDFWjafKk1ghh1k7x/n/dwcsdev/b/select_ai_agent_demo/o/DATABASE_INSPECT_AGENT.mp4)
+
+[▶ Watch Database Inspect Agent Demo](https://objectstorage.eu-frankfurt-1.oraclecloud.com/p/DqsbbE15HSHZv6LgeqS6yqi4OmxLaeO3ykwZ-DaKAM7yOZ3VDFWjafKk1ghh1k7x/n/dwcsdev/b/select_ai_agent_demo/o/DATABASE_INSPECT_AGENT.mp4)
+
+The demo walks through a practical inspection workflow where the agent accepts natural-language prompts, identifies relevant database objects, retrieves metadata and dependencies using tools, and returns structured responses that help developers analyze and troubleshoot code faster.
 
 ---
 
@@ -162,8 +198,8 @@ https://docs.oracle.com/en/database/oracle/oracle-database/26/saicm/select-ai-ca
 
 1. Run the Tools layer scripts to install and register Select AI tools.
 2. Run the Agent layer scripts to create sample tasks, agents, and teams.
-3. Customize existing agents or create new ones by composing available tools.
-4. Extend the framework by adding new tools and agent definitions.
+3. Validate with test prompts for your selected AI profile.
+4. Customize existing templates or build new agents by composing available tools.
 
 ---
 
@@ -177,11 +213,10 @@ This repository is intended for:
 - Platform teams
 - AI practitioners working with Oracle Autonomous AI Database
 
-Anyone looking to build secure, database-native AI agents using Select AI can use this repository as a starting point.
-
 ---
 
 ## License
 
-This project is licensed under the **Universal Permissive License (UPL), Version 1.0**.
+This project is licensed under the Universal Permissive License (UPL), Version 1.0.
 See: https://oss.oracle.com/licenses/upl/
+Copyright (c) 2026 Oracle and/or its affiliates.

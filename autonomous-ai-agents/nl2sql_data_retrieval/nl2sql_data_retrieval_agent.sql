@@ -1,6 +1,6 @@
 rem ============================================================================
 rem LICENSE
-rem   Copyright (c) 2025 Oracle and/or its affiliates.
+rem   Copyright (c) 2026 Oracle and/or its affiliates.
 rem   Licensed under the Universal Permissive License (UPL), Version 1.0
 rem   https://oss.oracle.com/licenses/upl/
 rem

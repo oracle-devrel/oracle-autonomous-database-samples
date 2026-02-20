@@ -2,15 +2,15 @@
 
 ##  Overview
 
-## OCI Object Storage
+### OCI Object Storage
 
 OCI Object Storage is a highly scalable and durable storage service in Oracle Cloud Infrastructure that enables you to securely store and retrieve unstructured data such as files, backups, logs, and media. It offers high availability, strong security with encryption, lifecycle management, and seamless integration with OCI services and applications.
 
 The **Select AI - OCI Object Storage AI Agent** enables natural-language–driven automation and advisory capabilities for **OCI Object Storage**, powered by **Select AI (DBMS_CLOUD_AI_AGENT)**.
 
-This agent allows users to manage buckets, objects, lifecycle policies, retention rules, replication, multipart uploads, and work requests using **conversational instructions**, while enforcing ** confirmations, and clarity**.
+With this agent, users can manage buckets and objects, apply lifecycle and retention policies, configure replication, run multipart upload flows, and monitor work requests using natural-language instructions.
 
-The design follows a **Tools + Agent + Team** architecture, making it scalable, auditable, and easy to extend.
+For definitions of **Tool**, **Task**, **Agent**, and **Agent Team**, see the top-level guide: [README](../README.md#simple-agent-execution-flow).
 
 ---
 
@@ -74,7 +74,7 @@ Confirmed Operation + Result
 
 ##  Prerequisites
 
-- Oracle Autonomous Database (23ai recommended)
+- Oracle Autonomous AI Database (26ai recommended)
 - Select AI enabled
 - OCI Object Storage access
 - OCI credential or Resource Principal
@@ -84,10 +84,19 @@ Confirmed Operation + Result
 
 ##  Installation – Tools
 
-Run as ADMIN (or privileged user):
+Before running installation commands:
+
+1. Clone or download this repository.
+2. Open a terminal and change directory to `autonomous-ai-agents/oci_object_storage`.
+3. Choose one execution mode:
+   - SQL*Plus/SQLcl: run script files directly with `@script_name`.
+   - SQL Worksheet (Database Actions or other SQL IDE): open the `.sql` file and run/paste its contents.
+4. Uploading scripts to `DATA_PUMP_DIR` is not required for these methods.
+
+Run as `ADMIN` (or another privileged user):
 
 ```sql
-sqlplus admin@db @oci_object_storage_tools.sql
+sqlplus admin@<adb_connect_string> @oci_object_storage_tools.sql
 ```
 
 ### Input Parameters required to run
@@ -145,11 +154,13 @@ sqlplus admin@db @oci_object_storage_tools.sql
 
 ##  Installation – Agent and Team
 
-Run:
+From `autonomous-ai-agents/oci_object_storage`, run:
 
 ```sql
-sqlplus admin@db @oci_object_storage_agent.sql
+sqlplus admin@<adb_connect_string> @oci_object_storage_agent.sql
 ```
+
+You can also execute the contents of `oci_object_storage_agent.sql` in SQL Worksheet.
 
 ### Input Parameters required to run
 - Target schema name (Schema where to the agent team needs to be installed)
@@ -257,6 +268,7 @@ After creating the OCI Object Storage AI Agent, users can interact with it using
 
 Universal Permissive License (UPL) 1.0  
 https://oss.oracle.com/licenses/upl/
+Copyright (c) 2026 Oracle and/or its affiliates.
 
 ---
 
