@@ -6,11 +6,11 @@
 
 OCI Network Load Balancer is a high-performance, layer-4 load balancing service in Oracle Cloud Infrastructure that distributes TCP and UDP traffic across backend servers while preserving source IP addresses. It is designed for ultra-low latency, high throughput, and scalability, making it ideal for mission-critical and network-intensive workloads.
 
-The **Select AI - OCI Network Load Balancer (NLB) AI Agent** enables conversational management of **OCI Network Load Balancers** using **Select AI (DBMS_CLOUD_AI_AGENT)** in Oracle Autonomous Database.
+The **Select AI - OCI Network Load Balancer (NLB) AI Agent** enables conversational management of **OCI Network Load Balancers** using **Select AI (DBMS_CLOUD_AI_AGENT)** in Oracle Autonomous AI Database.
 
-It allows users to **list, create, update, and delete Network Load Balancers**, along with their **listeners, backend sets, and health status**, while enforcing **explicit confirmation for destructive operations**.
+With this agent, users can list, create, update, and delete Network Load Balancers, manage listeners and backend sets, inspect health status, and enforce explicit confirmation for destructive operations.
 
-This agent follows the same **Tools + Agent + Team** architecture used across other OCI service agents in this repository.
+For definitions of **Tool**, **Task**, **Agent**, and **Agent Team**, see the top-level guide: [README](../README.md#simple-agent-execution-flow).
 
 ---
 
@@ -72,7 +72,7 @@ Confirmed NLB Operation + Result
 
 ##  Prerequisites
 
-- Oracle Autonomous Database 
+- Oracle Autonomous AI Database (26ai recommended)
 - Select AI enabled
 - OCI Network Load Balancer permissions
 - OCI credential or Resource Principal
@@ -82,11 +82,22 @@ Confirmed NLB Operation + Result
 
 ##  Installation – Agent and Team
 
-Run as ADMIN (or privileged user):
+Before running installation commands:
+
+1. Clone or download this repository.
+2. Open a terminal and change directory to `autonomous-ai-agents/oci_network_load_balancer`.
+3. Choose one execution mode:
+   - SQL*Plus/SQLcl: run script files directly with `@script_name`.
+   - SQL Worksheet (Database Actions or other SQL IDE): open the `.sql` file and run/paste its contents.
+4. Uploading scripts to `DATA_PUMP_DIR` is not required for these methods.
+
+Run as `ADMIN` (or another privileged user):
 
 ```sql
-sqlplus admin@db @oci_network_load_balancer_agent.sql
+sqlplus admin@<adb_connect_string> @oci_network_load_balancer_agent.sql
 ```
+
+You can also execute the contents of `oci_network_load_balancer_agent.sql` in SQL Worksheet.
 
 ### Input Parameters required to run
 - Target schema name (Schema where to the agent team needs to be installed)
@@ -231,6 +242,7 @@ After creating the OCI Network Load Balancer AI Agent, users can interact with i
 
 Universal Permissive License (UPL) 1.0  
 https://oss.oracle.com/licenses/upl/
+Copyright (c) 2026 Oracle and/or its affiliates.
 
 ---
 

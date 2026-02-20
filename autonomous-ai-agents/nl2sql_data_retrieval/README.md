@@ -1,5 +1,11 @@
 # Select AI - NL2SQL Data Retrieval Agent for Oracle Autonomous AI Database
 
+## Overview
+
+The **Select AI - NL2SQL Data Retrieval Agent** enables natural-language data analysis workflows by combining NL2SQL generation, metadata inspection, query correction, web intelligence, and chart generation inside Oracle Autonomous AI Database.
+
+For definitions of **Tool**, **Task**, **Agent**, and **Agent Team**, see the top-level guide: [README](../README.md#simple-agent-execution-flow).
+
 ## How the NL2SQL agent improves upon Select AI NL2SQL
 
 Oracle Select AI already provides Natural Language to SQL (NL2SQL), but **real-world data retrieval often fails** due to:
@@ -48,7 +54,7 @@ The agent dynamically selects tools, retries intelligently, and produces **expla
 
 ```text
 .
-├── nl2sql_data_retrieval_tools.sql
+├── nl2sql_data_retrieval_tool.sql
 │   ├── PL/SQL utility functions
 │   ├── OCI Vault integration for Websearch credentials
 │   ├── Web search enablement
@@ -67,7 +73,7 @@ The agent dynamically selects tools, retries intelligently, and produces **expla
 
 ##  Prerequisites
 
-- Oracle Autonomous AI Database
+- Oracle Autonomous AI Database (26ai recommended)
 - Select AI enabled
 - OCI Vault configured (Optional for websearch)
 - Google Custom Search API enabled (Optional for websearch)
@@ -105,10 +111,19 @@ Note the **Vault Secret OCIDs**.
 
 ##  Installation – Tools
 
-Run as ADMIN (or privileged user):
+Before running installation commands:
+
+1. Clone or download this repository.
+2. Open a terminal and change directory to `autonomous-ai-agents/nl2sql_data_retrieval`.
+3. Choose one execution mode:
+   - SQL*Plus/SQLcl: run script files directly with `@script_name`.
+   - SQL Worksheet (Database Actions or other SQL IDE): open the `.sql` file and run/paste its contents.
+4. Uploading scripts to `DATA_PUMP_DIR` is not required for these methods.
+
+Run as `ADMIN` (or another privileged user):
 
 ```sql
-sqlplus admin@db @nl2sql_data_retrieval_tools.sql
+sqlplus admin@<adb_connect_string> @nl2sql_data_retrieval_tool.sql
 ```
 ### Input Parameters required to run
 - Target schema name (Schema where to the agent team needs to be installed)
@@ -197,11 +212,13 @@ sqlplus admin@db @nl2sql_data_retrieval_tools.sql
 
 ##  Installation – Agent and Team
 
-Run:
+From `autonomous-ai-agents/nl2sql_data_retrieval`, run:
 
 ```sql
-sqlplus admin@db @nl2sql_data_retrieval_agent.sql
+sqlplus admin@<adb_connect_string> @nl2sql_data_retrieval_agent.sql
 ```
+
+You can also execute the contents of `nl2sql_data_retrieval_agent.sql` in SQL Worksheet.
 
 ### Input Parameters required to run.
 - Target schema name (Schema where to the agent team needs to be installed)
@@ -274,6 +291,7 @@ After creating the NL2SQL Data Retrieval Agent team, you can interact with it us
 
 Universal Permissive License (UPL) 1.0  
 https://oss.oracle.com/licenses/upl/
+Copyright (c) 2026 Oracle and/or its affiliates.
 
 ---
 

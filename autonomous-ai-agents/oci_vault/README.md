@@ -6,11 +6,11 @@
 
 OCI Vault is a secure key and secrets management service in Oracle Cloud Infrastructure that helps you centrally store, manage, and control access to sensitive data such as encryption keys, secrets, certificates, and passwords. It supports customer-managed encryption keys backed by Hardware Security Modules (HSMs), enabling strong security, compliance, key rotation, and fine-grained access control for OCI resources and applications.
 
-The ** Select AI OCI Vault AI Agent** enables secure, conversational management of **OCI Vault secrets and secret versions** using **Select AI (DBMS_CLOUD_AI_AGENT)** within Oracle Autonomous AI Database.
+The **Select AI OCI Vault AI Agent** enables secure, conversational management of **OCI Vault secrets and secret versions** using **Select AI (DBMS_CLOUD_AI_AGENT)** within Oracle Autonomous AI Database.
 
-This agent is designed for **security‑critical workflows**, allowing users to create, inspect, rotate, move, and schedule deletion of secrets while enforcing **explicit confirmations, least‑privilege access, and human‑readable responses**.
+With this agent, users can create, inspect, rotate, move, and schedule deletion of secrets, inspect secret versions, and manage compartment-level secret operations using natural-language instructions with explicit confirmations.
 
-It follows the same **Tools + Agent + Team** architecture used across other OCI service agents in this repository.
+For definitions of **Tool**, **Task**, **Agent**, and **Agent Team**, see the top-level guide: [README](../README.md#simple-agent-execution-flow).
 
 ---
 
@@ -67,7 +67,7 @@ Confirmed Vault Operation + Result
 
 ## Prerequisites
 
-- Oracle Autonomous AI Database
+- Oracle Autonomous AI Database (26ai recommended)
 - Select AI enabled
 - OCI Vault access
 - OCI credential or Resource Principal
@@ -77,10 +77,19 @@ Confirmed Vault Operation + Result
 
 ##  Installation – Tools
 
-Run as ADMIN (or privileged user):
+Before running installation commands:
+
+1. Clone or download this repository.
+2. Open a terminal and change directory to `autonomous-ai-agents/oci_vault`.
+3. Choose one execution mode:
+   - SQL*Plus/SQLcl: run script files directly with `@script_name`.
+   - SQL Worksheet (Database Actions or other SQL IDE): open the `.sql` file and run/paste its contents.
+4. Uploading scripts to `DATA_PUMP_DIR` is not required for these methods.
+
+Run as `ADMIN` (or another privileged user):
 
 ```sql
-sqlplus admin@db @oci_vault_tools.sql
+sqlplus admin@<adb_connect_string> @oci_vault_tools.sql
 ```
 
 ### Optional Configuration JSON
@@ -138,11 +147,13 @@ sqlplus admin@db @oci_vault_tools.sql
 
 ##  Installation – Agent & Team
 
-Run:
+From `autonomous-ai-agents/oci_vault`, run:
 
 ```sql
-sqlplus admin@db @oci_vault_agent.sql
+sqlplus admin@<adb_connect_string> @oci_vault_agent.sql
 ```
+
+You can also execute the contents of `oci_vault_agent.sql` in SQL Worksheet.
 
 ### Prompts
 - Target schema name
@@ -230,6 +241,7 @@ After creating the OCI Vault AI Agent, users can interact with it using prompts 
 
 Universal Permissive License (UPL) 1.0  
 https://oss.oracle.com/licenses/upl/
+Copyright (c) 2026 Oracle and/or its affiliates.
 
 ---
 

@@ -4,6 +4,8 @@
 
 Select AI Inspect is an AI-powered inspection tool built using the **Select AI Agent** framework. It enables users to explore, understand, and interact with database objects and their metadata using natural language.
 
+For definitions of **Tool**, **Task**, **Agent**, and **Agent Team**, see the top-level guide: [README](../README.md#simple-agent-execution-flow).
+
 ### Use Cases
 
 Instead of manually reviewing tables, searching through PL/SQL files, or examining function and procedure metadata, users can simply ask the Select AI Inspect agent natural language questions such as:
@@ -41,6 +43,37 @@ Select AI Inspect supports the following database object types:
 * Schema
 
 Users may define the inspection scope either at the individual object level or at the schema level. When a schema is specified, all supported object types within that schema are included.
+
+---
+
+## Prerequisites
+
+- Oracle Autonomous AI Database (26ai recommended)
+- Select AI and `DBMS_CLOUD_AI_AGENT` enabled
+- `ADMIN` or equivalent privileged user for installation
+- A Select AI profile created with `DBMS_CLOUD_AI.CREATE_PROFILE`
+
+---
+
+## Installation
+
+Before running installation commands:
+
+1. Clone or download this repository.
+2. Open a terminal and change directory to `autonomous-ai-agents/database_inspect`.
+3. Choose one execution mode:
+   - SQL*Plus/SQLcl: run script files directly with `@script_name`.
+   - SQL Worksheet (Database Actions or other SQL IDE): open the `.sql` file and run/paste its contents.
+4. Uploading scripts to `DATA_PUMP_DIR` is not required for these methods.
+
+Run as `ADMIN` (or another privileged user):
+
+```sql
+sqlplus admin@<adb_connect_string> @database_inspect_tool.sql
+sqlplus admin@<adb_connect_string> @database_inspect_agent.sql
+```
+
+You can also execute the contents of `database_inspect_tool.sql` and `database_inspect_agent.sql` in SQL Worksheet.
 
 ---
 
@@ -193,3 +226,11 @@ This schema includes more than 10 tables, such as customers, products, orders, a
 4. Explain what the CHECKOUT_PKG.reprice_order procedure is used for, including its purpose, parameters and business rules.
 5. Can you write and run a test script for the calc_tax_amount function to verify the results and check for any bugs?
 6. When I call the calc_tax_amount function, for state_code = 'CA' (rate 0.0825), calc_tax_amount(10.01, 'CA') returns 0.82, but it should return 0.83. Please debug the function and show me the exact code that needs to be fixed.
+
+---
+
+## License
+
+Universal Permissive License (UPL) 1.0  
+https://oss.oracle.com/licenses/upl/
+Copyright (c) 2026 Oracle and/or its affiliates.

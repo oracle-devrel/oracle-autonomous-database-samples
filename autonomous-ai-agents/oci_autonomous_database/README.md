@@ -4,13 +4,15 @@
 
 The **Select AI - OCI Autonomous Database AI Agent** enables natural-language–driven provisioning, management, and advisory operations for **Oracle Autonomous Databases on OCI**, powered by **Select AI (DBMS_CLOUD_AI_AGENT)**.
 
+With this agent, users can provision databases, run lifecycle and scaling operations, inspect configuration and backups, and perform guided administrative workflows using natural-language instructions.
+
 Unlike traditional scripts or consoles, this agent allows users to:
 - Provision and manage Autonomous Databases conversationally
 - Run lifecycle operations with confirmations
 - Discover OCI resources dynamically (regions, compartments, databases)
 - Automate complex OCI workflows through reusable AI tools
 
-This repository provides a **clean separation between Tools and Agent orchestration**, making it easy to extend, customize, and reuse.
+For definitions of **Tool**, **Task**, **Agent**, and **Agent Team**, see the top-level guide: [README](../README.md#simple-agent-execution-flow).
 
 ---
 
@@ -68,7 +70,7 @@ Confirmed OCI Operation + Result
 
 ##  Prerequisites
 
-- Oracle Autonomous Database
+- Oracle Autonomous AI Database (26ai recommended)
 - Select AI enabled
 - OCI credential or Resource Principal
 - Access to OCI compartments with ADB permissions
@@ -78,10 +80,19 @@ Confirmed OCI Operation + Result
 
 ##  Installation – Tools
 
-Run as ADMIN (or privileged user):
+Before running installation commands:
+
+1. Clone or download this repository.
+2. Open a terminal and change directory to `autonomous-ai-agents/oci_autonomous_database`.
+3. Choose one execution mode:
+   - SQL*Plus/SQLcl: run script files directly with `@script_name`.
+   - SQL Worksheet (Database Actions or other SQL IDE): open the `.sql` file and run/paste its contents.
+4. Uploading scripts to `DATA_PUMP_DIR` is not required for these methods.
+
+Run as `ADMIN` (or another privileged user):
 
 ```sql
-sqlplus admin@db @oci_autonomous_database_tools.sql
+sqlplus admin@<adb_connect_string> @oci_autonomous_database_tools.sql
 ```
 
 ### Input Parameters required to run
@@ -146,11 +157,13 @@ sqlplus admin@db @oci_autonomous_database_tools.sql
 
 ##  Installation – Agent and Team
 
-Run:
+From `autonomous-ai-agents/oci_autonomous_database`, run:
 
 ```sql
-sqlplus admin@db @oci_autonomous_database_agent.sql
+sqlplus admin@<adb_connect_string> @oci_autonomous_database_agent.sql
 ```
+
+You can also execute the contents of `oci_autonomous_database_agent.sql` in SQL Worksheet.
 
 ### Input Parameters required to run.
 - Target schema name (Schema where to the agent team needs to be installed)
@@ -246,6 +259,7 @@ After creating the Oracle Autonomous Database AI Agent, users can interact with 
 
 Universal Permissive License (UPL) 1.0  
 https://oss.oracle.com/licenses/upl/
+Copyright (c) 2026 Oracle and/or its affiliates.
 
 ---
 
