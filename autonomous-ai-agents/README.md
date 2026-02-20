@@ -182,6 +182,18 @@ https://docs.oracle.com/en/database/oracle/oracle-database/26/saicm/select-ai-ca
 
 ---
 
+## Database Inspect Agent Demo Video
+
+Watch this demo video to see the Database Inspect agent in action:
+
+[![Database Inspect Agent Demo Thumbnail](https://objectstorage.eu-frankfurt-1.oraclecloud.com/p/ZF8hVJGpN1RJDwOh1ZkRVJjKgzKdqYKuEDtIT1mekE18seU23DtZVbP5mHyJXQWm/n/dwcsdev/b/select_ai_agent_demo/o/Datbase_Inspect.png)](https://objectstorage.eu-frankfurt-1.oraclecloud.com/p/DqsbbE15HSHZv6LgeqS6yqi4OmxLaeO3ykwZ-DaKAM7yOZ3VDFWjafKk1ghh1k7x/n/dwcsdev/b/select_ai_agent_demo/o/DATABASE_INSPECT_AGENT.mp4)
+
+[▶ Watch Database Inspect Agent Demo](https://objectstorage.eu-frankfurt-1.oraclecloud.com/p/DqsbbE15HSHZv6LgeqS6yqi4OmxLaeO3ykwZ-DaKAM7yOZ3VDFWjafKk1ghh1k7x/n/dwcsdev/b/select_ai_agent_demo/o/DATABASE_INSPECT_AGENT.mp4)
+
+The demo walks through a practical inspection workflow where the agent accepts natural-language prompts, identifies relevant database objects, retrieves metadata and dependencies using tools, and returns structured responses that help developers analyze and troubleshoot code faster.
+
+---
+
 ## Getting Started
 
 1. Run the Tools layer scripts to install and register Select AI tools.

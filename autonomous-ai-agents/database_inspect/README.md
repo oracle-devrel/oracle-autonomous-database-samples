@@ -2,7 +2,7 @@
 
 ## Overview
 
-Select AI Inspect is an AI-powered inspection tool built using the **Select AI Agent** framework. It enables users to explore, understand, and interact with database objects and their metadata using natural language.
+Select AI Inspect is an AI-powered database inspection tool built using the **Select AI Agent** framework. It enables users to explore, understand, and interact with database objects and their metadata using natural language.
 
 For definitions of **Tool**, **Task**, **Agent**, and **Agent Team**, see the top-level guide: [README](../README.md#simple-agent-execution-flow).
 
