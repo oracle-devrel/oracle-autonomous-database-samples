@@ -5,7 +5,7 @@ rem   Licensed under the Universal Permissive License (UPL), Version 1.0
 rem   https://oss.oracle.com/licenses/upl/
 rem
 rem NAME
-rem   jira_inspect_agent.sql
+rem   jira_insight_agent.sql
 rem
 rem DESCRIPTION
 rem   Installer and configuration script for Jira AI Agent Team
@@ -46,19 +46,19 @@ rem
 rem   4. AI Registration:
 rem        - Drop and create JIRA_TASKS
 rem        - Drop and create JIRA_ADVISOR agent
-rem        - Drop and create JIRA_INSPECT_TEAM
+rem        - Drop and create JIRA_INSIGHT_TEAM
 rem
 rem   5. Execution:
 rem        - Execute installer procedure with AI profile parameter
 rem
 rem INSTALL INSTRUCTIONS
-rem   1. Run jira_inspect_tools.sql first.
+rem   1. Run jira_insight_tools.sql first.
 rem
 rem   2. Connect as ADMIN or a privileged user.
 rem
 rem   3. Run the script using SQL*Plus or SQLcl:
 rem
-rem      sqlplus admin@db @jira_inspect_agent.sql
+rem      sqlplus admin@db @jira_insight_agent.sql
 rem
 rem   4. Provide inputs when prompted:
 rem        - Target schema name
@@ -143,6 +143,7 @@ BEGIN
         || 'Use GET_JIRA_PROJECT_TOOL for project metadata. '
         || 'Use GET_ATLASSIAN_USER_TOOL for user profile lookup. '
         || 'Use GET_JIRA_BOARDS_TOOL for board metadata. '
+        || 'Use UPDATE_JIRA_COMMENT to update comment. '
         || 'Present results clearly and in human-readable format. '
         || 'User request: {query}",
       "tools": [
@@ -155,7 +156,8 @@ BEGIN
         "GET_JIRA_WORKLOG_TOOL",
         "GET_JIRA_PROJECT_TOOL",
         "GET_ATLASSIAN_USER_TOOL",
-        "GET_JIRA_BOARDS_TOOL"
+        "GET_JIRA_BOARDS_TOOL",
+        "UPDATE_JIRA_COMMENT_TOOL"
       ],
       "enable_human_tool": "true"
     }'
@@ -182,21 +184,21 @@ BEGIN
   DBMS_OUTPUT.PUT_LINE('Created agent JIRA_ADVISOR');
 
   BEGIN
-    DBMS_CLOUD_AI_AGENT.DROP_TEAM('JIRA_INSPECT_TEAM');
-    DBMS_OUTPUT.PUT_LINE('Dropped team JIRA_INSPECT_TEAM');
+    DBMS_CLOUD_AI_AGENT.DROP_TEAM('JIRA_INSIGHT_TEAM');
+    DBMS_OUTPUT.PUT_LINE('Dropped team JIRA_INSIGHT_TEAM');
   EXCEPTION
     WHEN OTHERS THEN
-      DBMS_OUTPUT.PUT_LINE('Team JIRA_INSPECT_TEAM does not exist, skipping');
+      DBMS_OUTPUT.PUT_LINE('Team JIRA_INSIGHT_TEAM does not exist, skipping');
   END;
 
   DBMS_CLOUD_AI_AGENT.CREATE_TEAM(
-    team_name  => 'JIRA_INSPECT_TEAM',
+    team_name  => 'JIRA_INSIGHT_TEAM',
     attributes => '{
       "agents":[{"name":"JIRA_ADVISOR","task":"JIRA_TASKS"}],
       "process":"sequential"
     }'
   );
-  DBMS_OUTPUT.PUT_LINE('Created team JIRA_INSPECT_TEAM');
+  DBMS_OUTPUT.PUT_LINE('Created team JIRA_INSIGHT_TEAM');
 
   DBMS_OUTPUT.PUT_LINE('--------------------------------------------');
   DBMS_OUTPUT.PUT_LINE('Jira AI installation COMPLETE');

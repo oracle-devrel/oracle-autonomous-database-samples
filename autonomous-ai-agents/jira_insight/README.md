@@ -6,7 +6,7 @@
 
 Jira integration in this project connects Oracle Autonomous AI Database to Atlassian Jira Cloud APIs through `DBMS_CLOUD`, then exposes those operations as Select AI tools via `DBMS_CLOUD_AI_AGENT`.
 
-The **Select AI Jira Agent** enables conversational Jira operations such as issue search, issue inspection, assignee lookup, comments/changelog/worklog retrieval, project lookup, user lookup, and board discovery.
+The **Select AI Jira Agent** enables conversational Jira operations such as issue search, issue insight generation, assignee lookup, comments/changelog/worklog retrieval, project lookup, user lookup, and board discovery.
 
 Runtime connection settings are stored in `SELECTAI_AGENT_CONFIG` under agent key `JIRA`, so credentials and Jira Cloud ID are centrally managed and not passed as user inputs on every tool call.
 
@@ -43,7 +43,8 @@ JIRA_ADVISOR Reasoning & Validation
    ├── GET_JIRA_WORKLOG_TOOL
    ├── GET_JIRA_PROJECT_TOOL
    ├── GET_ATLASSIAN_USER_TOOL
-   └── GET_JIRA_BOARDS_TOOL
+   ├── GET_JIRA_BOARDS_TOOL
+   └── UPDATE_JIRA_COMMENT_TOOL
    ↓
 Formatted Jira/Atlassian Response
 ```
@@ -54,16 +55,16 @@ Formatted Jira/Atlassian Response
 
 ```text
 .
-├── jira_inspect_tools.sql
+├── jira_insight_tools.sql
 │   ├── Configuration bootstrap (SELECTAI_AGENT_CONFIG)
 │   ├── Jira API wrapper package (jira_selectai)
 │   ├── Agent package (select_ai_jira_agent)
 │   └── Jira AI tool registrations
 │
-├── jira_inspect_agent.sql
+├── jira_insight_agent.sql
 │   ├── Task definition (JIRA_TASKS)
 │   ├── Agent creation (JIRA_ADVISOR)
-│   ├── Team creation (JIRA_INSPECT_TEAM)
+│   ├── Team creation (JIRA_INSIGHT_TEAM)
 │   └── AI profile binding
 │
 └── README.md
@@ -87,7 +88,7 @@ Formatted Jira/Atlassian Response
 Before running installation commands:
 
 1. Clone or download this repository.
-2. Open a terminal and change directory to `autonomous-ai-agents/jira_inspect`.
+2. Open a terminal and change directory to `autonomous-ai-agents/jira_insight`.
 3. Choose one execution mode:
    - SQL*Plus/SQLcl: run script files directly with `@script_name`.
    - SQL Worksheet (Database Actions or other SQL IDE): open the `.sql` file and run/paste its contents.
@@ -96,7 +97,7 @@ Before running installation commands:
 Run as `ADMIN` (or another privileged user):
 
 ```sql
-sqlplus admin@<adb_connect_string> @jira_inspect_tools.sql
+sqlplus admin@<adb_connect_string> @jira_insight_tools.sql
 ```
 
 ### Optional Configuration JSON
@@ -121,7 +122,7 @@ sqlplus admin@<adb_connect_string> @jira_inspect_tools.sql
 
 ---
 
-## Available AI Tools (High-Level)
+## Available AI Tools (Complete)
 
 ### Issue Search & Retrieval
 - `SEARCH_JIRA_TOOL`
@@ -141,17 +142,36 @@ sqlplus admin@<adb_connect_string> @jira_inspect_tools.sql
 - `GET_ATLASSIAN_USER_TOOL`
 - `GET_JIRA_BOARDS_TOOL`
 
+### Comment Updates
+- `UPDATE_JIRA_COMMENT_TOOL`
+
+### Tool-to-Function Mapping (from `jira_insight_tools.sql`)
+
+| Tool | Function | Purpose |
+|------|----------|---------|
+| `SEARCH_JIRA_TOOL` | `select_ai_jira_agent.search_jira` | Search Jira issues by keyword |
+| `GET_JIRA_TOOL` | `select_ai_jira_agent.get_jira` | Get Jira issue details by key |
+| `GET_ASSIGNEE_ACCOUNT_ID_TOOL` | `select_ai_jira_agent.get_assignee_account_id` | Resolve assignee account ID |
+| `GET_JIRA_ASSIGNED_ISSUES_TOOL` | `select_ai_jira_agent.get_jira_assigned_issues` | List issues assigned to an account |
+| `GET_JIRA_COMMENTS_TOOL` | `select_ai_jira_agent.get_jira_comments` | Get issue comments |
+| `GET_JIRA_CHANGELOG_TOOL` | `select_ai_jira_agent.get_jira_changelog` | Get issue changelog/history |
+| `GET_JIRA_WORKLOG_TOOL` | `select_ai_jira_agent.get_jira_worklog` | Get issue worklogs |
+| `GET_JIRA_PROJECT_TOOL` | `select_ai_jira_agent.get_jira_project` | Get project metadata |
+| `GET_ATLASSIAN_USER_TOOL` | `select_ai_jira_agent.get_atlassian_user` | Get Atlassian user profile |
+| `GET_JIRA_BOARDS_TOOL` | `select_ai_jira_agent.get_jira_boards` | List Jira boards (optional project filter) |
+| `UPDATE_JIRA_COMMENT_TOOL` | `select_ai_jira_agent.update_jira_comment` | Update Jira comment text |
+
 ---
 
 ## Installation – Agent & Team
 
-From `autonomous-ai-agents/jira_inspect`, run after tools installation:
+From `autonomous-ai-agents/jira_insight`, run after tools installation:
 
 ```sql
-sqlplus admin@<adb_connect_string> @jira_inspect_agent.sql
+sqlplus admin@<adb_connect_string> @jira_insight_agent.sql
 ```
 
-You can also execute the contents of `jira_inspect_agent.sql` in SQL Worksheet.
+You can also execute the contents of `jira_insight_agent.sql` in SQL Worksheet.
 
 ### Prompts
 
@@ -164,7 +184,7 @@ You can also execute the contents of `jira_inspect_agent.sql` in SQL Worksheet.
 |--------|------|
 | Task   | `JIRA_TASKS` |
 | Agent  | `JIRA_ADVISOR` |
-| Team   | `JIRA_INSPECT_TEAM` |
+| Team   | `JIRA_INSIGHT_TEAM` |
 
 ---
 
@@ -197,6 +217,9 @@ The Jira task is configured to:
 - "Get project details for `FIN`."
 - "Get Atlassian user details for `<account_id>`."
 - "List Jira boards for project `FIN`."
+
+### Comment Update
+- "Update Jira comment `<comment_id>` in project `FIN` with: `Please prioritize this issue for release.`"
 
 ---
 
@@ -232,3 +255,50 @@ Copyright (c) 2026 Oracle and/or its affiliates.
 ## Final Thoughts
 
 The Jira AI Agent provides a clean operational bridge between Select AI and Jira APIs, making issue intelligence workflows faster and easier to standardize across teams.
+
+---
+
+## Jira Credential & ACL Setup (ADMIN)
+
+Run the following as `ADMIN` before using Jira tools.
+
+### 1. Create Jira Credential
+
+```sql
+BEGIN
+  DBMS_CLOUD.CREATE_CREDENTIAL (
+    credential_name => '<JIRA_OAUTH2_CRED_NAME>',
+    params          => JSON_OBJECT(
+                         'oauth2' VALUE JSON_OBJECT(
+                           'client_id'     VALUE '<client_id>',
+                           'client_secret' VALUE ',client_secret>',
+                           'endpoint' VALUE 'https://auth.atlassian.com/oauth/token',
+                           'grant_type' VALUE 'client_credentials'
+                         )
+                       )
+  );
+END;
+/
+```
+
+### 2. Grant Network ACL for Jira Hosts
+
+Grant HTTP access to the target install schema (the schema where the Jira agent is installed) for each host below:
+- `atlassian.com`
+- `api.atlassian.com`
+
+Use this block twice by setting `&url` to each host:
+
+```sql
+begin
+dbms_network_acl_admin.append_host_ace(
+  host =>'&url',
+  lower_port => 443,
+  upper_port => 443,
+  ace => xs$ace_type(
+    privilege_list => xs$name_list('http'),
+    principal_name => '<SCHEMA_NAME>',
+    principal_type => xs_acl.ptype_db));
+end;
+/
+```
