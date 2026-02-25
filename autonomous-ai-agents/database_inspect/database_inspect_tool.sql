@@ -164,6 +164,7 @@ CREATE OR REPLACE PACKAGE database_inspect AUTHID CURRENT_USER AS
   TOOL_EXPAND_OBJECT_METADATA_CHUNK     CONSTANT DBMS_ID := 'expand_object_metadata_chunk';
   TOOL_SUMMARIZE_OBJECT                 CONSTANT DBMS_ID := 'summarize_object';
   TOOL_GENERATE_PLDOC                   CONSTANT DBMS_ID := 'generate_pldoc';
+  TOOL_GENERATE_GRAPH                   CONSTANT DBMS_ID := 'generate_graph';
 
   -- Vector distance types
   VEC_DIST_COSINE        CONSTANT DBMS_ID     := 'cosine';
@@ -302,6 +303,20 @@ CREATE OR REPLACE PACKAGE database_inspect AUTHID CURRENT_USER AS
     object_type       IN VARCHAR2,
     object_owner      IN VARCHAR2,
     user_prompt       IN CLOB DEFAULT NULL
+  ) RETURN CLOB;
+
+
+  -----------------------------------------------------------------------------
+  -- generate_chart: Generates graph content from a natural language prompt and
+  -- relationship context (Mermaid or HTML tree).
+  -- Tool name will contain the id for the agent team.
+  -----------------------------------------------------------------------------
+  FUNCTION generate_chart(
+    tool_name         IN VARCHAR2,
+    chart_prompt      IN CLOB,
+    output_format     IN VARCHAR2 DEFAULT 'mermaid',
+    graph_style       IN VARCHAR2 DEFAULT 'auto',
+    graph_direction   IN VARCHAR2 DEFAULT 'TB'
   ) RETURN CLOB;
 
 
@@ -599,7 +614,9 @@ CREATE OR REPLACE PACKAGE BODY database_inspect AS
                          TOOL_RETRIEVE_OBJECT_METADATA, 
                          TOOL_RETRIEVE_OBJECT_METADATA_CHUNKS,
                          TOOL_EXPAND_OBJECT_METADATA_CHUNK, 
-                         TOOL_SUMMARIZE_OBJECT, TOOL_GENERATE_PLDOC) 
+                         TOOL_SUMMARIZE_OBJECT, TOOL_GENERATE_PLDOC,
+                         TOOL_GENERATE_GRAPH,
+                         'generate_dependency_chart') 
     THEN
       raise_application_error(-20000, 'Invalid tool type - ' || tool_type);
     END IF;
@@ -1586,7 +1603,15 @@ CREATE OR REPLACE PACKAGE BODY database_inspect AS
   IS
     l_vector_table_name   VARCHAR2(200) := VECTOR_TABLE_PREFIX || 
                                            agent_team_name;
+    l_vector_table_exists NUMBER := 0;
   BEGIN
+    -- The vector table might already be removed (partial cleanup or force
+    -- drop). Keep object cleanup idempotent by skipping vector deletes
+    -- when the table is absent.
+    EXECUTE IMMEDIATE
+      'SELECT COUNT(*) FROM user_tables WHERE table_name = :1'
+      INTO l_vector_table_exists USING UPPER(l_vector_table_name);
+
     -- Remove the object records from inspect table and vector table. 
     -- If obj_name is null, it means remove all objects of the type and owner.
     IF obj_name IS NULL THEN
@@ -1595,10 +1620,19 @@ CREATE OR REPLACE PACKAGE BODY database_inspect AS
         ' WHERE agent_team_name =:1 AND owner =:2' 
           USING IN agent_team_name, owner_name;
 
-      EXECUTE IMMEDIATE 
-        'DELETE FROM ' || l_vector_table_name || 
-        ' WHERE JSON_VALUE(attributes, ''$.object_owner'') =:1' 
-          USING IN owner_name;
+      IF l_vector_table_exists > 0 THEN
+        BEGIN
+          EXECUTE IMMEDIATE 
+            'DELETE FROM ' || l_vector_table_name || 
+            ' WHERE JSON_VALUE(attributes, ''$.object_owner'') =:1' 
+              USING IN owner_name;
+        EXCEPTION
+          WHEN OTHERS THEN
+            IF SQLCODE != -942 THEN
+              RAISE;
+            END IF;
+        END;
+      END IF;
     ELSE
       EXECUTE IMMEDIATE 
         'DELETE FROM ' || INSPECT_OBJECTS || 
@@ -1606,12 +1640,21 @@ CREATE OR REPLACE PACKAGE BODY database_inspect AS
         '       object_type =:3 AND owner =:4' 
           USING IN agent_team_name, obj_name, obj_type, owner_name;
 
-      EXECUTE IMMEDIATE 
-      'DELETE FROM ' || l_vector_table_name                           || 
-      '   WHERE JSON_VALUE(attributes, ''$.object_name'')  =:1 AND '  ||
-      '         JSON_VALUE(attributes, ''$.object_type'')  =:2 AND '  ||
-      '         JSON_VALUE(attributes, ''$.object_owner'') =:3' 
-          USING IN obj_name, IN obj_type, IN owner_name;
+      IF l_vector_table_exists > 0 THEN
+        BEGIN
+          EXECUTE IMMEDIATE 
+          'DELETE FROM ' || l_vector_table_name                           || 
+          '   WHERE JSON_VALUE(attributes, ''$.object_name'')  =:1 AND '  ||
+          '         JSON_VALUE(attributes, ''$.object_type'')  =:2 AND '  ||
+          '         JSON_VALUE(attributes, ''$.object_owner'') =:3' 
+              USING IN obj_name, IN obj_type, IN owner_name;
+        EXCEPTION
+          WHEN OTHERS THEN
+            IF SQLCODE != -942 THEN
+              RAISE;
+            END IF;
+        END;
+      END IF;
     END IF;
   END unset_object;
 
@@ -1776,6 +1819,12 @@ CREATE OR REPLACE PACKAGE BODY database_inspect AS
                                                  tool_name_suffix;
     l_tool_generate_pldoc VARCHAR2(200) := TOOL_GENERATE_PLDOC || 
                                                  tool_name_suffix;
+    l_tool_generate_graph VARCHAR2(200) := 
+                                                 TOOL_GENERATE_GRAPH || 
+                                                 tool_name_suffix;
+    l_tool_generate_graph_legacy VARCHAR2(200) := 
+                                                 'generate_dependency_chart' || 
+                                                 tool_name_suffix;
   BEGIN
     -- TOOL: list_objects
     BEGIN
@@ -1895,6 +1944,60 @@ CREATE OR REPLACE PACKAGE BODY database_inspect AS
                         ],
                         "function": "' || DATABASE_INSPECT_PACKAGE || '.' || TOOL_LIST_OUTGOING_DEPENDENCIES || '"
         }'
+    );
+
+    -- TOOL: generate_graph
+    BEGIN
+      DBMS_CLOUD_AI_AGENT.drop_tool(l_tool_generate_graph);
+    EXCEPTION
+      WHEN OTHERS THEN
+        NULL;
+    END;
+    -- Backward compatibility cleanup for prior tool name.
+    BEGIN
+      DBMS_CLOUD_AI_AGENT.drop_tool(l_tool_generate_graph_legacy);
+    EXCEPTION
+      WHEN OTHERS THEN
+        NULL;
+    END;
+    DBMS_CLOUD_AI_AGENT.create_tool(
+      tool_name => l_tool_generate_graph,
+      attributes => '{
+                      "instruction": "Use this tool to generate relationship visualization output as Mermaid syntax or HTML tree markup. ' ||
+                                     'Supported scenarios include dependency maps, hierarchy trees, binary-tree style layouts, and general relationship networks. ' ||
+                                     'Before calling this tool, collect/validate relationship data with discovery tools such as ' || l_tool_list_objects || ', ' || l_tool_list_incoming_deps || ', and ' || l_tool_list_outgoing_deps || ' whenever possible. ' ||
+                                     'Provide a complete chart_prompt that includes the nodes and directed edges to visualize. ' ||
+                                     'Use output_format to choose the rendering format, then use graph_style and graph_direction to guide layout. ' ||
+                                     'The output must be raw generated content only (no markdown fences and no explanation text).",
+                      "tool_inputs": [
+                        {
+                          "name": "tool_name",
+                          "mandatory": true,
+                          "description": "The name of the current tool to call."
+                        },
+                        {
+                          "name": "chart_prompt",
+                          "mandatory": true,
+                          "description": "A detailed prompt describing relationships to render, including nodes and directed edges."
+                        },
+                        {
+                          "name": "output_format",
+                          "mandatory": false,
+                          "description": "Optional output format. Allowed values: mermaid, html_tree. Default is mermaid."
+                        },
+                        {
+                          "name": "graph_style",
+                          "mandatory": false,
+                          "description": "Optional layout preference. Allowed values: auto, binary_tree, hierarchical, network, dependency."
+                        },
+                        {
+                          "name": "graph_direction",
+                          "mandatory": false,
+                          "description": "Optional Mermaid flow direction: TB, LR, BT, or RL. Default is TB."
+                        }
+                      ],
+                      "function": "' || DATABASE_INSPECT_PACKAGE || '.generate_chart"
+      }'
     );
 
     -- TOOL: retrieve_object_metadata
@@ -2207,6 +2310,11 @@ CREATE OR REPLACE PACKAGE BODY database_inspect AS
             '    Use these validated dependency lists together with {list_objects} to build the object_list argument for {retrieve_object_metadata_chunks} when you need to ' ||
             'constrain vector search to a concrete set of related objects. ' ||
 
+            '  - Graph visualization: If the user asks for a graph, diagram, binary tree, hierarchy, or relationship map, gather the relevant relationships first (for dependency-style requests use {list_incoming_dependencies} and/or {list_outgoing_dependencies}). ' ||
+            'Then call {generate_graph} with a detailed prompt containing validated nodes and directed edges. ' ||
+            'If the user explicitly asks for a binary tree, call {generate_graph} with graph_style = ''binary_tree''. ' ||
+            'If the user explicitly asks for HTML/CSS output (instead of Mermaid), call {generate_graph} with output_format = ''html_tree''. ' ||
+
             '  - Keyword usage for {retrieve_object_metadata_chunks}: When searching code with {retrieve_object_metadata_chunks}, provide a keyword whenever possible to improve search accuracy. ' ||
             'The keyword must follow Oracle Text syntax and must be wrapped in braces, for example: ''{<keyword_1>}''. To specify multiple keywords, use expressions ' ||
             'like ''{<keyword_1>} OR {<keyword_2>}'' or ''{<keyword_1>} AND {<keyword_2>}''). Do not pass raw text (such as a bare column name) without braces as the keyword. ' ||
@@ -2266,6 +2374,9 @@ CREATE OR REPLACE PACKAGE BODY database_inspect AS
             '  - Present results in a well-structured, readable layout with sections, bullet lists, and tables where helpful. Add one empty line between major sections. ' ||
             '  - If you are using {retrieve_object_metadata_chunks} and {expand_object_metadata_chunk} to gather results, indicate whether your findings likely cover all relevant code. If you are unsure, add a ' ||
             'brief note that the list may not be exhaustive. ' ||
+            '  - If you used {generate_graph}, first provide a short textual summary and then include the raw output from {generate_graph}. ' ||
+            'When output_format = ''mermaid'', wrap it in a code block that starts with ```mermaid and ends with ```. ' ||
+            'When output_format = ''html_tree'', wrap it in a code block that starts with ```html and ends with ```. Do not edit the generated output. ' ||
             '  - If no relevant results are found, or if no issues are detected, provide a short, concise message clearly stating that outcome, and, when appropriate, mention what search steps you performed.';
       
     l_task_instruction := REPLACE(l_task_instruction, '{list_objects}', TOOL_LIST_OBJECTS || l_tool_name_suffix);
@@ -2276,10 +2387,12 @@ CREATE OR REPLACE PACKAGE BODY database_inspect AS
     l_task_instruction := REPLACE(l_task_instruction, '{expand_object_metadata_chunk}', TOOL_EXPAND_OBJECT_METADATA_CHUNK || l_tool_name_suffix);
     l_task_instruction := REPLACE(l_task_instruction, '{summarize_object}', TOOL_SUMMARIZE_OBJECT || l_tool_name_suffix);
     l_task_instruction := REPLACE(l_task_instruction, '{generate_pldoc}', TOOL_GENERATE_PLDOC || l_tool_name_suffix);
+    l_task_instruction := REPLACE(l_task_instruction, '{generate_graph}', TOOL_GENERATE_GRAPH || l_tool_name_suffix);
 
     l_tools.append(TOOL_LIST_OBJECTS || l_tool_name_suffix);
     l_tools.append(TOOL_LIST_INCOMING_DEPENDENCIES || l_tool_name_suffix);
     l_tools.append(TOOL_LIST_OUTGOING_DEPENDENCIES || l_tool_name_suffix);
+    l_tools.append(TOOL_GENERATE_GRAPH || l_tool_name_suffix);
     l_tools.append(TOOL_RETRIEVE_OBJECT_METADATA || l_tool_name_suffix);
     l_tools.append(TOOL_RETRIEVE_OBJECT_METADATA_CHUNKS || l_tool_name_suffix);
     l_tools.append(TOOL_EXPAND_OBJECT_METADATA_CHUNK || l_tool_name_suffix);
@@ -2337,6 +2450,13 @@ CREATE OR REPLACE PACKAGE BODY database_inspect AS
                                   l_tool_name_suffix,
                                   true);
     DBMS_CLOUD_AI_AGENT.drop_tool(TOOL_LIST_OUTGOING_DEPENDENCIES || 
+                                  l_tool_name_suffix,
+                                  true);
+    DBMS_CLOUD_AI_AGENT.drop_tool(TOOL_GENERATE_GRAPH || 
+                                  l_tool_name_suffix,
+                                  true);
+    -- Backward compatibility cleanup for old graph tool name.
+    DBMS_CLOUD_AI_AGENT.drop_tool('generate_dependency_chart' || 
                                   l_tool_name_suffix,
                                   true);
     DBMS_CLOUD_AI_AGENT.drop_tool(TOOL_RETRIEVE_OBJECT_METADATA || 
@@ -3409,6 +3529,113 @@ CREATE OR REPLACE PACKAGE BODY database_inspect AS
       -- Suppress all errors; return NULL for tool safety
       RETURN NULL;
   END summarize_object;
+
+
+  -----------------------------------------------------------------------------
+  -- generate_chart: generate Mermaid/HTML tree graph content for relationship
+  -- visualization (dependency, hierarchy, tree, network).
+  -----------------------------------------------------------------------------
+  FUNCTION generate_chart(
+    tool_name         IN VARCHAR2,
+    chart_prompt      IN CLOB,
+    output_format     IN VARCHAR2 DEFAULT 'mermaid',
+    graph_style       IN VARCHAR2 DEFAULT 'auto',
+    graph_direction   IN VARCHAR2 DEFAULT 'TB'
+  ) RETURN CLOB
+  IS
+    l_full_prompt      CLOB;
+    l_result           CLOB;
+    l_profile_name     DBMS_ID;
+    l_agent_team_name  DBMS_ID;
+    l_output_format    VARCHAR2(20) := LOWER(NVL(TRIM(output_format), 
+                                                'mermaid'));
+    l_graph_style      VARCHAR2(30) := LOWER(NVL(TRIM(graph_style), 'auto'));
+    l_graph_direction  VARCHAR2(2) := UPPER(NVL(TRIM(graph_direction), 'TB'));
+  BEGIN
+    IF chart_prompt IS NULL THEN
+      RETURN '{"error":"chart_prompt is required"}';
+    END IF;
+
+    IF l_graph_style NOT IN ('auto', 'binary_tree', 'hierarchical', 
+                             'network', 'dependency') THEN
+      l_graph_style := 'auto';
+    END IF;
+
+    IF l_output_format NOT IN ('mermaid', 'html_tree') THEN
+      l_output_format := 'mermaid';
+    END IF;
+
+    IF l_graph_direction NOT IN ('TB', 'LR', 'BT', 'RL') THEN
+      l_graph_direction := 'TB';
+    END IF;
+
+    BEGIN
+      l_agent_team_name := get_agent_team_name_from_tool(
+                             tool_name => tool_name,
+                             tool_type => TOOL_GENERATE_GRAPH);
+    EXCEPTION
+      WHEN OTHERS THEN
+        -- Backward compatibility for previously registered tool prefix.
+        l_agent_team_name := get_agent_team_name_from_tool(
+                               tool_name => tool_name,
+                               tool_type => 'generate_dependency_chart');
+    END;
+    l_profile_name := get_attribute(l_agent_team_name, 'profile_name');
+
+    IF l_output_format = 'html_tree' THEN
+      l_full_prompt :=
+        'You are a graph visualization assistant for Oracle database objects and related metadata.' ||
+        CHR(10) ||
+        'Create an HTML+CSS tree visualization for the relationships provided in the user prompt.' ||
+        CHR(10) ||
+        'Requested style: ' || l_graph_style || CHR(10) ||
+        'Requested direction: ' || l_graph_direction || CHR(10) ||
+        'Output rules:' || CHR(10) ||
+        '- Output ONLY raw HTML and CSS. No markdown fences, no explanations, no prose.' || CHR(10) ||
+        '- Return exactly one <style>...</style> block and one <div class="db-tree">...</div> block.' || CHR(10) ||
+        '- Use nested <ul><li> for hierarchy rendering.' || CHR(10) ||
+        '- Use class names prefixed with "db-tree-".' || CHR(10) ||
+        '- Keep labels readable and preserve relationship direction from parent to child.' || CHR(10) ||
+        '- If the graph is not a strict tree, render the closest readable tree/hierarchy without inventing nodes.' || CHR(10) ||
+        'User prompt:' || CHR(10) ||
+        chart_prompt;
+    ELSE
+      l_full_prompt :=
+        'You are a graph visualization assistant for Oracle database objects and related metadata.' ||
+        CHR(10) ||
+        'Create Mermaid syntax that represents the relationships provided in the user prompt.' ||
+        CHR(10) ||
+        'Requested style: ' || l_graph_style || CHR(10) ||
+        'Requested direction: ' || l_graph_direction || CHR(10) ||
+        'Output rules:' || CHR(10) ||
+        '- Output ONLY Mermaid diagram syntax.' || CHR(10) ||
+        '- Do NOT add markdown fences, explanations, bullets, or prose.' ||
+        CHR(10) ||
+        '- Use a directed flowchart when expressing relationships (for example: flowchart TB).' || CHR(10) ||
+        '- Ensure node identifiers are Mermaid-safe (letters, numbers, underscore).' ||
+        CHR(10) ||
+        '- Preserve dependency direction exactly as described in the prompt.' ||
+        CHR(10) ||
+        '- Include only relationships supported by the provided data.' ||
+        CHR(10) ||
+        '- If style is binary_tree, render as a tree-like directed graph. If strict binary branching is not possible from the provided data, keep all relationships and render the closest tree-like layout.' ||
+        CHR(10) ||
+        '- Prefer concise, readable node labels and avoid duplicate nodes.' ||
+        CHR(10) ||
+        'User prompt:' || CHR(10) ||
+        chart_prompt;
+    END IF;
+
+    l_result := DBMS_CLOUD_AI.GENERATE(
+                  prompt       => l_full_prompt,
+                  profile_name => l_profile_name,
+                  action       => 'CHAT');
+
+    RETURN l_result;
+  EXCEPTION
+    WHEN OTHERS THEN
+      RETURN '{"error":"' || REPLACE(SQLERRM, '"', '\\"') || '"}';
+  END generate_chart;
 
 
   -----------------------------------------------------------------------------

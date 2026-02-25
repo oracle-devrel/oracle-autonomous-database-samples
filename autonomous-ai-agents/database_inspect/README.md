@@ -204,6 +204,7 @@ An inspection agent is created when you call `DATABASE_INSPECT.create_inspect_ag
 * **list_objects**: List all available objects for the agent
 * **list_incoming_dependencies**: List objects that depend on or reference the given object
 * **list_outgoing_dependencies**: List objects that the given object itself depends on or references
+* **generate_graph**: Generate relationship visualizations as Mermaid graph syntax or HTML/CSS tree markup (dependency, hierarchy, binary-tree style, network)
 * **retrieve_object_metadata**: Retrieve the full metadata for the given object
 * **retrieve_object_metadata_chunks**: Retrieve a list of metadata chunks by performing hybrid search (vector search + Oracle Text search) to answer user’s query
 * **expand_object_metadata_chunk**: Given a selected result from the retrieve_object_metadata_chunks tool, returns an expanded metadata segment around the specified chunk to provide additional context
@@ -226,6 +227,9 @@ This schema includes more than 10 tables, such as customers, products, orders, a
 4. Explain what the CHECKOUT_PKG.reprice_order procedure is used for, including its purpose, parameters and business rules.
 5. Can you write and run a test script for the calc_tax_amount function to verify the results and check for any bugs?
 6. When I call the calc_tax_amount function, for state_code = 'CA' (rate 0.0825), calc_tax_amount(10.01, 'CA') returns 0.82, but it should return 0.83. Please debug the function and show me the exact code that needs to be fixed.
+7. Please show me a dependency graph for my table relationships.
+8. Show the object call hierarchy as a binary-tree style diagram.
+9. Render the outgoing dependency hierarchy as HTML + CSS tree markup for my web app.
 
 ---
 

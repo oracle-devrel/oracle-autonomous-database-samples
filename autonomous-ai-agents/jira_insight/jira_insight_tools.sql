@@ -5,7 +5,7 @@ rem   Licensed under the Universal Permissive License (UPL), Version 1.0
 rem   https://oss.oracle.com/licenses/upl/
 rem
 rem NAME
-rem   jira_inspect_tools.sql
+rem   jira_insight_tools.sql
 rem
 rem DESCRIPTION
 rem   Installer script for Jira Select AI tools
@@ -297,6 +297,14 @@ CREATE OR REPLACE PACKAGE jira_selectai AS
     credential_name VARCHAR2,
     project_key     VARCHAR2 DEFAULT NULL
   ) RETURN CLOB;
+
+  FUNCTION update_jira_comment(
+    cloud_id        VARCHAR2,
+    credential_name VARCHAR2,
+    project_key     VARCHAR2 DEFAULT NULL,
+    comment_id      VARCHAR2 DEFAULT NULL,
+    comment         CLOB
+  ) RETURN CLOB;
 END jira_selectai;
 /
 
@@ -321,6 +329,18 @@ CREATE OR REPLACE PACKAGE BODY jira_selectai AS
     );
     RETURN DBMS_CLOUD.get_response_text(l_resp);
   END get_response;
+
+  FUNCTION call_put_api(credential_name VARCHAR2, uri VARCHAR2, body CLOB) RETURN CLOB IS
+    l_resp DBMS_CLOUD_TYPES.resp;
+  BEGIN
+    l_resp := DBMS_CLOUD.send_request(
+      credential_name => credential_name,
+      uri             => uri,
+      method          => DBMS_CLOUD.METHOD_PUT,
+      body            => UTL_RAW.cast_to_raw(body)
+    );
+    RETURN DBMS_CLOUD.get_response_text(l_resp);
+  END call_put_api;
 
   FUNCTION get_jira(
     cloud_id        VARCHAR2,
@@ -509,6 +529,23 @@ CREATE OR REPLACE PACKAGE BODY jira_selectai AS
     END IF;
     RETURN get_response(credential_name, l_url);
   END get_jira_boards;
+
+  FUNCTION update_jira_comment(
+    cloud_id        VARCHAR2,
+    credential_name VARCHAR2,
+    project_key     VARCHAR2 DEFAULT NULL,
+    comment_id      VARCHAR2 DEFAULT NULL,
+    comment         CLOB
+  ) RETURN CLOB IS
+    l_url VARCHAR2(4000);
+  BEGIN
+    l_url := jira_api_base_url(cloud_id) || '/issue/';
+    IF project_key IS NOT NULL THEN
+      l_url := l_url || '?projectKeyOrId=' || UTL_URL.escape(project_key, TRUE)
+               || chr(38) || 'id=' || UTL_URL.escape(comment_id);
+    END IF;
+    RETURN call_put_api(credential_name, l_url, comment);
+  END update_jira_comment;
 END jira_selectai;
 /
 
@@ -561,6 +598,12 @@ CREATE OR REPLACE PACKAGE select_ai_jira_agent AS
     schema_name IN VARCHAR2,
     table_name  IN VARCHAR2,
     agent_name  IN VARCHAR2
+  ) RETURN CLOB;
+
+  FUNCTION update_jira_comment(
+    project_key IN VARCHAR2 DEFAULT NULL,
+    comment_id  IN VARCHAR2,
+    comment     IN CLOB
   ) RETURN CLOB;
 END select_ai_jira_agent;
 /
@@ -866,6 +909,30 @@ CREATE OR REPLACE PACKAGE BODY select_ai_jira_agent AS
     WHEN OTHERS THEN
       RETURN build_error_response('get_jira_boards', SQLERRM);
   END get_jira_boards;
+
+  FUNCTION update_jira_comment(
+    project_key IN VARCHAR2 DEFAULT NULL,
+    comment_id  IN VARCHAR2,
+    comment     IN CLOB
+  ) RETURN CLOB
+  IS
+    l_response         CLOB;
+    l_credential_name  VARCHAR2(4000);
+    l_cloud_id         VARCHAR2(4000);
+  BEGIN
+    get_runtime_config(l_credential_name, l_cloud_id);
+    l_response := jira_selectai.update_jira_comment(
+      credential_name => l_credential_name,
+      cloud_id        => l_cloud_id,
+      project_key     => project_key,
+      comment_id      => comment_id,
+      comment         => comment
+    );
+    RETURN l_response;
+  EXCEPTION
+    WHEN OTHERS THEN
+      RETURN build_error_response('update_jira_comment', SQLERRM);
+  END update_jira_comment;
 END select_ai_jira_agent;
 /
 
@@ -980,6 +1047,16 @@ BEGIN
       "function": "select_ai_jira_agent.get_jira_boards"
     }',
     description => 'Get Jira boards'
+  );
+
+  drop_tool_if_exists('UPDATE_JIRA_COMMENT_TOOL');
+  DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
+    tool_name => 'UPDATE_JIRA_COMMENT_TOOL',
+    attributes => '{
+      "instruction": "Update Jira comment.",
+      "function": "select_ai_jira_agent.update_jira_comment"
+    }',
+    description => 'Update Jira comment'
   );
 
   DBMS_OUTPUT.PUT_LINE('initialize_jira_tools completed.');
