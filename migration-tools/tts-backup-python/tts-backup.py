@@ -1,5 +1,3 @@
-#!/usr/bin/python3
-#
 import os
 import sys
 import json
@@ -21,6 +19,7 @@ import math
 import getpass
 import functools
 from datetime import datetime
+import re
 
 
 print = functools.partial(print, flush=True)
@@ -104,6 +103,14 @@ def split_into_lines(items, to_upper=True, chunk_size=10):
     chunks.append("'" + "','".join(chunk) + "'")
   item_list = ",\n".join(chunks)
   return item_list
+
+# Escape '$' in table names for shell safety (TABLE$1 --> TABLE\$1)
+def escape_dollar(raw):
+    tables = []
+    for tbl in raw.split(','):
+      tbl = re.sub(r'(?<!\\)\$', r'\$', tbl.strip())
+      tables.append(tbl)
+    return ",".join(tables)
 
 class ConsoleLogger:
   """
@@ -281,6 +288,8 @@ class Environment:
       value = self._defaults.get(var, '').strip()
       if value and (var == 'TABLESPACES' or var == 'SCHEMAS'):
         value = value.replace(" ", "")
+      if value and (var == 'EXCLUDE_TABLES'):
+        value = escape_dollar(value)
       setattr(self, var, value)
     
     if getattr(self, 'ZDM_BASED_TRANSPORT').strip():
@@ -642,10 +651,18 @@ class TTS_SRC_RUN_VALIDATIONS:
         sql_script = template.get('get_common_schemas')
     elif user_type == "required":
       ts_list = split_into_lines(self._env.TABLESPACES)
+      if self._env.DB_VERSION == '11g':
+        l_user_list_clause = "username not in ('SYS','SYSTEM')"
+      else:
+        l_user_list_clause = "username not in ('SYS','SYSTEM') and common='NO'"
       Configuration.substitutions = {
         'ts_list': ts_list.upper(),
+        'l_user_list_clause': l_user_list_clause,
       }
-      sql_script = template.get('owners_in_tablespaces')
+      if not self._env.SCHEMAS:
+        sql_script = template.get('owners_and_grantee_in_tablespaces')
+      else:
+        sql_script = template.get('owners_in_tablespaces')
     else:
       if not self._env.SCHEMAS:
         print("No schemas provided. Returning a list of required users.")
@@ -1273,7 +1290,8 @@ class TTS_SRC_TDE_KEY_EXPORTER:
       }
     
     try:
-      if not sqlplus.run_sql(template.get('tts_src_export_tde_keys')) or not os.path.exists(tde_keys_path):
+      # if not sqlplus.run_sql(template.get('tts_src_export_tde_keys')) or not os.path.exists(tde_keys_path):
+      if not sqlplus.run_sql(template.get('tts_src_export_tde_keys')):
         print("Export TDE Keys failed. \n")
         raise RuntimeError("TDE key export command failed.")
       print(f"TDE keys exported successfully to {tde_keys_path}.")
@@ -1458,9 +1476,13 @@ class TTS_SRC_RMAN_BACKUP:
     self.host_array = self._env.DB_PROPS_ARRAY[13].split(';')
     self._env.CPU_COUNT = self.calculate_cpu_count()
 
+    if not self._env.DB_PROPS_ARRAY[13]:
+      print("Invalid DATABASE_NAME {0} or the PDB is not open in READ WRITE mode in any instance. Exiting...".format(self._env.DATABASE_NAME))
+      sys.exit(1)
+
     if not self.host_array or self._env.CPU_COUNT <= 0:
       print("No instances or CPUs to construct channel string. Exiting...")
-      return False
+      sys.exit(1)
 
     rman_parms = ""
     if self._env.STORAGE_TYPE == "FSS":
@@ -1580,6 +1602,9 @@ class TTS_SRC_RMAN_BACKUP:
       compressed = "compressed"
       if self._env.DB_VERSION != '11g':
         allow_inconsistent = "allow inconsistent"
+
+    # Remove DATAPUMP Clause from rman restore
+    tablespace_dump_clause = ""
 
     # 11g -> for transport not supported, add section size clause
     # 12c/19c : 
@@ -2110,7 +2135,7 @@ def main(args):
       exit(1)
     log_end_time(start_time)
     
-    _env.platform_id = int(_env.DB_PROPS_ARRAY[4])
+    _env.platform_id = int(_env.DB_PROPS_ARRAY[3])
     _env.version_full = _env.DB_PROPS_ARRAY[9]
     _env.bigfile_tablespaces = _env.DB_PROPS_ARRAY[15].replace(';', ',')
     _env.smallfile_tablespaces = _env.DB_PROPS_ARRAY[16].replace(';', ',')

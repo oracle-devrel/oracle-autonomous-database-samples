@@ -1,4 +1,10 @@
-26.2.1.2 - 05 February 2005
+26.2.3.2 - 20 February 2026
+ + Escape '$' in table names (EXCLUDE_TABLES) e.g. TABLE$1 --> TABLE\$1
+ + Add users to schema list those have obj grants on tbs list if schema list not provided
+ - remove tde keys file check to avoid platform dependency issues
+ + Improve error messages incase of invalid user input for DATABASE_NAME
+
+26.2.1.2 - 05 February 2026
  + Added support to query the TTS Backup Utility version
  + Updated RMAN and Data Pump job names to include the project name
  + Added validation to ensure the tablespace list remains unaltered across backups
