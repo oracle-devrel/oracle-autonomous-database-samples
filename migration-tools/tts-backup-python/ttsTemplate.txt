@@ -274,6 +274,18 @@ get_local_schemas:
 owners_in_tablespaces:
   select distinct owner from dba_tables where tablespace_name in (${ts_list});
 
+owners_and_grantee_in_tablespaces:
+  select distinct username from (
+    select owner as username from dba_tables where tablespace_name in (${ts_list})
+    union
+    select grantee as username from dba_tab_privs 
+    where owner in (
+      select owner from dba_tables where tablespace_name in (${ts_list})
+    ) and grantee in (
+      select username from dba_users where ${l_user_list_clause}
+    )
+  );
+
 object_validation:
   -- SEGMENTS : Physical Segments (tables, indexes, lobs, partitions etc.)
   SELECT 'SEGMENT,' || owner || '.' || segment_name
