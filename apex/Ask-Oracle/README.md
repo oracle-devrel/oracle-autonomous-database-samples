@@ -70,7 +70,7 @@ Builder. This quick video will guide through the steps.
 
 * [Install Ask Oracle Chatbot](https://youtu.be/kjeQ2AC3TFo)
 
-* [You can download the Ask Oracle APEX app here](https://github.com/oracle-devrel/oracle-autonomous-database-samples/blob/main/apex/Ask-Oracle/ADB-AskOracle-Chatbot-2025-10-07.sql)
+* [You can download the Ask Oracle APEX app here](https://github.com/oracle-devrel/oracle-autonomous-database-samples/blob/main/apex/Ask-Oracle/ADB-AskOracle-Chatbot-2026-03-04.sql)
 
 # Resources
 
