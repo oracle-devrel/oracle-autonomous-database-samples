@@ -216,7 +216,17 @@ IS
   -- Helper: grant execute on list of objects
   ----------------------------------------------------------------------------
   PROCEDURE execute_grants(p_schema IN VARCHAR2, p_objects IN priv_list_t) IS
+    l_session_user VARCHAR2(128);
   BEGIN
+    l_session_user := SYS_CONTEXT('USERENV', 'SESSION_USER');
+
+    -- Avoid self-grant errors (ORA-01749) when installer schema == connected user.
+    IF UPPER(p_schema) = UPPER(l_session_user) THEN
+      DBMS_OUTPUT.PUT_LINE('Skipping grants for schema ' || p_schema ||
+                           ' (same as session user).');
+      RETURN;
+    END IF;
+
     EXECUTE IMMEDIATE 'GRANT SELECT ON SYS.V_$PDBS TO ' || p_schema;
     FOR i IN 1 .. p_objects.COUNT LOOP
       BEGIN
@@ -791,6 +801,10 @@ AS
     region           IN VARCHAR2
   ) RETURN CLOB;
 
+  -- Helper: gets the list of compartments using configured credentials
+  FUNCTION list_compartments
+  RETURN CLOB;
+
 
 END oci_object_storage_agents;
 /
@@ -918,6 +932,45 @@ AS
       END;
 
       RETURN l_result_json.to_clob();
+  END list_compartments;
+
+  -- Helper: gets the list of compartments using configured credentials
+  FUNCTION list_compartments
+  RETURN CLOB
+  IS
+      l_result_json    JSON_OBJECT_T := JSON_OBJECT_T();
+      l_current_user   VARCHAR2(128) := SYS_CONTEXT('USERENV', 'CURRENT_USER');
+      l_cfg_json       CLOB;
+      l_cfg            JSON_OBJECT_T;
+      l_params         JSON_OBJECT_T;
+      l_credential_name VARCHAR2(256);
+  BEGIN
+      l_cfg_json := get_agent_config(
+        l_current_user,
+        'SELECTAI_AGENT_CONFIG',
+        'OCI_OBJECT_STORAGE'
+      );
+      l_cfg := JSON_OBJECT_T.parse(l_cfg_json);
+
+      IF l_cfg.get_string('status') = 'success' THEN
+          l_params := l_cfg.get_object('config_params');
+          l_credential_name := l_params.get_string('CREDENTIAL_NAME');
+      END IF;
+
+      IF l_credential_name IS NULL OR TRIM(l_credential_name) IS NULL THEN
+          l_result_json.put('status', 'error');
+          l_result_json.put('message', 'Credential name is not configured. Set CREDENTIAL_NAME in SELECTAI_AGENT_CONFIG before calling this tool.');
+          RETURN l_result_json.to_clob();
+      END IF;
+
+      RETURN list_compartments(credential_name => l_credential_name);
+
+  EXCEPTION
+      WHEN OTHERS THEN
+          l_result_json := JSON_OBJECT_T();
+          l_result_json.put('status', 'error');
+          l_result_json.put('message', 'Error: ' || SQLERRM);
+          RETURN l_result_json.to_clob();
   END list_compartments;
 
   -- Helper: gets the compartment ocid with the given compatment name
@@ -4170,6 +4223,20 @@ IS
       END IF;
     END drop_tool_if_exists;
 BEGIN
+  ------------------------------------------------------------------------
+  -- AI TOOL: LIST_COMPARTMENTS_TOOL
+  -- maps to oci_object_storage_agents.list_compartments
+  ------------------------------------------------------------------------
+  drop_tool_if_exists(tool_name => 'LIST_COMPARTMENTS_TOOL');
+  DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
+    tool_name => 'LIST_COMPARTMENTS_TOOL',
+    attributes => '{
+      "instruction": "List compartments visible to the configured tenancy and credentials, including OCID and lifecycle metadata.",
+      "function": "oci_object_storage_agents.list_compartments"
+    }',
+    description => 'Tool for listing OCI compartments'
+  );
+
   ------------------------------------------------------------------------
   -- AI TOOL: LIST_OBJECTS_TOOL
   -- maps to oci_object_storage_agents.list_objects
