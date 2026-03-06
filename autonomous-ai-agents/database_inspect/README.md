@@ -1,8 +1,9 @@
-# Select AI Inspect - Database Inspection Tool Built Using Select AI Agent
+# Select AI Inspect - Database Inspection Tool Built Using Select AI Agent (23ai/26ai)
 
 ## Overview
 
 Select AI Inspect is an AI-powered database inspection tool built using the **Select AI Agent** framework. It enables users to explore, understand, and interact with database objects and their metadata using natural language.
+This agent is supported only on Oracle Database **23ai** and **26ai**.
 
 For definitions of **Tool**, **Task**, **Agent**, and **Agent Team**, see the top-level guide: [README](../README.md#simple-agent-execution-flow).
 
@@ -48,7 +49,7 @@ Users may define the inspection scope either at the individual object level or a
 
 ## Prerequisites
 
-- Oracle Autonomous AI Database (26ai recommended)
+- Oracle Database 23ai or 26ai (Autonomous AI Database supported)
 - Select AI and `DBMS_CLOUD_AI_AGENT` enabled
 - `ADMIN` or equivalent privileged user for installation
 - A Select AI profile created with `DBMS_CLOUD_AI.CREATE_PROFILE`
@@ -79,27 +80,37 @@ You can also execute the contents of `database_inspect_tool.sql` and `database_i
 
 ## Architecture Overview
 
-Run `database_inspect_tool.sql` to install `DATABASE_INSPECT` package and tools
-   ↓
-Run `database_inspect_agent.sql` to configure and create the inspect agent team
-   ↓
-execute `DATABASE_INSPECT.create_inspect_agent_team(<inspect_agent_team>, <attributes_in_json_object>)` to create an Inspect agent;
-   ↓
+```text
+Run database_inspect_tool.sql to install DATABASE_INSPECT package and tools
+  |
+  v
+Run database_inspect_agent.sql to configure and create the inspect agent team
+  |
+  v
+Execute DATABASE_INSPECT.create_inspect_agent_team(<inspect_agent_team>, <attributes_in_json_object>)
+to create an inspect agent
+  |
+  v
 User query
-   ↓
+  |
+  v
 <inspect_agent_team>
-   ↓
-Agent Reasoning
-   ├── LIST_OBJECTS
-   ├── LIST_INCOMING_DEPENDENCIES
-   ├── LIST_OUTGOING_DEPENDENCIES
-   ├── RETRIEVE_OBJECT_METADATA
-   ├── RETRIEVE_OBJECT_METADATA_CHUNKS
-   ├── EXPAND_OBJECT_METADATA_CHUNK
-   ├── SUMMARIZE_OBJECT
-   └── GENERATE_PLDOC
-   ↓
-Final Verified Answer
+  |
+  v
+Agent reasoning
+  |
+  +-- LIST_OBJECTS
+  +-- LIST_INCOMING_DEPENDENCIES
+  +-- LIST_OUTGOING_DEPENDENCIES
+  +-- RETRIEVE_OBJECT_METADATA
+  +-- RETRIEVE_OBJECT_METADATA_CHUNKS
+  +-- EXPAND_OBJECT_METADATA_CHUNK
+  +-- SUMMARIZE_OBJECT
+  `-- GENERATE_PLDOC
+  |
+  v
+Final verified answer
+```
 
 ---
 

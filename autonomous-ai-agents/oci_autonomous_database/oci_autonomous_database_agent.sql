@@ -115,16 +115,27 @@ EXEC :v_ai_profile_name := '&AI_PROFILE_NAME';
 -- 1. Grants (safe to re-run)
 ----------------------------------------------------------------
 DECLARE
-  l_sql VARCHAR2(500);
+  l_sql          VARCHAR2(500);
+  l_schema       VARCHAR2(128);
+  l_session_user VARCHAR2(128);
 BEGIN
-  l_sql := 'GRANT EXECUTE ON DBMS_CLOUD_AI_AGENT TO ' || :v_schema;
-  EXECUTE IMMEDIATE l_sql;
+  l_schema := DBMS_ASSERT.SIMPLE_SQL_NAME(:v_schema);
+  l_session_user := SYS_CONTEXT('USERENV', 'SESSION_USER');
 
-  l_sql := 'GRANT EXECUTE ON DBMS_CLOUD_AI TO ' || :v_schema;
-  EXECUTE IMMEDIATE l_sql;
+  -- Avoid self-grant errors (ORA-01749) when target schema == connected user.
+  IF UPPER(l_schema) <> UPPER(l_session_user) THEN
+    l_sql := 'GRANT EXECUTE ON DBMS_CLOUD_AI_AGENT TO ' || l_schema;
+    EXECUTE IMMEDIATE l_sql;
 
-  l_sql := 'GRANT EXECUTE ON DBMS_CLOUD TO ' || :v_schema;
-  EXECUTE IMMEDIATE l_sql;
+    l_sql := 'GRANT EXECUTE ON DBMS_CLOUD_AI TO ' || l_schema;
+    EXECUTE IMMEDIATE l_sql;
+
+    l_sql := 'GRANT EXECUTE ON DBMS_CLOUD TO ' || l_schema;
+    EXECUTE IMMEDIATE l_sql;
+  ELSE
+    DBMS_OUTPUT.PUT_LINE('Skipping grants for schema ' || l_schema ||
+                         ' (same as session user).');
+  END IF;
 
   DBMS_OUTPUT.PUT_LINE('Grants completed.');
 END;

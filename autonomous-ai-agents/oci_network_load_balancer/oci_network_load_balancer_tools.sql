@@ -149,7 +149,17 @@ IS
   -- Helper: grant execute on list of objects
   ----------------------------------------------------------------------------
   PROCEDURE execute_grants(p_schema IN VARCHAR2, p_objects IN priv_list_t) IS
+    l_session_user VARCHAR2(128);
   BEGIN
+    l_session_user := SYS_CONTEXT('USERENV', 'SESSION_USER');
+
+    -- Avoid self-grant errors (ORA-01749) when installer schema == connected user.
+    IF UPPER(p_schema) = UPPER(l_session_user) THEN
+      DBMS_OUTPUT.PUT_LINE('Skipping grants for schema ' || p_schema ||
+                           ' (same as session user).');
+      RETURN;
+    END IF;
+
     EXECUTE IMMEDIATE 'GRANT SELECT ON SYS.V_$PDBS TO ' || p_schema;
     FOR i IN 1 .. p_objects.COUNT LOOP
       BEGIN
