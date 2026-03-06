@@ -182,13 +182,11 @@ BEGIN
                 || '- Bullet points for simple lists. '
                 || '- Indented JSON for structured responses. '
                 || 'Use LIST_COMPARTMENTS_TOOL to list compartments. '
-                || 'Use LIST_SUBSCRIBED_REGIONS_TOOL to list regions and confirm with user. '
                 || 'Automatically derive namespace using GET_NAMESPACE_TOOL. '
                 || 'Confirm destructive actions before execution. '
                 || 'User request: {query}",
           "tools": [
                 "LIST_COMPARTMENTS_TOOL",
-                "LIST_SUBSCRIBED_REGIONS_TOOL",
                 "GET_NAMESPACE_TOOL",
                 "CREATE_BUCKET_TOOL",
                 "DELETE_BUCKET_TOOL",
