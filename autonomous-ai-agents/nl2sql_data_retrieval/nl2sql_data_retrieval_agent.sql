@@ -208,7 +208,7 @@ BEGIN
         'invoke GET_URL_CONTENT to validate the source content. ' ||
         'Always present answers in a clearly formatted and readable manner using bullet points. ' ||
         'At the end of the response, add a blank line followed by a **Sources** section. ' ||
-        'If SQL_TOOL was used, include the source tag * DATABASE. ' ||
+        'If SQL_TOOL was used, include the source tag * ORACLE AI DATABASE. ' ||
         'If WEBSEARCH was used, include a * WEBSEARCH section followed by a markdown list of referenced URLs. ' ||
         'If both were used, include both source sections. ' ||
         'Use {current_location} to identify the user location when required. ' ||
