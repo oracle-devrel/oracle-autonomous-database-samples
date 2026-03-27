@@ -5,16 +5,16 @@ rem   Licensed under the Universal Permissive License (UPL), Version 1.0
 rem   https://oss.oracle.com/licenses/upl/
 rem
 rem NAME
-rem   nl2sql_data_retrieval_agent.sql
+rem   oracle_ai_database_agent.sql
 rem
 rem DESCRIPTION
-rem   Installer and configuration script for the NL2SQL Data Retrieval
-rem   AI Agent using DBMS_CLOUD_AI_AGENT (Select AI / Oracle AI Database).
+rem   Installer and configuration script for the Oracle AI Database Agent
+rem   using DBMS_CLOUD_AI_AGENT (Select AI / Oracle AI Database).
 rem
 rem   This script performs an interactive installation of an
-rem   NL2SQL Data Retrieval AI Team by:
+rem   Oracle AI Database Agent team by:
 rem     - Prompting for target schema and AI Profile
-rem     - Granting required DBMS_CLOUD and Select AI privileges
+rem     - Granting required Select AI privileges
 rem     - Creating an installer procedure in the target schema
 rem     - Registering an NL2SQL task with supported analysis tools
 rem     - Creating an NL2SQL Data Retrieval AI Agent bound to the AI Profile
@@ -30,7 +30,7 @@ rem
 rem MAJOR CHANGES IN THIS RELEASE
 rem   - Initial release
 rem   - Added NL2SQL task, agent, and team registration
-rem   - Supports SQL generation, metadata analysis, web search,
+rem   - Supports SQL generation, metadata analysis,
 rem     and chart/visualization generation
 rem   - Interactive installer with schema and AI profile prompts
 rem
@@ -40,17 +40,17 @@ rem        - Enable output and error handling
 rem        - Prompt for target schema and AI profile
 rem
 rem   2. Grants:
-rem        - Grant DBMS_CLOUD_AI_AGENT, DBMS_CLOUD_AI,
-rem          and DBMS_CLOUD privileges to the target schema
+rem        - Grant DBMS_CLOUD_AI_AGENT and DBMS_CLOUD_AI
+rem          privileges to the target schema
 rem
 rem   3. Installer Procedure Creation:
 rem        - Create DATA_RETRIEVAL_AGENT procedure
 rem          in the target schema
 rem
 rem   4. AI Registration:
-rem        - Drop and create NL2SQL_DATA_RETRIEVAL_TASK
-rem        - Drop and create NL2SQL_DATA_RETRIEVAL_AGENT
-rem        - Drop and create NL2SQL_DATA_RETRIEVAL_TEAM
+rem        - Drop and create ORACLE_AI_DATABASE_TASK
+rem        - Drop and create ORACLE_AI_DATABASE_AGENT
+rem        - Drop and create ORACLE_AI_DATABASE_TEAM
 rem
 rem   5. Execution:
 rem        - Execute installer procedure with AI profile parameter
@@ -60,16 +60,16 @@ rem   1. Connect as ADMIN or a privileged user
 rem
 rem   2. Run the script using SQL*Plus or SQLcl:
 rem
-rem      sqlplus admin@db @nl2sql_data_retrieval_agent.sql
+rem      sqlplus admin@db @oracle_ai_database_agent.sql
 rem
 rem   3. Provide inputs when prompted:
 rem        - Target schema name
 rem        - AI Profile name
 rem
 rem   4. Verify installation by confirming:
-rem        - NL2SQL_DATA_RETRIEVAL_TASK exists
-rem        - NL2SQL_DATA_RETRIEVAL_AGENT is created
-rem        - NL2SQL_DATA_RETRIEVAL_TEAM is registered
+rem        - ORACLE_AI_DATABASE_TASK exists
+rem        - ORACLE_AI_DATABASE_AGENT is created
+rem        - ORACLE_AI_DATABASE_TEAM is registered
 rem
 rem PARAMETERS
 rem   INSTALL_SCHEMA (Prompted)
@@ -77,14 +77,14 @@ rem     Target schema where the installer procedure,
 rem     task, agent, and team are created.
 rem
 rem   PROFILE_NAME (Prompted)
-rem     AI Profile name used to bind the NL2SQL agent.
+rem     AI Profile name used to bind the Oracle AI Database Agent.
 rem
 rem NOTES
 rem   - Script is safe to re-run; existing tasks, agents,
 rem     and teams are dropped and recreated.
 rem
-rem   - SQL and web-based data sources are clearly
-rem     attributed in the agent response.
+rem   - SQL data sources are clearly attributed in the
+rem     agent response.
 rem
 rem   - Script exits immediately on SQL errors.
 rem
@@ -95,7 +95,7 @@ SET SERVEROUTPUT ON
 SET VERIFY OFF
 
 PROMPT ======================================================
-PROMPT NL2SQL Data Retrieval Agent Installer
+PROMPT Oracle AI Database Agent Installer
 PROMPT ======================================================
 
 -- Target schema
@@ -126,8 +126,6 @@ BEGIN
     l_sql := 'GRANT EXECUTE ON DBMS_CLOUD_AI TO ' || l_schema;
     EXECUTE IMMEDIATE l_sql;
 
-    l_sql := 'GRANT EXECUTE ON DBMS_CLOUD TO ' || l_schema;
-    EXECUTE IMMEDIATE l_sql;
   ELSE
     DBMS_OUTPUT.PUT_LINE('Skipping grants for schema ' || l_schema ||
                          ' (same as session user).');
@@ -154,7 +152,7 @@ AUTHID DEFINER
 AS
 BEGIN
   DBMS_OUTPUT.PUT_LINE('--------------------------------------------');
-  DBMS_OUTPUT.PUT_LINE('Starting Data Retrieval Agent Team installation');
+  DBMS_OUTPUT.PUT_LINE('Starting Oracle AI Database Agent team installation');
   DBMS_OUTPUT.PUT_LINE('--------------------------------------------');
   
   ------------------------------------------------------------
@@ -165,14 +163,14 @@ BEGIN
     BEGIN
     
     DELETE FROM SELECTAI_AGENT_CONFIG
-    WHERE KEY='AGENT_AI_PROFILE' AND AGENT='NL2SQL_DATA_RETRIEVAL_AGENT';
+    WHERE KEY='AGENT_AI_PROFILE' AND AGENT='ORACLE_AI_DATABASE_AGENT';
     COMMIT;
     
     INSERT INTO SELECTAI_AGENT_CONFIG ("KEY", "VALUE", "AGENT")
     VALUES (
       'AGENT_AI_PROFILE',
       p_profile_name,
-      'NL2SQL_DATA_RETRIEVAL_AGENT'
+      'ORACLE_AI_DATABASE_AGENT'
     );
     
     COMMIT;
@@ -183,13 +181,13 @@ BEGIN
   -- DROP and CREATE TASK
   ------------------------------------------------------------
   BEGIN
-    DBMS_CLOUD_AI_AGENT.DROP_TASK('NL2SQL_DATA_RETRIEVAL_TASK');
+    DBMS_CLOUD_AI_AGENT.DROP_TASK('ORACLE_AI_DATABASE_TASK');
   EXCEPTION
     WHEN OTHERS THEN NULL;
   END;
 
     DBMS_CLOUD_AI_AGENT.CREATE_TASK(
-      task_name   => 'NL2SQL_DATA_RETRIEVAL_TASK',
+      task_name   => 'ORACLE_AI_DATABASE_TASK',
       description => 'Task for natural language to SQL data retrieval, analysis, and visualization.',
       attributes  =>
         '{' ||
@@ -204,13 +202,9 @@ BEGIN
         'Do not modify, reformat, or add any extra text inside the JSON block. ' ||
         'You may use DISTINCT_VALUES_CHECK or RANGE_VALUES_CHECK tools to analyze column values, ' ||
         'but you must clearly explain which values were selected and why in the final response. ' ||
-        'You may use WEBSEARCH to retrieve external information. If the answer cannot be verified directly from the search snippet, ' ||
-        'invoke GET_URL_CONTENT to validate the source content. ' ||
         'Always present answers in a clearly formatted and readable manner using bullet points. ' ||
         'At the end of the response, add a blank line followed by a **Sources** section. ' ||
         'If SQL_TOOL was used, include the source tag * ORACLE AI DATABASE. ' ||
-        'If WEBSEARCH was used, include a * WEBSEARCH section followed by a markdown list of referenced URLs. ' ||
-        'If both were used, include both source sections. ' ||
         'Use {current_location} to identify the user location when required. ' ||
         'Use {logged_in_user} to identify the current user when required. ' ||
         'Current system time: {current_time}. ' ||
@@ -219,65 +213,64 @@ BEGIN
           '"SQL_TOOL",' ||
           '"DISTINCT_VALUES_CHECK",' ||
           '"RANGE_VALUES_CHECK",' ||
-          '"WEBSEARCH",' ||
-          '"GET_URL_CONTENT",' ||
           '"GENERATE_CHART"' ||
         '],' ||
         '"enable_human_tool":"false"' ||
         '}'
     );
   
-  DBMS_OUTPUT.PUT_LINE('Created task NL2SQL_DATA_RETRIEVAL_TASK');
+  DBMS_OUTPUT.PUT_LINE('Created task ORACLE_AI_DATABASE_TASK');
 
   ------------------------------------------------------------
   -- DROP and CREATE AGENT
   ------------------------------------------------------------
   BEGIN
-    DBMS_CLOUD_AI_AGENT.DROP_AGENT('NL2SQL_DATA_RETRIEVAL_AGENT');
-    DBMS_OUTPUT.PUT_LINE('Dropped agent NL2SQL_DATA_RETRIEVAL_AGENT');
+    DBMS_CLOUD_AI_AGENT.DROP_AGENT('ORACLE_AI_DATABASE_AGENT');
+    DBMS_OUTPUT.PUT_LINE('Dropped agent ORACLE_AI_DATABASE_AGENT');
   EXCEPTION
     WHEN OTHERS THEN
-      DBMS_OUTPUT.PUT_LINE('Agent NL2SQL_DATA_RETRIEVAL_AGENT does not exist, skipping');
+      DBMS_OUTPUT.PUT_LINE('Agent ORACLE_AI_DATABASE_AGENT does not exist, skipping');
   END;
 
     DBMS_CLOUD_AI_AGENT.CREATE_AGENT(
-      agent_name => 'NL2SQL_DATA_RETRIEVAL_AGENT',
+      agent_name => 'ORACLE_AI_DATABASE_AGENT',
       attributes =>
         '{' || 
         '"profile_name":"' || p_profile_name || '",' ||
         '"role":"You are a professional data analyst with deep knowledge of SQL, PL/SQL, and modern database features who owns different custom databases. ' ||
-        'You are also highly informed about current affairs and general knowledge about world demographics. ' ||
         'Always answer in a professional manner without any greetings."' ||
         '}',
       description => 'AI agent for natural language to SQL data retrieval'
     );
 
-  DBMS_OUTPUT.PUT_LINE('Created agent NL2SQL_DATA_RETRIEVAL_AGENT');
+  DBMS_OUTPUT.PUT_LINE('Created agent ORACLE_AI_DATABASE_AGENT');
 
   ------------------------------------------------------------
   -- DROP and CREATE TEAM
   ------------------------------------------------------------
   BEGIN
-    DBMS_CLOUD_AI_AGENT.DROP_TEAM('NL2SQL_DATA_RETRIEVAL_TEAM');
-    DBMS_OUTPUT.PUT_LINE('Dropped team NL2SQL_DATA_RETRIEVAL_TEAM');
+    DBMS_CLOUD_AI_AGENT.DROP_TEAM('ORACLE_AI_DATABASE_TEAM');
+    DBMS_OUTPUT.PUT_LINE('Dropped team ORACLE_AI_DATABASE_TEAM');
   EXCEPTION
     WHEN OTHERS THEN
-      DBMS_OUTPUT.PUT_LINE('Team NL2SQL_DATA_RETRIEVAL_TEAM does not exist, skipping');
+      DBMS_OUTPUT.PUT_LINE('Team ORACLE_AI_DATABASE_TEAM does not exist, skipping');
   END;
 
   DBMS_CLOUD_AI_AGENT.CREATE_TEAM(
-      team_name  => 'NL2SQL_DATA_RETRIEVAL_TEAM',
+      team_name  => 'ORACLE_AI_DATABASE_TEAM',
       attributes =>
         '{' ||
-        '"agents":[{"name":"NL2SQL_DATA_RETRIEVAL_AGENT","task":"NL2SQL_DATA_RETRIEVAL_TASK"}],' ||
+        '"agents":[{"name":"ORACLE_AI_DATABASE_AGENT","task":"ORACLE_AI_DATABASE_TASK"}],' ||
         '"process":"sequential"' ||
-        '}'
+        '}',
+      description =>
+        'The Oracle Autonomous AI Database Agent for Natural Language Queries (Preview) provides a seamless natural language interface for querying enterprise data stored in Oracle Database on Google Cloud. Integrated with Gemini Enterprise, this agent removes the need to build custom natural language processing pipelines by automatically translating plain text inputs into optimized SQL queries. It executes these queries against your Oracle database, retrieves results, and returns formatted data interpretations, all within the Gemini experience.'
   );
 
-  DBMS_OUTPUT.PUT_LINE('Created team NL2SQL_DATA_RETRIEVAL_TEAM');
+  DBMS_OUTPUT.PUT_LINE('Created team ORACLE_AI_DATABASE_TEAM');
 
   DBMS_OUTPUT.PUT_LINE('------------------------------------------------');
-  DBMS_OUTPUT.PUT_LINE('NL2SQL Data Retrieval Team installation COMPLETE');
+  DBMS_OUTPUT.PUT_LINE('Oracle AI Database Team installation COMPLETE');
   DBMS_OUTPUT.PUT_LINE('------------------------------------------------');
   
 END data_retrieval_agent;
