@@ -1027,7 +1027,7 @@ BEGIN
                     "tool_inputs": [{"name": "match_type",
                                      "mandatory": false,
                                      "description": "Type of filtering technique to use: ' ||
-                                                    '1.fuzzy - uses FUZZY MATCH  string comparison in Oracle 23ai; ' ||
+                                                    '1.fuzzy - uses FUZZY MATCH string comparison; ' ||
                                                     '2.exact - uses ''='' operator for exact matches; ' ||
                                                     '3.regex - uses REGEXP_LIKE for regular expression matching of the pattern."},
                                     {"name": "match_pattern",
@@ -1082,4 +1082,3 @@ END;
 /
 
 alter session set current_schema = ADMIN;
-
