@@ -1,9 +1,9 @@
-# Select AI Inspect - Database Inspection Tool Built Using Select AI Agent (23ai/26ai)
+# Select AI Inspect - Database Inspection Tool Built Using Select AI Agent (26ai)
 
 ## Overview
 
 Select AI Inspect is an AI-powered database inspection tool built using the **Select AI Agent** framework. It enables users to explore, understand, and interact with database objects and their metadata using natural language.
-This agent is supported only on Oracle Database **23ai** and **26ai**.
+This agent is supported only on Oracle Database **26ai**.
 
 For definitions of **Tool**, **Task**, **Agent**, and **Agent Team**, see the top-level guide: [README](../README.md#simple-agent-execution-flow).
 
@@ -49,7 +49,7 @@ Users may define the inspection scope either at the individual object level or a
 
 ## Prerequisites
 
-- Oracle Database 23ai or 26ai (Autonomous AI Database supported)
+- Oracle Database 26ai (Autonomous AI Database supported)
 - Select AI and `DBMS_CLOUD_AI_AGENT` enabled
 - `ADMIN` or equivalent privileged user for installation
 - A Select AI profile created with `DBMS_CLOUD_AI.CREATE_PROFILE`
