@@ -2,8 +2,6 @@
 
 This repository contains prerequisite SQL objects (views) to support **optimal parallel processing** and **reliable restart capability** when migrating from **non-Oracle (heterogeneous) source databases**.
 
-You can place the SQL statements provided below into separate files (recommended structure included).
-
 ---
 
 ## Overview
@@ -30,19 +28,14 @@ If the required views are **not** created on the source database, the migration 
 ### Purpose
 To enable parallel processing and reliable restart capability on a PostgreSQL source database, create the required views.
 
-### Files (recommended)
-Place the SQL into files such as:
-
-- `postgres/ALL_TAB_PARTITIONS.sql`
-- `postgres/ALL_PART_KEY_COLUMNS.sql`
-- `postgres/ALL_PART_TABLES.sql`
+### Files
+- `postgres/views.sql`
 
 ### Required Views
 - `ALL_TAB_PARTITIONS`
 - `ALL_PART_KEY_COLUMNS`
 - `ALL_PART_TABLES`
 
-> Add the PostgreSQL SQL definitions to the files above.
 
 ---
 
@@ -56,12 +49,8 @@ Place the SQL into files such as:
 ### Purpose
 To enable parallel processing and reliable restart capability on a MySQL source database, create the required views.
 
-### Files (recommended)
-Place the SQL into files such as:
-
-- `mysql/ALL_PART_TABLES.sql`
-- `mysql/ALL_PART_KEY_COLUMNS.sql`
-- `mysql/ALL_TAB_PARTITIONS.sql`
+### Files
+- `mysql/views.sql`
 
 ### Required Views
 - `ALL_PART_TABLES`
