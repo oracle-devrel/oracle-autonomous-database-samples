@@ -11,6 +11,12 @@ rem DESCRIPTION
 rem   Installer script for DATABASE_INSPECT package and tool framework.
 rem   (Select AI Agent / Oracle AI Database)
 rem
+rem RELEASE VERSION
+rem   1.1
+rem
+rem RELEASE DATE
+rem   5-Feb-2026
+rem
 rem   This script:
 rem     - Grants required privileges to the target schema
 rem     - Switches session to the target schema
@@ -42,6 +48,8 @@ PROMPT ======================================================
 -- Target schema
 VAR v_schema VARCHAR2(128)
 EXEC :v_schema := '&SCHEMA_NAME';
+VAR v_invoker_schema VARCHAR2(128)
+EXEC :v_invoker_schema := SYS_CONTEXT('USERENV', 'SESSION_USER');
 
 
 CREATE OR REPLACE PROCEDURE initialize_database_inspect_tools(
@@ -49,6 +57,7 @@ CREATE OR REPLACE PROCEDURE initialize_database_inspect_tools(
 )
 IS
   l_schema_name VARCHAR2(128);
+  l_session_user VARCHAR2(128) := SYS_CONTEXT('USERENV', 'SESSION_USER');
 
   TYPE priv_list_t IS VARRAY(50) OF VARCHAR2(4000);
   l_priv_list CONSTANT priv_list_t := priv_list_t(
@@ -65,14 +74,14 @@ IS
     p_objects IN priv_list_t
   )
   IS
-    l_session_user VARCHAR2(128);
   BEGIN
-    l_session_user := SYS_CONTEXT('USERENV', 'SESSION_USER');
-
-    -- Avoid self-grant errors (ORA-01749) when installer schema == connected user.
+    -- Granting privileges to the current session user is a no-op and raises
+    -- ORA-01749. Skip that case to keep reruns clean.
     IF UPPER(p_schema) = UPPER(l_session_user) THEN
-      DBMS_OUTPUT.PUT_LINE('Skipping grants for schema ' || p_schema ||
-                           ' (same as session user).');
+      DBMS_OUTPUT.PUT_LINE(
+        'Skipping EXECUTE grants because target schema ' || p_schema ||
+        ' is the current session user.'
+      );
       RETURN;
     END IF;
 
@@ -81,8 +90,12 @@ IS
         EXECUTE IMMEDIATE 'GRANT EXECUTE ON ' || p_objects(i) || ' TO ' || p_schema;
       EXCEPTION
         WHEN OTHERS THEN
-          DBMS_OUTPUT.PUT_LINE('Warning: failed to grant ' || p_objects(i) ||
-                               ' to ' || p_schema || ' - ' || SQLERRM);
+          IF SQLCODE = -1749 THEN
+            NULL;
+          ELSE
+            DBMS_OUTPUT.PUT_LINE('Warning: failed to grant ' || p_objects(i) ||
+                                 ' to ' || p_schema || ' - ' || SQLERRM);
+          END IF;
       END;
     END LOOP;
   END execute_grants;
@@ -149,7 +162,9 @@ CREATE OR REPLACE PACKAGE database_inspect AUTHID CURRENT_USER AS
   OBJECT_FUNCTION       CONSTANT DBMS_ID := 'FUNCTION';
   OBJECT_TRIGGER        CONSTANT DBMS_ID := 'TRIGGER';
   OBJECT_VIEW           CONSTANT DBMS_ID := 'VIEW';
-  OBJECT_TYPE           CONSTANT DBMS_ID := 'TYPE';
+  -- Avoid confusion with object_type
+  OBJECT_TYPE_TYPE      CONSTANT DBMS_ID := 'TYPE';
+  OBJECT_TYPE_BODY      CONSTANT DBMS_ID := 'TYPE BODY';
 
   -- Reserved name for internal tables
   INSPECT_AGENT_TEAMS             CONSTANT DBMS_ID := 'DATABASE_INSPECT_AGENT_TEAMS$';
@@ -174,7 +189,6 @@ CREATE OR REPLACE PACKAGE database_inspect AUTHID CURRENT_USER AS
   TOOL_EXPAND_OBJECT_METADATA_CHUNK     CONSTANT DBMS_ID := 'expand_object_metadata_chunk';
   TOOL_SUMMARIZE_OBJECT                 CONSTANT DBMS_ID := 'summarize_object';
   TOOL_GENERATE_PLDOC                   CONSTANT DBMS_ID := 'generate_pldoc';
-  TOOL_GENERATE_GRAPH                   CONSTANT DBMS_ID := 'generate_graph';
 
   -- Vector distance types
   VEC_DIST_COSINE        CONSTANT DBMS_ID     := 'cosine';
@@ -269,14 +283,22 @@ CREATE OR REPLACE PACKAGE database_inspect AUTHID CURRENT_USER AS
 
 
   -----------------------------------------------------------------------------
-  -- expand_object_metadata_chunk: Returns a concatenated CLOB of 
-  -- vectorized code snippets surrounding a specified content index for a given
-  -- object.
+  -- expand_object_metadata_chunk: Returns a JSON CLOB containing expanded
+  -- source code and its corresponding line range for a specified content index
+  -- within a given object.
   --
-  -- The function retrieves snippets whose content_index falls within
-  -- ± search_range of the provided content_index, ordered by content_index
-  -- to preserve the original code sequence.
-  -- Tool name will contain the id for the agent team.
+  -- The function retrieves vectorized code snippets whose content_index falls
+  -- within ± search_range of the provided content_index. The snippets are
+  -- ordered by content_index to reconstruct the original code sequence.
+  --
+  -- The returned JSON object contains:
+  --   - code: the concatenated expanded code snippet
+  --   - start_line: the starting line number of the expanded code in the
+  --                 original source (minimum start_line across the snippets)
+  --   - end_line: the ending line number of the expanded code in the original
+  --               source (maximum end_line across the snippets)
+  --
+  -- Tool name contains the identifier of the agent team.
   -----------------------------------------------------------------------------
   FUNCTION expand_object_metadata_chunk(
     tool_name              IN VARCHAR2,
@@ -313,20 +335,6 @@ CREATE OR REPLACE PACKAGE database_inspect AUTHID CURRENT_USER AS
     object_type       IN VARCHAR2,
     object_owner      IN VARCHAR2,
     user_prompt       IN CLOB DEFAULT NULL
-  ) RETURN CLOB;
-
-
-  -----------------------------------------------------------------------------
-  -- generate_chart: Generates graph content from a natural language prompt and
-  -- relationship context (Mermaid or HTML tree).
-  -- Tool name will contain the id for the agent team.
-  -----------------------------------------------------------------------------
-  FUNCTION generate_chart(
-    tool_name         IN VARCHAR2,
-    chart_prompt      IN CLOB,
-    output_format     IN VARCHAR2 DEFAULT 'mermaid',
-    graph_style       IN VARCHAR2 DEFAULT 'auto',
-    graph_direction   IN VARCHAR2 DEFAULT 'TB'
   ) RETURN CLOB;
 
 
@@ -624,9 +632,7 @@ CREATE OR REPLACE PACKAGE BODY database_inspect AS
                          TOOL_RETRIEVE_OBJECT_METADATA, 
                          TOOL_RETRIEVE_OBJECT_METADATA_CHUNKS,
                          TOOL_EXPAND_OBJECT_METADATA_CHUNK, 
-                         TOOL_SUMMARIZE_OBJECT, TOOL_GENERATE_PLDOC,
-                         TOOL_GENERATE_GRAPH,
-                         'generate_dependency_chart') 
+                         TOOL_SUMMARIZE_OBJECT, TOOL_GENERATE_PLDOC) 
     THEN
       raise_application_error(-20000, 'Invalid tool type - ' || tool_type);
     END IF;
@@ -1312,7 +1318,7 @@ CREATE OR REPLACE PACKAGE BODY database_inspect AS
   IS
     l_metdata               CLOB := '';
     l_chunk_size            NUMBER;
-    l_start_position        NUMBER;
+    l_start_position        NUMBER := 1;
     l_chunk                 CLOB;
     l_new_line_index        NUMBER;
     l_metadata_js           JSON_OBJECT_T;
@@ -1326,6 +1332,8 @@ CREATE OR REPLACE PACKAGE BODY database_inspect AS
     l_provider              DBMS_ID;
     l_vector_table_name     VARCHAR2(200) := VECTOR_TABLE_PREFIX || 
                                              agent_team_name;
+    l_start_line_number     NUMBER := 1;
+    l_end_line_number       NUMBER;
 
     PROCEDURE store_vector
     IS
@@ -1366,7 +1374,9 @@ CREATE OR REPLACE PACKAGE BODY database_inspect AS
 
     PROCEDURE store_chunk(
       content         IN CLOB,
-      content_index   IN NUMBER
+      content_index   IN NUMBER,
+      start_line      IN NUMBER,
+      end_line        IN NUMBER
     ) 
     IS
     BEGIN
@@ -1376,6 +1386,8 @@ CREATE OR REPLACE PACKAGE BODY database_inspect AS
       l_metadata_js.put('object_type', obj_type);
       l_metadata_js.put('content_index', content_index);
       l_metadata_js.put('content', content);
+      l_metadata_js.put('start_line', start_line);
+      l_metadata_js.put('end_line', end_line);
 
       l_point := JSON_OBJECT_T('{}');
       l_point.put('payload', l_metadata_js);
@@ -1405,7 +1417,6 @@ CREATE OR REPLACE PACKAGE BODY database_inspect AS
       l_chunk_size := DEFAULT_CHUNK_SIZE;
     END IF;
 
-    l_start_position := 1;
     WHILE l_start_position < LENGTH(l_metdata) LOOP
       l_chunk := SUBSTR(l_metdata, l_start_position, l_chunk_size);
       l_new_line_index := INSTR(l_chunk, CHR(10), -1, 1);
@@ -1414,12 +1425,19 @@ CREATE OR REPLACE PACKAGE BODY database_inspect AS
       THEN
         l_chunk := SUBSTR(l_chunk, 1, l_new_line_index);
         l_start_position := l_start_position + l_new_line_index;
+        l_end_line_number := l_start_line_number + 
+                             REGEXP_COUNT(l_chunk, CHR(10)) - 1;
       ELSE
         l_start_position := l_start_position + l_chunk_size;
+        l_end_line_number := l_start_line_number + 
+                             REGEXP_COUNT(l_chunk, CHR(10));
       END IF;
       l_content_index := l_content_index + 1;
 
-      store_chunk(l_chunk, l_content_index);
+
+      store_chunk(l_chunk, l_content_index, l_start_line_number, 
+                  l_end_line_number);
+      l_start_line_number := l_end_line_number + 1;
     END LOOP;
 
     IF l_points_arr.get_size > 0 THEN
@@ -1511,7 +1529,6 @@ CREATE OR REPLACE PACKAGE BODY database_inspect AS
     profile_name        IN VARCHAR2
   )
   IS
-    l_embedding         JSON_ARRAY_T;
     l_chunk_size        NUMBER;
     l_dummy_prompt      CLOB;
     l_vector_dimension  NUMBER;
@@ -1522,6 +1539,10 @@ CREATE OR REPLACE PACKAGE BODY database_inspect AS
     l_text_index_name   VARCHAR2(200);
     l_count             NUMBER;
     l_distance_type     DBMS_ID := VEC_DIST_COSINE;
+    l_dummy_payload     JSON_OBJECT_T;
+    l_dummy_point       JSON_OBJECT_T;
+    l_points_arr        JSON_ARRAY_T := JSON_ARRAY_T('[]');
+    l_embed_arr         JSON_ARRAY_T;
   BEGIN
     l_vector_table_name := VECTOR_TABLE_PREFIX || agent_team_name;
     l_vector_index_name := VECTOR_INDEX_PREFIX || agent_team_name;
@@ -1542,16 +1563,22 @@ CREATE OR REPLACE PACKAGE BODY database_inspect AS
         INITCAP(l_provider) || ' is not supported for vector embeddings.');
     END IF;
 
-    -- Validate the dimension using a dummy vector embedding request
+    -- Use the same embedding path as object registration so the vector table
+    -- dimension always matches the vectors we later insert.
     l_dummy_prompt := DBMS_RANDOM.string('a', l_chunk_size);
-    l_embedding := JSON_ARRAY_T(
-                        DBMS_CLOUD_AI.generate(
-                          prompt        => l_dummy_prompt,
-                          profile_name  => profile_name,
-                          action        => 'embedding'));
+    l_dummy_payload := JSON_OBJECT_T('{}');
+    l_dummy_payload.put('content', l_dummy_prompt);
+    l_dummy_point := JSON_OBJECT_T('{}');
+    l_dummy_point.put('payload', l_dummy_payload);
+    l_points_arr.append(l_dummy_point);
+
+    get_embedding_batch(agent_team_name => agent_team_name,
+                        points_arr      => l_points_arr);
+    l_embed_arr := TREAT(l_points_arr.get(0) AS JSON_OBJECT_T)
+                     .get_array('vector');
 
     -- Get value for dimension
-    l_vector_dimension := l_embedding.get_size();
+    l_vector_dimension := l_embed_arr.get_size();
     
     drop_vector_table(agent_team_name);
 
@@ -1702,11 +1729,13 @@ CREATE OR REPLACE PACKAGE BODY database_inspect AS
         SELECT object_name, object_type FROM all_objects
           WHERE owner = owner_name AND 
                 object_type IN (OBJECT_TABLE, OBJECT_VIEW, OBJECT_TRIGGER,
-                                OBJECT_TYPE, OBJECT_FUNCTION, OBJECT_PROCEDURE,
+                                OBJECT_TYPE_TYPE, OBJECT_FUNCTION, 
+                                OBJECT_PROCEDURE,
                                 OBJECT_PACKAGE, OBJECT_PACKAGE_BODY)
       ) LOOP
           IF m.object_type IN (OBJECT_TABLE, OBJECT_VIEW, OBJECT_TRIGGER,
-                               OBJECT_TYPE, OBJECT_FUNCTION, OBJECT_PROCEDURE,
+                               OBJECT_TYPE_TYPE, OBJECT_FUNCTION, 
+                               OBJECT_PROCEDURE,
                                OBJECT_PACKAGE, OBJECT_PACKAGE_BODY) AND
             -- Avoid set the database_inspect package
             (m.object_type NOT IN (OBJECT_PACKAGE, OBJECT_PACKAGE_BODY) OR 
@@ -1718,10 +1747,15 @@ CREATE OR REPLACE PACKAGE BODY database_inspect AS
              (m.object_name NOT IN (INSPECT_AGENT_TEAMS, 
                                     INSPECT_AGENT_TEAM_ATTRIBUTES, 
                                     INSPECT_OBJECTS) AND
-              m.object_name NOT LIKE VECTOR_TABLE_PREFIX || '%' AND                    
+              m.object_name NOT LIKE VECTOR_TABLE_PREFIX || '%' AND   
+              m.object_name NOT LIKE 'COPY$%' AND   
+              m.object_name NOT LIKE 'SYNTHETIC_DATA$%' AND    
+              m.object_name NOT LIKE 'DM$%' AND  
+              m.object_name NOT LIKE 'PIPELINE$%' AND
               -- Internal tables for Select AI Agent
               m.object_name NOT IN ('ADB_CHAT_PROMPTS', 
-                                    'DBTOOLS$EXECUTION_HISTORY', 
+                                    'DBTOOLS$EXECUTION_HISTORY',
+                                    'ASK_ORACLE_AUTO_VISUAL_LOG', 
                                     'PIN_CONVERSATIONS', 
                                     'CONVERSATION_TIME') AND
               m.object_name NOT LIKE 'SYS_%'))
@@ -1729,8 +1763,7 @@ CREATE OR REPLACE PACKAGE BODY database_inspect AS
             AND (m.object_type NOT IN (OBJECT_PACKAGE, OBJECT_PACKAGE_BODY, 
                                        OBJECT_PROCEDURE) OR
                  m.object_name NOT IN ('ADB_CHAT', 'PROCESS_PROMPT_REQUEST', 
-                                       'SET_THEME_STYLE_FOR_APP', 
-                                       'SET_THEME_STYLE_FOR_APP')
+                                       'SET_THEME_STYLE_FOR_APP','ASK_ORACLE_GET_AGENT_AUTO_VISUAL')
             )
           -- You can add more tables here that you want to skip during 
           -- schema registration.
@@ -1828,12 +1861,6 @@ CREATE OR REPLACE PACKAGE BODY database_inspect AS
     l_tool_summarize_object VARCHAR2(200) := TOOL_SUMMARIZE_OBJECT || 
                                                  tool_name_suffix;
     l_tool_generate_pldoc VARCHAR2(200) := TOOL_GENERATE_PLDOC || 
-                                                 tool_name_suffix;
-    l_tool_generate_graph VARCHAR2(200) := 
-                                                 TOOL_GENERATE_GRAPH || 
-                                                 tool_name_suffix;
-    l_tool_generate_graph_legacy VARCHAR2(200) := 
-                                                 'generate_dependency_chart' || 
                                                  tool_name_suffix;
   BEGIN
     -- TOOL: list_objects
@@ -1956,60 +1983,6 @@ CREATE OR REPLACE PACKAGE BODY database_inspect AS
         }'
     );
 
-    -- TOOL: generate_graph
-    BEGIN
-      DBMS_CLOUD_AI_AGENT.drop_tool(l_tool_generate_graph);
-    EXCEPTION
-      WHEN OTHERS THEN
-        NULL;
-    END;
-    -- Backward compatibility cleanup for prior tool name.
-    BEGIN
-      DBMS_CLOUD_AI_AGENT.drop_tool(l_tool_generate_graph_legacy);
-    EXCEPTION
-      WHEN OTHERS THEN
-        NULL;
-    END;
-    DBMS_CLOUD_AI_AGENT.create_tool(
-      tool_name => l_tool_generate_graph,
-      attributes => '{
-                      "instruction": "Use this tool to generate relationship visualization output as Mermaid syntax or HTML tree markup. ' ||
-                                     'Supported scenarios include dependency maps, hierarchy trees, binary-tree style layouts, and general relationship networks. ' ||
-                                     'Before calling this tool, collect/validate relationship data with discovery tools such as ' || l_tool_list_objects || ', ' || l_tool_list_incoming_deps || ', and ' || l_tool_list_outgoing_deps || ' whenever possible. ' ||
-                                     'Provide a complete chart_prompt that includes the nodes and directed edges to visualize. ' ||
-                                     'Use output_format to choose the rendering format, then use graph_style and graph_direction to guide layout. ' ||
-                                     'The output must be raw generated content only (no markdown fences and no explanation text).",
-                      "tool_inputs": [
-                        {
-                          "name": "tool_name",
-                          "mandatory": true,
-                          "description": "The name of the current tool to call."
-                        },
-                        {
-                          "name": "chart_prompt",
-                          "mandatory": true,
-                          "description": "A detailed prompt describing relationships to render, including nodes and directed edges."
-                        },
-                        {
-                          "name": "output_format",
-                          "mandatory": false,
-                          "description": "Optional output format. Allowed values: mermaid, html_tree. Default is mermaid."
-                        },
-                        {
-                          "name": "graph_style",
-                          "mandatory": false,
-                          "description": "Optional layout preference. Allowed values: auto, binary_tree, hierarchical, network, dependency."
-                        },
-                        {
-                          "name": "graph_direction",
-                          "mandatory": false,
-                          "description": "Optional Mermaid flow direction: TB, LR, BT, or RL. Default is TB."
-                        }
-                      ],
-                      "function": "' || DATABASE_INSPECT_PACKAGE || '.generate_chart"
-      }'
-    );
-
     -- TOOL: retrieve_object_metadata
     BEGIN
       DBMS_CLOUD_AI_AGENT.drop_tool(l_tool_retrieve_object_metadata);
@@ -2023,7 +1996,8 @@ CREATE OR REPLACE PACKAGE BODY database_inspect AS
                       "instruction": "Use this tool to retrieve the full metadata (DDL) of a specified database object. ' ||
                                      'This is useful when you need to inspect the complete definition of an object (for example, table structure, trigger definition, or a standalone procedure/function) as part of a code analysis or impact assessment. ' ||
                                      'It is recommended to use this tool directly for relatively small object types such as: [TABLE, VIEW, TRIGGER, PROCEDURE, FUNCTION, TYPE], because their metadata is usually compact and unlikely to exceed the LLM token limit. ' ||
-                                     'However, for large objects such as PACKAGE, PACKAGE BODY, or SCHEMA-level metadata, the result can be very large and may exceed the LLM''s token budget. For these cases, only call retrieve_object_metadata when you truly need the full DDL; otherwise, prefer using retrieve_object_metadata_chunks (optionally scoped by object_list) and expand_object_metadata_chunk to retrieve just the relevant code sections. ' ||
+                                     'However, for large objects such as PACKAGE, PACKAGE BODY, the result can be very large and may exceed the LLM''s token budget. For these cases, only call retrieve_object_metadata when you truly need the full DDL; otherwise, prefer using retrieve_object_metadata_chunks (optionally scoped by object_list) and expand_object_metadata_chunk to retrieve just the relevant code sections. ' ||
+                                     'Do not use this tool for to get the full SCHEMA-level metadata. ' ||
                                      'Before calling this tool, you should always identify and validate the correct object_name, object_type, and object_owner using ' || l_tool_list_objects || ' (or ' || l_tool_list_incoming_deps || ' or ' || l_tool_list_outgoing_deps || ' when doing impact analysis).",
                       "tool_inputs": [
                             {
@@ -2065,7 +2039,7 @@ CREATE OR REPLACE PACKAGE BODY database_inspect AS
                                     'The keyword MUST follow Oracle Text syntax and be wrapped in braces, for example: ''{keyword_1}''. ' ||
                                     'To specify multiple keywords, you may use logical expressions such as ''{keyword_1} OR {keyword_2}'' or ''{keyword_1} AND {keyword_2}''. ' ||
                                     'If object_list is provided, search results are further restricted to the specified objects. ' ||
-                                    'Each returned JSON item contains: the code snippet (data), metadata including object_owner, object_name, object_type, and content_index, as well as scoring information used to rank the results. ' ||
+                                    'Each returned JSON item contains: the code snippet (data), metadata including object_owner, object_name, object_type, line range (start_line, end_line) of the snippet in the source code, and content_index identifying the snippet within the object. It also contains scoring information used to rank the results. ' ||
                                     'Do not rely solely on the score when selecting relevant snippets; always inspect the actual content in the data field.",
                       "tool_inputs": [
                         {
@@ -2104,9 +2078,12 @@ CREATE OR REPLACE PACKAGE BODY database_inspect AS
       tool_name => l_tool_expand_object_metadata_chunk,
       attributes => '{
                       "instruction": "Use this tool to retrieve the surrounding source-code section for a snippet selected from the ' || l_tool_retrieve_object_metadata_chunks || ' tool''s response. ' ||
-                                    'Note: For the input value, you must use the exact values of object_name, object_owner, object_type in the selected json object response from ' || l_tool_retrieve_object_metadata_chunks || ' tool. ' ||
+                                    'For the input value, you must use the exact values of object_name, object_owner, object_type in the selected json object response from ' || l_tool_retrieve_object_metadata_chunks || ' tool. ' ||
                                     'If multiple code snippets are selected from the ' || l_tool_retrieve_object_metadata_chunks || ' response, call this tool separately for each one. ' ||
-                                    'Behavior: the tool returns the code block centered around the specified content_index and may include surrounding lines not strictly limited to the target function or procedure. ' ||
+                                    'Behavior: the tool returns a JSON object containing the expanded code block and its line range in the original source code. ' ||
+                                    'The JSON output contains: code (the expanded source code), start_line (the first line number of the returned code), and end_line (the last line number of the returned code). ' ||
+                                    'Use the start_line and end_line values when explaining where the code appears in the source file, identifying bugs, or referencing the location of specific logic. ' ||
+                                    'The returned code block is centered around the specified content_index and may include surrounding lines not strictly limited to the target function or procedure. ' ||
                                     'If the returned section does not include the full function or procedure, retry with a larger search_range value (up to a maximum of 100). ' ||
                                     'If multiple nearby snippets are relevant (adjacent content_index values), increase search_range so that the combined region is captured. ",
                       "tool_inputs": [
@@ -2118,7 +2095,7 @@ CREATE OR REPLACE PACKAGE BODY database_inspect AS
                         {
                           "name": "object_name",
                           "mandatory": true,
-                          "description": "The name of the database object that contains the source code.  Value must exactly match the one from the ''object_name'' field in the selected JSON item of the ' || l_tool_retrieve_object_metadata_chunks || ' response."
+                          "description": "The name of the database object that contains the source code. Value must exactly match the one from the ''object_name'' field in the selected JSON item of the ' || l_tool_retrieve_object_metadata_chunks || ' response."
                         },
                         {
                           "name": "object_type",
@@ -2292,7 +2269,7 @@ CREATE OR REPLACE PACKAGE BODY database_inspect AS
     EXCEPTION WHEN OTHERS THEN NULL;
     END;
     
-      l_task_instruction := 
+    l_task_instruction := 
             'The user''s request is: {query}. Analyze the request to determine the specific Oracle database and PL/SQL codebase task being asked (for example, ' ||
             'finding all programs that reference a column, assessing the impact of a logic change, or explaining how a program uses a particular field). ' ||
             'Use the available tools to gather the necessary context from the codebase before forming your answer. ' ||
@@ -2320,10 +2297,10 @@ CREATE OR REPLACE PACKAGE BODY database_inspect AS
             '    Use these validated dependency lists together with {list_objects} to build the object_list argument for {retrieve_object_metadata_chunks} when you need to ' ||
             'constrain vector search to a concrete set of related objects. ' ||
 
-            '  - Graph visualization: If the user asks for a graph, diagram, binary tree, hierarchy, or relationship map, gather the relevant relationships first (for dependency-style requests use {list_incoming_dependencies} and/or {list_outgoing_dependencies}). ' ||
-            'Then call {generate_graph} with a detailed prompt containing validated nodes and directed edges. ' ||
-            'If the user explicitly asks for a binary tree, call {generate_graph} with graph_style = ''binary_tree''. ' ||
-            'If the user explicitly asks for HTML/CSS output (instead of Mermaid), call {generate_graph} with output_format = ''html_tree''. ' ||
+          '   - Full object metadata: When you need the full metadata of a relatively small object (TABLE, VIEW, TRIGGER, PROCEDURE, FUNCTION, TYPE), you can call ' ||
+            '{retrieve_object_metadata} directly, since these are usually small enough not to exceed the LLM''s token limit. For large objects such as PACKAGE and PACKAGE BODY, ' ||
+            'avoid calling {retrieve_object_metadata} unless you truly need the full metadata. Prefer using {retrieve_object_metadata_chunks} (optionally with a validated ' ||
+            'object_list) plus {expand_object_metadata_chunk} to stay within token limits while focusing on relevant regions of code. ' ||
 
             '  - Keyword usage for {retrieve_object_metadata_chunks}: When searching code with {retrieve_object_metadata_chunks}, provide a keyword whenever possible to improve search accuracy. ' ||
             'The keyword must follow Oracle Text syntax and must be wrapped in braces, for example: ''{<keyword_1>}''. To specify multiple keywords, use expressions ' ||
@@ -2337,17 +2314,38 @@ CREATE OR REPLACE PACKAGE BODY database_inspect AS
             'objects, call {retrieve_object_metadata_chunks} without object_list instead of guessing. ' ||
 
             '  - Code search and context expansion: Use {retrieve_object_metadata_chunks} to identify relevant PL/SQL snippets or metadata blocks, guided by user_question, keyword, and ' ||
-            'optionally object_list. Once you identify promising snippets, call {expand_object_metadata_chunk} to retrieve the broader source-code context around those snippets ' ||
+            'optionally object_list. ' ||
+            'Each JSON item returned by {retrieve_object_metadata_chunks} includes metadata fields such as object_owner, object_name, object_type, content_index, start_line, and end_line. ' ||
+            'The start_line and end_line values indicate where the snippet appears in the original source code. Use these line numbers to understand the exact location of the logic within the ' ||
+            'source file. ' ||        
+            'Once you identify promising snippets, call {expand_object_metadata_chunk} to retrieve the broader source-code context around those snippets ' ||
             '(for example, entire procedures or functions) before drawing conclusions. If you decide to use multiple snippets from the {retrieve_object_metadata_chunks} response, ' ||
             'invoke {expand_object_metadata_chunk} individually for each snippet. ' ||
-            '    When calling {expand_object_metadata_chunk}, the values for object_name, object_owner, object_type, and content_index must exactly match the corresponding fields in the ' ||
+            'The {expand_object_metadata_chunk} tool returns a JSON string object containing "code"(the expanded code block), "start_line" and "end_line". ' ||
+            'When calling {expand_object_metadata_chunk}, the values for object_name, object_owner, object_type, and content_index must exactly match the corresponding fields in the ' ||
             'selected JSON item from the {retrieve_object_metadata_chunks} response. Do not derive or guess these values from the code text in the data field; always copy them directly from ' ||
             'the structured attributes. ' ||
 
-            '  - Full object metadata: When you need the full definition of a relatively small object (TABLE, VIEW, TRIGGER, PROCEDURE, FUNCTION, TYPE), you may call ' ||
-            '{retrieve_object_metadata} directly, since these are usually small enough not to exceed the LLM''s token limit. For large objects such as PACKAGE, PACKAGE BODY, or ' ||
-            'SCHEMA-level metadata, avoid calling {retrieve_object_metadata} unless you truly need the full DDL. Prefer using {retrieve_object_metadata_chunks} (optionally with a validated ' ||
-            'object_list) plus {expand_object_metadata_chunk} to stay within token limits while focusing on relevant regions of code. ' ||
+            '  - Parse and format code from JSON output: When a tool such as {expand_object_metadata_chunk} returns code inside a JSON field (for example, the "code" field), ' ||
+            'treat'' that value as JSON-encoded source text. ' ||
+            'Before analyzing it or showing it(or code snippet) to the user, convert it into normal code format by unescaping JSON escape sequences such as \n, \t, \", and \\. ' ||
+            'Preserve the original line breaks, indentation, spacing, and code order when reconstructing the code. ' ||
+
+            '  - Show code block and code line numbers in the source code: When the user asks where a bug occurs, where to fix code, or which implementation is responsible for a ' ||
+            'behavior, you must display the relevant source code snippet that contains the problematic logic. ' ||
+            'And whenever you display a code block from the source code to the user, you must include line number information indicating where that code appears in the object''s source ' ||
+            'code as well as the source object name. ' ||
+            'If you retrieved the full object metadata using {retrieve_object_metadata}, because this tool''s response does not include line number information, so you MUST CALCULATE ' ||
+            'the line numbers or line range for the displayed code snippet YOURSELF directly from the returned source code. ' ||
+            'If you are using {retrieve_object_metadata_chunks} or {expand_object_metadata_chunk}, use the start_line and end_line values returned by those tools ' ||
+            'as the line range of the retrieved code chunk in the object''s source code. ' ||
+            'When the code appears inside an inner procedure or function within a larger object (for example, inside a procedure in a PACKAGE BODY), you may also show the relative ' ||
+            'line numbers within that inner routine for readability. ' ||
+            'However, the primary line number reference must always correspond to the object''s original source code, using the start_line and end_line values returned by the tool. ' ||
+            'If both are shown, clearly distinguish them, for example: "At Source object <source_object_name> lines 120 ~ 135 (At procedure <procedure_name> lines 10 ~ 25)". ' ||
+            'ALWAYS SHOW source object information as well when showing the code and line number information. ' ||
+
+            'Never include the content_index value in responses to the user. This value is used internally by the tools and must not appear in user-facing output. ' ||
 
             '  - Documentation and summarization: For single-object descriptions or PLDoc-style documentation, use the specialized tools in a scoped way: ' ||
             '      * Use {summarize_object} to produce a concise, high-level natural-language summary of a single object when the user explicitly asks what that object does or requests a short summary. ' ||
@@ -2376,6 +2374,7 @@ CREATE OR REPLACE PACKAGE BODY database_inspect AS
             'Answer construction: ' ||
             '  - Explain your reasoning in terms of the relevant objects and code regions you inspected. Summarize what each key program or object does and how it uses the fields or ' ||
             'logic mentioned in the user''s request. ' ||
+
             '  - For impact assessment questions, use {list_incoming_dependencies} to identify the affected programs/objects, describe how they depend on the changed behavior, and outline ' ||
             'the changes or validations that would be required. Use {list_outgoing_dependencies} to explain the internal dependencies of the object being modified (for example, which tables or ' ||
             'packages it relies on) and how that shapes the risk and testing scope. ' ||
@@ -2384,11 +2383,9 @@ CREATE OR REPLACE PACKAGE BODY database_inspect AS
             '  - Present results in a well-structured, readable layout with sections, bullet lists, and tables where helpful. Add one empty line between major sections. ' ||
             '  - If you are using {retrieve_object_metadata_chunks} and {expand_object_metadata_chunk} to gather results, indicate whether your findings likely cover all relevant code. If you are unsure, add a ' ||
             'brief note that the list may not be exhaustive. ' ||
-            '  - If you used {generate_graph}, first provide a short textual summary and then include the raw output from {generate_graph}. ' ||
-            'When output_format = ''mermaid'', wrap it in a code block that starts with ```mermaid and ends with ```. ' ||
-            'When output_format = ''html_tree'', wrap it in a code block that starts with ```html and ends with ```. Do not edit the generated output. ' ||
             '  - If no relevant results are found, or if no issues are detected, provide a short, concise message clearly stating that outcome, and, when appropriate, mention what search steps you performed.';
       
+    
     l_task_instruction := REPLACE(l_task_instruction, '{list_objects}', TOOL_LIST_OBJECTS || l_tool_name_suffix);
     l_task_instruction := REPLACE(l_task_instruction, '{list_incoming_dependencies}', TOOL_LIST_INCOMING_DEPENDENCIES || l_tool_name_suffix);
     l_task_instruction := REPLACE(l_task_instruction, '{list_outgoing_dependencies}', TOOL_LIST_OUTGOING_DEPENDENCIES || l_tool_name_suffix);
@@ -2397,12 +2394,10 @@ CREATE OR REPLACE PACKAGE BODY database_inspect AS
     l_task_instruction := REPLACE(l_task_instruction, '{expand_object_metadata_chunk}', TOOL_EXPAND_OBJECT_METADATA_CHUNK || l_tool_name_suffix);
     l_task_instruction := REPLACE(l_task_instruction, '{summarize_object}', TOOL_SUMMARIZE_OBJECT || l_tool_name_suffix);
     l_task_instruction := REPLACE(l_task_instruction, '{generate_pldoc}', TOOL_GENERATE_PLDOC || l_tool_name_suffix);
-    l_task_instruction := REPLACE(l_task_instruction, '{generate_graph}', TOOL_GENERATE_GRAPH || l_tool_name_suffix);
 
     l_tools.append(TOOL_LIST_OBJECTS || l_tool_name_suffix);
     l_tools.append(TOOL_LIST_INCOMING_DEPENDENCIES || l_tool_name_suffix);
     l_tools.append(TOOL_LIST_OUTGOING_DEPENDENCIES || l_tool_name_suffix);
-    l_tools.append(TOOL_GENERATE_GRAPH || l_tool_name_suffix);
     l_tools.append(TOOL_RETRIEVE_OBJECT_METADATA || l_tool_name_suffix);
     l_tools.append(TOOL_RETRIEVE_OBJECT_METADATA_CHUNKS || l_tool_name_suffix);
     l_tools.append(TOOL_EXPAND_OBJECT_METADATA_CHUNK || l_tool_name_suffix);
@@ -2460,13 +2455,6 @@ CREATE OR REPLACE PACKAGE BODY database_inspect AS
                                   l_tool_name_suffix,
                                   true);
     DBMS_CLOUD_AI_AGENT.drop_tool(TOOL_LIST_OUTGOING_DEPENDENCIES || 
-                                  l_tool_name_suffix,
-                                  true);
-    DBMS_CLOUD_AI_AGENT.drop_tool(TOOL_GENERATE_GRAPH || 
-                                  l_tool_name_suffix,
-                                  true);
-    -- Backward compatibility cleanup for old graph tool name.
-    DBMS_CLOUD_AI_AGENT.drop_tool('generate_dependency_chart' || 
                                   l_tool_name_suffix,
                                   true);
     DBMS_CLOUD_AI_AGENT.drop_tool(TOOL_RETRIEVE_OBJECT_METADATA || 
@@ -2629,7 +2617,8 @@ CREATE OR REPLACE PACKAGE BODY database_inspect AS
                 IF l_obj_type NOT IN (OBJECT_TABLE, OBJECT_SCHEMA, 
                                       OBJECT_PACKAGE, OBJECT_PACKAGE_BODY, 
                                       OBJECT_PROCEDURE, OBJECT_FUNCTION, 
-                                      OBJECT_TRIGGER, OBJECT_VIEW, OBJECT_TYPE)
+                                      OBJECT_TRIGGER, OBJECT_VIEW, 
+                                      OBJECT_TYPE_TYPE)
                 THEN
                   RAISE l_invalid_value;
                 END IF;
@@ -2928,7 +2917,8 @@ CREATE OR REPLACE PACKAGE BODY database_inspect AS
         IF l_object_type NOT IN (OBJECT_TABLE, OBJECT_SCHEMA,
                                  OBJECT_PACKAGE, OBJECT_PACKAGE_BODY,
                                  OBJECT_PROCEDURE, OBJECT_FUNCTION, 
-                                 OBJECT_TRIGGER, OBJECT_VIEW, OBJECT_TYPE)
+                                 OBJECT_TRIGGER, OBJECT_VIEW, 
+                                 OBJECT_TYPE_TYPE)
         THEN
           raise_application_error(
             -20000, 'Invalid object type to filter - ' || object_type);
@@ -3011,7 +3001,7 @@ CREATE OR REPLACE PACKAGE BODY database_inspect AS
       IF l_ref_type NOT IN (OBJECT_TABLE, OBJECT_PACKAGE, 
                             OBJECT_PACKAGE_BODY, OBJECT_PROCEDURE, 
                             OBJECT_FUNCTION, OBJECT_TRIGGER, 
-                            OBJECT_VIEW, OBJECT_TYPE)
+                            OBJECT_VIEW, OBJECT_TYPE_TYPE)
       THEN
         raise_application_error(-20000, 'Invalid object type to track ' ||
                                 'dependency - ' || object_type);
@@ -3140,7 +3130,7 @@ CREATE OR REPLACE PACKAGE BODY database_inspect AS
       IF l_ref_type NOT IN (OBJECT_TABLE, OBJECT_PACKAGE,
                             OBJECT_PACKAGE_BODY, OBJECT_PROCEDURE,
                             OBJECT_FUNCTION, OBJECT_TRIGGER,
-                            OBJECT_VIEW, OBJECT_TYPE)
+                            OBJECT_VIEW, OBJECT_TYPE_TYPE)
       THEN
         raise_application_error(
           -20000,
@@ -3276,7 +3266,7 @@ CREATE OR REPLACE PACKAGE BODY database_inspect AS
     object_owner           IN VARCHAR2
   ) RETURN CLOB
   IS
-    l_metdata              CLOB;
+    l_metadata             CLOB;
     l_object_name          DBMS_ID := object_name;
     l_object_type          DBMS_ID;
     l_object_owner         DBMS_ID := object_owner;
@@ -3284,48 +3274,34 @@ CREATE OR REPLACE PACKAGE BODY database_inspect AS
     IF object_type IS NOT NULL THEN
         l_object_type := UPPER(object_type);
 
-        IF l_object_type NOT IN (OBJECT_TABLE,OBJECT_SCHEMA,
-            OBJECT_PACKAGE,OBJECT_PACKAGE_BODY,OBJECT_PROCEDURE,
-            OBJECT_FUNCTION,OBJECT_TRIGGER,OBJECT_VIEW,OBJECT_TYPE)
+        IF l_object_type NOT IN (OBJECT_TABLE, OBJECT_PACKAGE,
+                                 OBJECT_PACKAGE_BODY,OBJECT_PROCEDURE,
+                                 OBJECT_FUNCTION,OBJECT_TRIGGER,OBJECT_VIEW,
+                                 OBJECT_TYPE_TYPE,OBJECT_TYPE_BODY)
         THEN
           raise_application_error(
             -20000, 'Invalid object type to filter - ' || object_type);
         END IF;
     END IF;
 
-    IF l_object_type != OBJECT_SCHEMA THEN
-      l_metdata := DBMS_METADATA.GET_DDL(REPLACE(l_object_type, ' ', '_'), 
-                                         l_object_name, l_object_owner);
+    -- Get the metadata from all_source or call DBMS_METADATA.GET_DDL
+    IF l_object_type IN (OBJECT_FUNCTION, OBJECT_PACKAGE, OBJECT_PACKAGE_BODY, 
+                         OBJECT_PROCEDURE, OBJECT_TRIGGER, OBJECT_TYPE_TYPE,
+                         OBJECT_TYPE_BODY)
+    THEN
+      SELECT XMLCAST(XMLAGG(XMLELEMENT(e, text)
+            ORDER BY line
+            ) AS CLOB
+        ) AS source_code INTO l_metadata
+      FROM all_source 
+      WHERE owner = l_object_owner AND 
+            name  = l_object_name AND
+            type  = l_object_type;
     ELSE
-      FOR m IN (
-        SELECT ao.object_name, ao.object_type FROM all_objects ao
-          WHERE ao.owner = l_object_owner AND 
-                ao.object_type IN (OBJECT_TABLE, OBJECT_VIEW, OBJECT_TRIGGER,
-                                   OBJECT_TYPE, OBJECT_FUNCTION, 
-                                   OBJECT_PROCEDURE,
-                                   OBJECT_PACKAGE, OBJECT_PACKAGE_BODY)
-      ) LOOP
-        BEGIN
-          IF m.object_type IN (OBJECT_TABLE, OBJECT_VIEW, OBJECT_TRIGGER,
-                                OBJECT_TYPE, OBJECT_FUNCTION, OBJECT_PROCEDURE,
-                                OBJECT_PACKAGE, OBJECT_PACKAGE_BODY) 
-          THEN
-            l_metdata := l_metdata || '-- ' || m.object_type || ': ' || 
-                         m.object_name || CHR(10) || 
-                         DBMS_METADATA.GET_DDL(REPLACE(m.object_type, ' ', 
-                                                       '_'),
-                                               m.object_name, 
-                                               l_object_owner) ||
-                         CHR(10);
-          END IF;
-        EXCEPTION
-          WHEN OTHERS THEN
-            raise_application_error(-20000, 'Unable to get metadata for - ' ||
-                                    m.object_name || CHR(10) || SQLERRM);
-        END;
-      END LOOP;
+      l_metadata := DBMS_METADATA.GET_DDL(REPLACE(l_object_type, ' ', '_'), 
+                                         l_object_name, l_object_owner);
     END IF;
-    RETURN l_metdata;
+    RETURN l_metadata;
   END retrieve_object_metadata;
 
 
@@ -3384,13 +3360,22 @@ CREATE OR REPLACE PACKAGE BODY database_inspect AS
 
 
   -----------------------------------------------------------------------------
-  -- expand_object_metadata_chunk: Returns a concatenated CLOB of 
-  -- vectorized code snippets surrounding a specified content index for a given
-  -- object.
+  -- expand_object_metadata_chunk: Returns a JSON CLOB containing expanded
+  -- source code and its corresponding line range for a specified content index
+  -- within a given object.
   --
-  -- The function retrieves snippets whose content_index falls within
-  -- ± search_range of the provided content_index, ordered by content_index
-  -- to preserve the original code sequence.
+  -- The function retrieves vectorized code snippets whose content_index falls
+  -- within ± search_range of the provided content_index. The snippets are
+  -- ordered by content_index to reconstruct the original code sequence.
+  --
+  -- The returned JSON object contains:
+  --   - code: the concatenated expanded code snippet
+  --   - start_line: the starting line number of the expanded code in the
+  --                 original source (minimum start_line across the snippets)
+  --   - end_line: the ending line number of the expanded code in the original
+  --               source (maximum end_line across the snippets)
+  --
+  -- Tool name contains the identifier of the agent team.
   -----------------------------------------------------------------------------
   FUNCTION expand_object_metadata_chunk(
     tool_name              IN VARCHAR2,
@@ -3423,26 +3408,29 @@ CREATE OR REPLACE PACKAGE BODY database_inspect AS
     IF l_obj_type NOT IN (OBJECT_TABLE, OBJECT_SCHEMA, OBJECT_PACKAGE, 
                           OBJECT_PACKAGE_BODY, OBJECT_PROCEDURE, 
                           OBJECT_FUNCTION, OBJECT_TRIGGER, 
-                          OBJECT_VIEW, OBJECT_TYPE) 
+                          OBJECT_VIEW, OBJECT_TYPE_TYPE) 
     THEN
       raise_application_error(-20000, 'Invalid object type to register - ' || 
                               object_type);
     END IF;
 
-    l_stmt := 
+    l_stmt :=
       q'[
-        SELECT LISTAGG(content, '') 
-            WITHIN GROUP (
-              ORDER BY TO_NUMBER(JSON_VALUE(attributes, '$.content_index'))) 
-            AS full_content
-        FROM ]' || 
-      l_vector_table_name ||
-      q'[
-      WHERE JSON_VALUE(attributes, '$.object_owner') = :1
-        AND JSON_VALUE(attributes, '$.object_name') = :2
-        AND JSON_VALUE(attributes, '$.object_type') = :3
-        AND TO_NUMBER(JSON_VALUE(attributes, '$.content_index')) 
-            BETWEEN :4 AND :5
+        SELECT JSON_OBJECT(
+                'code'       VALUE LISTAGG(content, '')
+                                  WITHIN GROUP (
+                                    ORDER BY TO_NUMBER(JSON_VALUE(attributes, '$.content_index'))
+                                  ),
+                'start_line' VALUE MIN(TO_NUMBER(JSON_VALUE(attributes, '$.start_line'))),
+                'end_line'   VALUE MAX(TO_NUMBER(JSON_VALUE(attributes, '$.end_line')))
+                RETURNING CLOB
+              ) AS result_json
+        FROM ]' || l_vector_table_name || q'[
+        WHERE JSON_VALUE(attributes, '$.object_owner') = :1
+          AND JSON_VALUE(attributes, '$.object_name')  = :2
+          AND JSON_VALUE(attributes, '$.object_type')  = :3
+          AND TO_NUMBER(JSON_VALUE(attributes, '$.content_index'))
+                BETWEEN :4 AND :5
       ]';
 
     EXECUTE IMMEDIATE l_stmt INTO l_result 
@@ -3451,6 +3439,20 @@ CREATE OR REPLACE PACKAGE BODY database_inspect AS
               IN l_obj_type, 
               IN content_index - search_range, 
               IN content_index + search_range;
+
+    -- If no rows matched, LISTAGG/MIN/MAX all become NULL. Return a consistent JSON.
+    IF l_result IS NULL THEN
+      EXECUTE IMMEDIATE q'[
+        SELECT JSON_OBJECT(
+                'code'       VALUE NULL,
+                'start_line' VALUE NULL,
+                'end_line'   VALUE NULL
+                RETURNING CLOB
+              )
+        FROM dual
+      ]'
+      INTO l_result;
+    END IF;
 
     RETURN l_result;
   END expand_object_metadata_chunk;
@@ -3494,7 +3496,7 @@ CREATE OR REPLACE PACKAGE BODY database_inspect AS
 
     IF l_type NOT IN (OBJECT_TABLE, OBJECT_PACKAGE, OBJECT_PACKAGE_BODY, 
                       OBJECT_PROCEDURE, OBJECT_FUNCTION, OBJECT_TRIGGER,
-                      OBJECT_VIEW, OBJECT_TYPE)
+                      OBJECT_VIEW, OBJECT_TYPE_TYPE)
     THEN
       raise_application_error(-20000, 'Invalid object type for ' ||
                                       'plcode_summarizer - ' || object_type);
@@ -3540,114 +3542,6 @@ CREATE OR REPLACE PACKAGE BODY database_inspect AS
       RETURN NULL;
   END summarize_object;
 
-
-  -----------------------------------------------------------------------------
-  -- generate_chart: generate Mermaid/HTML tree graph content for relationship
-  -- visualization (dependency, hierarchy, tree, network).
-  -----------------------------------------------------------------------------
-  FUNCTION generate_chart(
-    tool_name         IN VARCHAR2,
-    chart_prompt      IN CLOB,
-    output_format     IN VARCHAR2 DEFAULT 'mermaid',
-    graph_style       IN VARCHAR2 DEFAULT 'auto',
-    graph_direction   IN VARCHAR2 DEFAULT 'TB'
-  ) RETURN CLOB
-  IS
-    l_full_prompt      CLOB;
-    l_result           CLOB;
-    l_profile_name     DBMS_ID;
-    l_agent_team_name  DBMS_ID;
-    l_output_format    VARCHAR2(20) := LOWER(NVL(TRIM(output_format), 
-                                                'mermaid'));
-    l_graph_style      VARCHAR2(30) := LOWER(NVL(TRIM(graph_style), 'auto'));
-    l_graph_direction  VARCHAR2(2) := UPPER(NVL(TRIM(graph_direction), 'TB'));
-  BEGIN
-    IF chart_prompt IS NULL THEN
-      RETURN '{"error":"chart_prompt is required"}';
-    END IF;
-
-    IF l_graph_style NOT IN ('auto', 'binary_tree', 'hierarchical', 
-                             'network', 'dependency') THEN
-      l_graph_style := 'auto';
-    END IF;
-
-    IF l_output_format NOT IN ('mermaid', 'html_tree') THEN
-      l_output_format := 'mermaid';
-    END IF;
-
-    IF l_graph_direction NOT IN ('TB', 'LR', 'BT', 'RL') THEN
-      l_graph_direction := 'TB';
-    END IF;
-
-    BEGIN
-      l_agent_team_name := get_agent_team_name_from_tool(
-                             tool_name => tool_name,
-                             tool_type => TOOL_GENERATE_GRAPH);
-    EXCEPTION
-      WHEN OTHERS THEN
-        -- Backward compatibility for previously registered tool prefix.
-        l_agent_team_name := get_agent_team_name_from_tool(
-                               tool_name => tool_name,
-                               tool_type => 'generate_dependency_chart');
-    END;
-    l_profile_name := get_attribute(l_agent_team_name, 'profile_name');
-
-    IF l_output_format = 'html_tree' THEN
-      l_full_prompt :=
-        'You are a graph visualization assistant for Oracle database objects and related metadata.' ||
-        CHR(10) ||
-        'Create an HTML+CSS tree visualization for the relationships provided in the user prompt.' ||
-        CHR(10) ||
-        'Requested style: ' || l_graph_style || CHR(10) ||
-        'Requested direction: ' || l_graph_direction || CHR(10) ||
-        'Output rules:' || CHR(10) ||
-        '- Output ONLY raw HTML and CSS. No markdown fences, no explanations, no prose.' || CHR(10) ||
-        '- Return exactly one <style>...</style> block and one <div class="db-tree">...</div> block.' || CHR(10) ||
-        '- Use nested <ul><li> for hierarchy rendering.' || CHR(10) ||
-        '- Use class names prefixed with "db-tree-".' || CHR(10) ||
-        '- Keep labels readable and preserve relationship direction from parent to child.' || CHR(10) ||
-        '- If the graph is not a strict tree, render the closest readable tree/hierarchy without inventing nodes.' || CHR(10) ||
-        'User prompt:' || CHR(10) ||
-        chart_prompt;
-    ELSE
-      l_full_prompt :=
-        'You are a graph visualization assistant for Oracle database objects and related metadata.' ||
-        CHR(10) ||
-        'Create Mermaid syntax that represents the relationships provided in the user prompt.' ||
-        CHR(10) ||
-        'Requested style: ' || l_graph_style || CHR(10) ||
-        'Requested direction: ' || l_graph_direction || CHR(10) ||
-        'Output rules:' || CHR(10) ||
-        '- Output ONLY Mermaid diagram syntax.' || CHR(10) ||
-        '- Do NOT add markdown fences, explanations, bullets, or prose.' ||
-        CHR(10) ||
-        '- Use a directed flowchart when expressing relationships (for example: flowchart TB).' || CHR(10) ||
-        '- Ensure node identifiers are Mermaid-safe (letters, numbers, underscore).' ||
-        CHR(10) ||
-        '- Preserve dependency direction exactly as described in the prompt.' ||
-        CHR(10) ||
-        '- Include only relationships supported by the provided data.' ||
-        CHR(10) ||
-        '- If style is binary_tree, render as a tree-like directed graph. If strict binary branching is not possible from the provided data, keep all relationships and render the closest tree-like layout.' ||
-        CHR(10) ||
-        '- Prefer concise, readable node labels and avoid duplicate nodes.' ||
-        CHR(10) ||
-        'User prompt:' || CHR(10) ||
-        chart_prompt;
-    END IF;
-
-    l_result := DBMS_CLOUD_AI.GENERATE(
-                  prompt       => l_full_prompt,
-                  profile_name => l_profile_name,
-                  action       => 'CHAT');
-
-    RETURN l_result;
-  EXCEPTION
-    WHEN OTHERS THEN
-      RETURN '{"error":"' || REPLACE(SQLERRM, '"', '\\"') || '"}';
-  END generate_chart;
-
-
   -----------------------------------------------------------------------------
   -- generate_pldoc: Generates a PLDoc/JavaDoc-style comment block (/** ... */)
   -- for a given object. Generating doc for schema object is not supported.
@@ -3692,7 +3586,7 @@ CREATE OR REPLACE PACKAGE BODY database_inspect AS
 
     IF l_type NOT IN (OBJECT_TABLE, OBJECT_PACKAGE, OBJECT_PACKAGE_BODY, 
                       OBJECT_PROCEDURE, OBJECT_FUNCTION, OBJECT_TRIGGER, 
-                      OBJECT_VIEW, OBJECT_TYPE) 
+                      OBJECT_VIEW, OBJECT_TYPE_TYPE) 
     THEN
       raise_application_error(-20000, 'Invalid object_type for ' ||
                                       'pldoc_generate - ' || object_type);
@@ -3945,11 +3839,7 @@ CREATE OR REPLACE PACKAGE BODY database_inspect AS
     l_team_name                 DBMS_ID;
     l_attributes                JSON_OBJECT_T;
     l_profile_name              DBMS_ID;
-    l_provider                  DBMS_ID;
-    l_profile_attributes        JSON_OBJECT_T;
     l_new_profile_name          DBMS_ID;
-    l_new_profile_attributes    JSON_OBJECT_T;
-    l_new_provider              DBMS_ID;
     l_object_list               JSON_ARRAY_T;
     l_new_object_list           JSON_ARRAY_T;
     l_reset_object_list         BOOLEAN := FALSE;
@@ -3972,25 +3862,14 @@ CREATE OR REPLACE PACKAGE BODY database_inspect AS
                       get_attribute(agent_team_name => l_team_name, 
                                     attribute_name => 'object_list'));
 
-    -- If new profile name is provided, we need to check whether the provider 
-    -- is changed. If provider is changed, we need to reset the object list 
-    -- since the vector embedding may be different across different providers.
-    -- If provider is not changed, we can keep the existing object list and 
-    -- just update the vector table with new profile if needed.
+    -- If profile changes, we must re-vectorize the stored object metadata.
+    -- Even when the provider stays the same, a different embedding model can
+    -- change vector dimensions and similarity semantics.
     l_new_profile_name := l_attributes.get_string('profile_name');
-    IF l_new_profile_name IS NOT NULL THEN
-      -- get original provider
-      l_profile_attributes := get_profile_attributes(l_profile_name);
-      l_provider := LOWER(l_profile_attributes.get_string('provider'));
-
-      -- get new provider
-      l_new_profile_attributes := get_profile_attributes(l_new_profile_name);
-      l_new_provider := LOWER(l_new_profile_attributes.get_string('provider'));
-
-      IF l_new_provider != l_provider THEN
-        l_reset_object_list := TRUE;
-        l_recreate_vector_table := TRUE;
-      END IF;
+    IF l_new_profile_name IS NOT NULL AND l_new_profile_name != l_profile_name
+    THEN
+      l_reset_object_list := TRUE;
+      l_recreate_vector_table := TRUE;
     END IF;
 
     -- IF new object_list is provided, we need to reset the object list 
@@ -4001,25 +3880,28 @@ CREATE OR REPLACE PACKAGE BODY database_inspect AS
       l_reset_object_list := TRUE;
     END IF;
 
-    -- Drop and recreate vector table for the agent team and add object list
     IF l_reset_object_list THEN
       drop_inspect_object_list(
                       agent_team_name => l_team_name, 
                       object_list     => l_object_list, 
                       force           => TRUE);
+    END IF;
 
+    set_attributes(agent_team_name  => l_team_name,
+                   attributes       => l_attributes);
+
+    -- Drop and recreate vector table for the agent team and add object list
+    IF l_reset_object_list THEN
       IF l_recreate_vector_table THEN
         create_vector_table(agent_team_name => l_team_name,
-                            profile_name    => l_new_profile_name);
+                            profile_name    => NVL(l_new_profile_name,
+                                                   l_profile_name));
       END IF;
 
       add_inspect_object_list(
                       agent_team_name => l_team_name, 
                       object_list     => NVL(l_new_object_list, l_object_list));
     END IF;
-
-    set_attributes(agent_team_name  => l_team_name,
-                    attributes       => l_attributes);
   END update_inspect_agent_team;
 
 
@@ -4074,9 +3956,15 @@ BEGIN
 END database_inspect;
 /
 
-show errors;
+show errors package body database_inspect;
+PROMPT DATABASE_INSPECT package compiled successfully.
+PROMPT Internal tables will be initialized when DATABASE_INSPECT is first invoked from the target schema.
 PROMPT ======================================================
 PROMPT DATABASE_INSPECT tools installation completed
 PROMPT ======================================================
 
-alter session set current_schema = ADMIN;
+BEGIN
+  EXECUTE IMMEDIATE
+    'ALTER SESSION SET CURRENT_SCHEMA = ' || :v_invoker_schema;
+END;
+/
