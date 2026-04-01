@@ -13,11 +13,11 @@ https://docs.oracle.com/en-us/iaas/autonomous-database-serverless/doc/select-ai-
 
 ---
 
-## What is a Select AI Agent?
+## What is a Select AI Agent Framework?
 
-Select AI Agent is part of Oracle Autonomous AI Database and extends core Select AI capabilities, including NL2SQL and RAG.
+Select AI Agent Framework is part of Oracle Autonomous AI Database and extends core Select AI capabilities, including NL2SQL and RAG.
 
-A Select AI Agent:
+An AI agent built using the Select AI Agent framework:
 
 - Accepts natural language input from users or programs
 - Uses an LLM to reason about the request

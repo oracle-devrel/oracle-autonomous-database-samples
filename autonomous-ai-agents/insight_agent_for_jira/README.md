@@ -55,13 +55,13 @@ Formatted Jira/Atlassian Response
 
 ```text
 .
-├── jira_insight_tools.sql
+├── insight_jira_tools.sql
 │   ├── Configuration bootstrap (SELECTAI_AGENT_CONFIG)
 │   ├── Jira API wrapper package (jira_selectai)
 │   ├── Agent package (select_ai_jira_agent)
 │   └── Jira AI tool registrations
 │
-├── jira_insight_agent.sql
+├── insight_jira_agent.sql
 │   ├── Task definition (JIRA_TASKS)
 │   ├── Agent creation (JIRA_ADVISOR)
 │   ├── Team creation (JIRA_INSIGHT_TEAM)
@@ -97,7 +97,7 @@ Before running installation commands:
 Run as `ADMIN` (or another privileged user):
 
 ```sql
-sqlplus admin@<adb_connect_string> @jira_insight_tools.sql
+sqlplus admin@<adb_connect_string> @insight_jira_tools.sql
 ```
 
 ### Optional Configuration JSON
@@ -145,7 +145,7 @@ sqlplus admin@<adb_connect_string> @jira_insight_tools.sql
 ### Comment Updates
 - `UPDATE_JIRA_COMMENT_TOOL`
 
-### Tool-to-Function Mapping (from `jira_insight_tools.sql`)
+### Tool-to-Function Mapping (from `insight_jira_tools.sql`)
 
 | Tool | Function | Purpose |
 |------|----------|---------|
@@ -168,10 +168,10 @@ sqlplus admin@<adb_connect_string> @jira_insight_tools.sql
 From `autonomous-ai-agents/jira_insight`, run after tools installation:
 
 ```sql
-sqlplus admin@<adb_connect_string> @jira_insight_agent.sql
+sqlplus admin@<adb_connect_string> @insight_jira_agent.sql
 ```
 
-You can also execute the contents of `jira_insight_agent.sql` in SQL Worksheet.
+You can also execute the contents of `insight_jira_agent.sql` in SQL Worksheet.
 
 ### Prompts
 

@@ -5,7 +5,7 @@ rem   Licensed under the Universal Permissive License (UPL), Version 1.0
 rem   https://oss.oracle.com/licenses/upl/
 rem
 rem NAME
-rem   jira_insight_agent.sql
+rem   insight_jira_agent.sql
 rem
 rem DESCRIPTION
 rem   Installer and configuration script for Jira AI Agent Team
@@ -52,13 +52,13 @@ rem   5. Execution:
 rem        - Execute installer procedure with AI profile parameter
 rem
 rem INSTALL INSTRUCTIONS
-rem   1. Run jira_insight_tools.sql first.
+rem   1. Run insight_jira_tools.sql first.
 rem
 rem   2. Connect as ADMIN or a privileged user.
 rem
 rem   3. Run the script using SQL*Plus or SQLcl:
 rem
-rem      sqlplus admin@db @jira_insight_agent.sql
+rem      sqlplus admin@db @insight_jira_agent.sql
 rem
 rem   4. Provide inputs when prompted:
 rem        - Target schema name

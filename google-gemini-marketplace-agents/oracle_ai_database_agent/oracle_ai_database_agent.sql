@@ -264,7 +264,7 @@ BEGIN
         '"process":"sequential"' ||
         '}',
       description =>
-        'The Oracle Autonomous AI Database Agent for Natural Language Queries (Preview) provides a seamless natural language interface for querying enterprise data stored in Oracle Database on Google Cloud. Integrated with Gemini Enterprise, this agent removes the need to build custom natural language processing pipelines by automatically translating plain text inputs into optimized SQL queries. It executes these queries against your Oracle database, retrieves results, and returns formatted data interpretations, all within the Gemini experience.'
+        'Oracle AI Database Agent provides a natural language interface for querying enterprise data stored in Oracle AI Database on Google Cloud. Integrated with Gemini Enterprise, this agent removes the need to build custom natural language processing pipelines by automatically translating plain text inputs into SQL queries. It executes these queries against your Oracle database, retrieves results, and returns formatted data interpretations, all within the Gemini experience.'
   );
 
   DBMS_OUTPUT.PUT_LINE('Created team ORACLE_AI_DATABASE_TEAM');
