@@ -1,4 +1,4 @@
-# Select AI - Jira AI Agent & Tools
+# Select AI - AI Agent & Tools for JIRA
 
 ## Overview
 
@@ -6,7 +6,7 @@
 
 Jira integration in this project connects Oracle Autonomous AI Database to Atlassian Jira Cloud APIs through `DBMS_CLOUD`, then exposes those operations as Select AI tools via `DBMS_CLOUD_AI_AGENT`.
 
-The **Select AI Jira Agent** enables conversational Jira operations such as issue search, issue insight generation, assignee lookup, comments/changelog/worklog retrieval, project lookup, user lookup, and board discovery.
+The **Select AI Insight agent for Jira** enables conversational Jira operations such as issue search, issue insight generation, assignee lookup, comments/changelog/worklog retrieval, project lookup, user lookup, and board discovery.
 
 Runtime connection settings are stored in `SELECTAI_AGENT_CONFIG` under agent key `JIRA`, so credentials and Jira Cloud ID are centrally managed and not passed as user inputs on every tool call.
 
