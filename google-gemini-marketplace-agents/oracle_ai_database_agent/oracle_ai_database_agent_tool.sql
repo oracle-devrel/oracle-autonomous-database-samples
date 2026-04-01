@@ -555,7 +555,7 @@ BEGIN
    
    DBMS_CLOUD_AI_AGENT.create_tool(
     tool_name  => 'SQL_TOOL',
-    description => 'Executes database queries based on natural language questions. Converts plain English requests into optimized SQL, runs them against your Oracle AI Database, and returns the results. If no data is found, suggests options to refine the query using column ranges or distinct values.',
+    description => 'Generates a SQL query from the provided natural language prompt and runs that query against your Oracle AI Database, returning the results. If no data is found, consider revising your prompt to be more descriptive.',
     attributes => '{"instruction": "This tool can access the data in database. It will take user question as user_prompt and generate a sql query, and then it will execute the sql query to get the result' ||
                                     ' If the result is 0 rows. It''s possible that there is an predicates issue. Please use RANGE_VALUES_CHECK for Numeric, DATE, or TIMESTAMP types or DISTINCT_VALUES_CHECK tool for other datatype columns to get all the distinct values and reinvoke the tool with a refined the user question", 
                     "function": "oracle_ai_data_retrieval_functions.runsql_func"}'
@@ -565,7 +565,7 @@ BEGIN
 
    DBMS_CLOUD_AI_AGENT.create_tool(
     tool_name  => 'RANGE_VALUES_CHECK',
-    description => ' Retrieves the minimum and maximum values for a numeric, date, or timestamp column in your table. Useful for understanding data boundaries or refining searches.',
+    description => 'Retrieves the minimum and maximum values for a numeric, date, or timestamp column in your table. Useful for understanding data boundaries or refining searches.',
     attributes => '{
       "instruction": "This tool returns the minimum and maximum (range) values of a column in the given table. Only Numeric, DATE, or TIMESTAMP types columns are supported.",
       "function": "oracle_ai_data_retrieval_functions.get_range_values_func"
@@ -576,7 +576,7 @@ BEGIN
 
    DBMS_CLOUD_AI_AGENT.create_tool(
     tool_name  => 'GENERATE_CHART',
-    description => 'Creates charts, graphs, or visualizations based on your data and preferences. Specify chart type, underlying data, and labels to generate formatted HTML or image output for display.',
+    description => 'Creates charts or visualizations based on your data and preferences. Specify chart type, underlying data, and labels to generate formatted HTML or image output for display.',
     attributes => '{"instruction": "Use this tool when you need to generate a chart, graph, or visualization based on data. Provide a detailed prompt describing the chart type, data, labels, titles, and any other details. The tool will return formatted HTML for embedding the chart in the response.", 
                     "function": "oracle_ai_data_retrieval_functions.generate_chart_func"}'
    );

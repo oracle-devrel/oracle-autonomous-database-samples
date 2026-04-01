@@ -5,7 +5,7 @@ rem   Licensed under the Universal Permissive License (UPL), Version 1.0
 rem   https://oss.oracle.com/licenses/upl/
 rem
 rem NAME
-rem   jira_insight_tools.sql
+rem   insight_jira_tools.sql
 rem
 rem DESCRIPTION
 rem   Installer script for Jira Select AI tools
