@@ -11,7 +11,7 @@ models.
 
 ## Ask Oracle overview
 
-Now in version 3, the Ask Oracle chatbot supports a broad range of
+Now in version 4, the Ask Oracle chatbot supports a broad range of
 functionality for Select AI:
 
 - **Chat** -- direct interaction with the LLM specified in your selected
