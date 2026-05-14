@@ -16,15 +16,15 @@ rem   AI Agent tools used to query Jira and Atlassian APIs
 rem   via Select AI Agent.
 rem
 rem RELEASE VERSION
-rem   1.0
+rem   1.1
 rem
 rem RELEASE DATE
-rem   20-Feb-2026
+rem   14-May-2026
 rem
 rem MAJOR CHANGES IN THIS RELEASE
-rem - Initial release
-rem - Added Jira configuration bootstrap using SELECTAI_AGENT_CONFIG
-rem - Added Jira tools installer procedure
+rem - Added project listing and project-name resolution support
+rem - Added current Jira user lookup for "me" style prompts
+rem - Added project-scoped issue listing tool for reliable project issue queries
 rem
 rem SCRIPT STRUCTURE
 rem   1. Initialization:
@@ -263,6 +263,13 @@ CREATE OR REPLACE PACKAGE jira_selectai AS
     max_results          NUMBER DEFAULT 50
   ) RETURN CLOB;
 
+  FUNCTION get_jira_project_issues(
+    cloud_id        VARCHAR2,
+    credential_name VARCHAR2,
+    project_key     VARCHAR2,
+    max_results     NUMBER DEFAULT 50
+  ) RETURN CLOB;
+
   FUNCTION get_assignee_account_id(
     cloud_id        VARCHAR2,
     credential_name VARCHAR2,
@@ -296,10 +303,22 @@ CREATE OR REPLACE PACKAGE jira_selectai AS
     project_key     VARCHAR2
   ) RETURN CLOB;
 
+  FUNCTION list_jira_projects(
+    cloud_id        VARCHAR2,
+    credential_name VARCHAR2,
+    project_query   VARCHAR2 DEFAULT NULL,
+    max_results     NUMBER DEFAULT 100
+  ) RETURN CLOB;
+
   FUNCTION get_atlassian_user(
     cloud_id        VARCHAR2,
     credential_name VARCHAR2,
     account_id      VARCHAR2
+  ) RETURN CLOB;
+
+  FUNCTION get_current_atlassian_user(
+    cloud_id        VARCHAR2,
+    credential_name VARCHAR2
   ) RETURN CLOB;
 
   FUNCTION get_jira_boards(
@@ -403,6 +422,28 @@ CREATE OR REPLACE PACKAGE BODY jira_selectai AS
              chr(38) || 'jql=' || UTL_URL.escape(l_jql, TRUE);
     RETURN get_response(credential_name, l_url);
   END get_jira_assigned_issues;
+
+  FUNCTION get_jira_project_issues(
+    cloud_id        VARCHAR2,
+    credential_name VARCHAR2,
+    project_key     VARCHAR2,
+    max_results     NUMBER DEFAULT 50
+  ) RETURN CLOB IS
+    l_url                    VARCHAR2(4000);
+    l_jql                    VARCHAR2(4000);
+    l_sanitized_project_key  VARCHAR2(4000);
+    l_limit                  NUMBER;
+  BEGIN
+    l_sanitized_project_key := REPLACE(project_key, '"', ' ');
+    l_jql := 'project = "' || l_sanitized_project_key || '" ORDER BY updated DESC';
+    l_limit := LEAST(NVL(max_results, 50), 1000);
+
+    l_url := jira_api_base_url(cloud_id) ||
+             '/search/jql?fields=key,summary,status,assignee,issuetype,project,updated' ||
+             chr(38) || 'maxResults=' || l_limit ||
+             chr(38) || 'jql=' || UTL_URL.escape(l_jql, TRUE);
+    RETURN get_response(credential_name, l_url);
+  END get_jira_project_issues;
 
   FUNCTION get_assignee_account_id(
     cloud_id        VARCHAR2,
@@ -514,6 +555,23 @@ CREATE OR REPLACE PACKAGE BODY jira_selectai AS
     RETURN get_response(credential_name, l_url);
   END get_jira_project;
 
+  FUNCTION list_jira_projects(
+    cloud_id        VARCHAR2,
+    credential_name VARCHAR2,
+    project_query   VARCHAR2 DEFAULT NULL,
+    max_results     NUMBER DEFAULT 100
+  ) RETURN CLOB IS
+    l_url    VARCHAR2(4000);
+    l_limit  NUMBER;
+  BEGIN
+    l_limit := LEAST(NVL(max_results, 100), 1000);
+    l_url := jira_api_base_url(cloud_id) || '/project/search?maxResults=' || l_limit;
+    IF project_query IS NOT NULL AND TRIM(project_query) <> '' THEN
+      l_url := l_url || chr(38) || 'query=' || UTL_URL.escape(TRIM(project_query), TRUE);
+    END IF;
+    RETURN get_response(credential_name, l_url);
+  END list_jira_projects;
+
   FUNCTION get_atlassian_user(
     cloud_id        VARCHAR2,
     credential_name VARCHAR2,
@@ -525,6 +583,16 @@ CREATE OR REPLACE PACKAGE BODY jira_selectai AS
              UTL_URL.escape(account_id, TRUE);
     RETURN get_response(credential_name, l_url);
   END get_atlassian_user;
+
+  FUNCTION get_current_atlassian_user(
+    cloud_id        VARCHAR2,
+    credential_name VARCHAR2
+  ) RETURN CLOB IS
+    l_url VARCHAR2(4000);
+  BEGIN
+    l_url := jira_api_base_url(cloud_id) || '/myself';
+    RETURN get_response(credential_name, l_url);
+  END get_current_atlassian_user;
 
   FUNCTION get_jira_boards(
     cloud_id        VARCHAR2,
@@ -573,6 +641,11 @@ CREATE OR REPLACE PACKAGE select_ai_jira_agent AS
     max_results         IN NUMBER DEFAULT 50
   ) RETURN CLOB;
 
+  FUNCTION get_jira_project_issues(
+    project_key IN VARCHAR2,
+    max_results IN NUMBER DEFAULT 50
+  ) RETURN CLOB;
+
   FUNCTION get_assignee_account_id(
     assignee_query IN VARCHAR2
   ) RETURN CLOB;
@@ -596,9 +669,16 @@ CREATE OR REPLACE PACKAGE select_ai_jira_agent AS
     project_key IN VARCHAR2
   ) RETURN CLOB;
 
+  FUNCTION list_jira_projects(
+    project_query IN VARCHAR2 DEFAULT NULL,
+    max_results   IN NUMBER DEFAULT 100
+  ) RETURN CLOB;
+
   FUNCTION get_atlassian_user(
     account_id IN VARCHAR2
   ) RETURN CLOB;
+
+  FUNCTION get_current_atlassian_user RETURN CLOB;
 
   FUNCTION get_jira_boards(
     project_key IN VARCHAR2 DEFAULT NULL
@@ -774,6 +854,28 @@ CREATE OR REPLACE PACKAGE BODY select_ai_jira_agent AS
       RETURN build_error_response('get_jira_assigned_issues', SQLERRM);
   END get_jira_assigned_issues;
 
+  FUNCTION get_jira_project_issues(
+    project_key IN VARCHAR2,
+    max_results IN NUMBER DEFAULT 50
+  ) RETURN CLOB
+  IS
+    l_response         CLOB;
+    l_credential_name  VARCHAR2(4000);
+    l_cloud_id         VARCHAR2(4000);
+  BEGIN
+    get_runtime_config(l_credential_name, l_cloud_id);
+    l_response := jira_selectai.get_jira_project_issues(
+      credential_name => l_credential_name,
+      cloud_id        => l_cloud_id,
+      project_key     => project_key,
+      max_results     => max_results
+    );
+    RETURN l_response;
+  EXCEPTION
+    WHEN OTHERS THEN
+      RETURN build_error_response('get_jira_project_issues', SQLERRM);
+  END get_jira_project_issues;
+
   FUNCTION get_assignee_account_id(
     assignee_query IN VARCHAR2
   ) RETURN CLOB
@@ -880,6 +982,28 @@ CREATE OR REPLACE PACKAGE BODY select_ai_jira_agent AS
       RETURN build_error_response('get_jira_project', SQLERRM);
   END get_jira_project;
 
+  FUNCTION list_jira_projects(
+    project_query IN VARCHAR2 DEFAULT NULL,
+    max_results   IN NUMBER DEFAULT 100
+  ) RETURN CLOB
+  IS
+    l_response         CLOB;
+    l_credential_name  VARCHAR2(4000);
+    l_cloud_id         VARCHAR2(4000);
+  BEGIN
+    get_runtime_config(l_credential_name, l_cloud_id);
+    l_response := jira_selectai.list_jira_projects(
+      credential_name => l_credential_name,
+      cloud_id        => l_cloud_id,
+      project_query   => project_query,
+      max_results     => max_results
+    );
+    RETURN l_response;
+  EXCEPTION
+    WHEN OTHERS THEN
+      RETURN build_error_response('list_jira_projects', SQLERRM);
+  END list_jira_projects;
+
   FUNCTION get_atlassian_user(
     account_id IN VARCHAR2
   ) RETURN CLOB
@@ -899,6 +1023,23 @@ CREATE OR REPLACE PACKAGE BODY select_ai_jira_agent AS
     WHEN OTHERS THEN
       RETURN build_error_response('get_atlassian_user', SQLERRM);
   END get_atlassian_user;
+
+  FUNCTION get_current_atlassian_user RETURN CLOB
+  IS
+    l_response         CLOB;
+    l_credential_name  VARCHAR2(4000);
+    l_cloud_id         VARCHAR2(4000);
+  BEGIN
+    get_runtime_config(l_credential_name, l_cloud_id);
+    l_response := jira_selectai.get_current_atlassian_user(
+      credential_name => l_credential_name,
+      cloud_id        => l_cloud_id
+    );
+    RETURN l_response;
+  EXCEPTION
+    WHEN OTHERS THEN
+      RETURN build_error_response('get_current_atlassian_user', SQLERRM);
+  END get_current_atlassian_user;
 
   FUNCTION get_jira_boards(
     project_key IN VARCHAR2 DEFAULT NULL
@@ -1039,6 +1180,26 @@ BEGIN
     description => 'Get Jira project metadata'
   );
 
+  drop_tool_if_exists('GET_JIRA_PROJECT_ISSUES_TOOL');
+  DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
+    tool_name => 'GET_JIRA_PROJECT_ISSUES_TOOL',
+    attributes => '{
+      "instruction": "List Jira issues for a specific project key.",
+      "function": "select_ai_jira_agent.get_jira_project_issues"
+    }',
+    description => 'List Jira issues by project key'
+  );
+
+  drop_tool_if_exists('LIST_JIRA_PROJECTS_TOOL');
+  DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
+    tool_name => 'LIST_JIRA_PROJECTS_TOOL',
+    attributes => '{
+      "instruction": "List Jira projects. Optionally filter by project name or keyword using project_query.",
+      "function": "select_ai_jira_agent.list_jira_projects"
+    }',
+    description => 'List Jira projects and resolve project keys from project names'
+  );
+
   drop_tool_if_exists('GET_ATLASSIAN_USER_TOOL');
   DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
     tool_name => 'GET_ATLASSIAN_USER_TOOL',
@@ -1047,6 +1208,16 @@ BEGIN
       "function": "select_ai_jira_agent.get_atlassian_user"
     }',
     description => 'Get Atlassian user profile'
+  );
+
+  drop_tool_if_exists('GET_CURRENT_ATLASSIAN_USER_TOOL');
+  DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
+    tool_name => 'GET_CURRENT_ATLASSIAN_USER_TOOL',
+    attributes => '{
+      "instruction": "Get the current Jira user profile for the configured credential.",
+      "function": "select_ai_jira_agent.get_current_atlassian_user"
+    }',
+    description => 'Get current Jira user profile'
   );
 
   drop_tool_if_exists('GET_JIRA_BOARDS_TOOL');

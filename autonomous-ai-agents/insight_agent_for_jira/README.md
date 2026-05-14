@@ -1,5 +1,10 @@
 # Select AI - AI Agent & Tools for JIRA
 
+## Release Metadata
+
+- Release Version: `1.1`
+- Release Date: `14-May-2026`
+
 ## Overview
 
 ## Jira Integration
@@ -36,8 +41,11 @@ JIRA_TASKS
 JIRA_ADVISOR Reasoning & Validation
    ├── SEARCH_JIRA_TOOL
    ├── GET_JIRA_TOOL
+   ├── LIST_JIRA_PROJECTS_TOOL
    ├── GET_ASSIGNEE_ACCOUNT_ID_TOOL
+   ├── GET_CURRENT_ATLASSIAN_USER_TOOL
    ├── GET_JIRA_ASSIGNED_ISSUES_TOOL
+   ├── GET_JIRA_PROJECT_ISSUES_TOOL
    ├── GET_JIRA_COMMENTS_TOOL
    ├── GET_JIRA_CHANGELOG_TOOL
    ├── GET_JIRA_WORKLOG_TOOL
@@ -130,6 +138,7 @@ sqlplus admin@<adb_connect_string> @insight_jira_tools.sql
 
 ### Assignee Workflows
 - `GET_ASSIGNEE_ACCOUNT_ID_TOOL`
+- `GET_CURRENT_ATLASSIAN_USER_TOOL`
 - `GET_JIRA_ASSIGNED_ISSUES_TOOL`
 
 ### Issue Activity
@@ -138,7 +147,9 @@ sqlplus admin@<adb_connect_string> @insight_jira_tools.sql
 - `GET_JIRA_WORKLOG_TOOL`
 
 ### Project, User, and Boards
+- `LIST_JIRA_PROJECTS_TOOL`
 - `GET_JIRA_PROJECT_TOOL`
+- `GET_JIRA_PROJECT_ISSUES_TOOL`
 - `GET_ATLASSIAN_USER_TOOL`
 - `GET_JIRA_BOARDS_TOOL`
 
@@ -153,11 +164,14 @@ sqlplus admin@<adb_connect_string> @insight_jira_tools.sql
 | `GET_JIRA_TOOL` | `select_ai_jira_agent.get_jira` | Get Jira issue details by key |
 | `GET_ASSIGNEE_ACCOUNT_ID_TOOL` | `select_ai_jira_agent.get_assignee_account_id` | Resolve assignee account ID |
 | `GET_JIRA_ASSIGNED_ISSUES_TOOL` | `select_ai_jira_agent.get_jira_assigned_issues` | List issues assigned to an account |
+| `GET_JIRA_PROJECT_ISSUES_TOOL` | `select_ai_jira_agent.get_jira_project_issues` | List issues for a specific project key |
 | `GET_JIRA_COMMENTS_TOOL` | `select_ai_jira_agent.get_jira_comments` | Get issue comments |
 | `GET_JIRA_CHANGELOG_TOOL` | `select_ai_jira_agent.get_jira_changelog` | Get issue changelog/history |
 | `GET_JIRA_WORKLOG_TOOL` | `select_ai_jira_agent.get_jira_worklog` | Get issue worklogs |
 | `GET_JIRA_PROJECT_TOOL` | `select_ai_jira_agent.get_jira_project` | Get project metadata |
+| `LIST_JIRA_PROJECTS_TOOL` | `select_ai_jira_agent.list_jira_projects` | List projects and resolve project names to keys |
 | `GET_ATLASSIAN_USER_TOOL` | `select_ai_jira_agent.get_atlassian_user` | Get Atlassian user profile |
+| `GET_CURRENT_ATLASSIAN_USER_TOOL` | `select_ai_jira_agent.get_current_atlassian_user` | Get current Jira user profile |
 | `GET_JIRA_BOARDS_TOOL` | `select_ai_jira_agent.get_jira_boards` | List Jira boards (optional project filter) |
 | `UPDATE_JIRA_COMMENT_TOOL` | `select_ai_jira_agent.update_jira_comment` | Update Jira comment text |
 
@@ -287,12 +301,24 @@ Grant HTTP access to the target install schema (the schema where the Jira agent 
 - `atlassian.com`
 - `api.atlassian.com`
 
-Use this block twice by setting `&url` to each host:
+Replace the <SCHEMA_NAME> in below code and run as admin.
 
 ```sql
 begin
 dbms_network_acl_admin.append_host_ace(
-  host =>'&url',
+  host =>'atlassian.com',
+  lower_port => 443,
+  upper_port => 443,
+  ace => xs$ace_type(
+    privilege_list => xs$name_list('http'),
+    principal_name => '<SCHEMA_NAME>',
+    principal_type => xs_acl.ptype_db));
+end;
+/
+
+begin
+dbms_network_acl_admin.append_host_ace(
+  host =>'api.atlassian.com',
   lower_port => 443,
   upper_port => 443,
   ace => xs$ace_type(

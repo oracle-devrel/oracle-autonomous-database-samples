@@ -21,15 +21,15 @@ rem     - Creating Jira AI agent bound to AI profile
 rem     - Creating Jira team linking the agent and task
 rem
 rem RELEASE VERSION
-rem   1.0
+rem   1.1
 rem
 rem RELEASE DATE
-rem   20-Feb-2026
+rem   14-May-2026
 rem
 rem MAJOR CHANGES IN THIS RELEASE
-rem   - Initial release
-rem   - Added Jira task, agent, and team registration
-rem   - Interactive installer with schema and AI profile prompts
+rem   - Added project and current-user resolution behavior in task instruction
+rem   - Added routing guidance for project-name to project-key to project-issues flow
+rem   - Expanded task tool list for new project and user helper tools
 rem
 rem SCRIPT STRUCTURE
 rem   1. Initialization:
@@ -148,20 +148,29 @@ BEGIN
         || 'Ask only for missing business inputs. '
         || 'Use SEARCH_JIRA_TOOL to find issues by keyword. '
         || 'Use GET_JIRA_TOOL for issue details by key. '
+        || 'Use LIST_JIRA_PROJECTS_TOOL to list projects and resolve project names to project keys. '
         || 'Use GET_ASSIGNEE_ACCOUNT_ID_TOOL to resolve assignee account id. '
+        || 'Use GET_CURRENT_ATLASSIAN_USER_TOOL to resolve requests that mention me/my issues/my account. '
         || 'Use GET_JIRA_ASSIGNED_ISSUES_TOOL for assignee issue lists. '
+        || 'Use GET_JIRA_PROJECT_ISSUES_TOOL for listing issues of a specific project key. '
         || 'Use GET_JIRA_COMMENTS_TOOL, GET_JIRA_CHANGELOG_TOOL, and GET_JIRA_WORKLOG_TOOL for issue history. '
         || 'Use GET_JIRA_PROJECT_TOOL for project metadata. '
         || 'Use GET_ATLASSIAN_USER_TOOL for user profile lookup. '
         || 'Use GET_JIRA_BOARDS_TOOL for board metadata. '
-        || 'Use UPDATE_JIRA_COMMENT to update comment. '
+        || 'Use UPDATE_JIRA_COMMENT_TOOL to update comment. '
+        || 'When a user asks for issues in a project by project name, resolve the project key using LIST_JIRA_PROJECTS_TOOL before asking follow-up questions. '
+        || 'After resolving the project key, call GET_JIRA_PROJECT_ISSUES_TOOL to fetch project issues. Do not use SEARCH_JIRA_TOOL for project-specific issue listing. '
+        || 'When a user asks for issues assigned to me, first call GET_CURRENT_ATLASSIAN_USER_TOOL and use returned accountId with GET_JIRA_ASSIGNED_ISSUES_TOOL. '
         || 'Present results clearly and in human-readable format. '
         || 'User request: {query}",
       "tools": [
         "SEARCH_JIRA_TOOL",
         "GET_JIRA_TOOL",
+        "LIST_JIRA_PROJECTS_TOOL",
         "GET_ASSIGNEE_ACCOUNT_ID_TOOL",
+        "GET_CURRENT_ATLASSIAN_USER_TOOL",
         "GET_JIRA_ASSIGNED_ISSUES_TOOL",
+        "GET_JIRA_PROJECT_ISSUES_TOOL",
         "GET_JIRA_COMMENTS_TOOL",
         "GET_JIRA_CHANGELOG_TOOL",
         "GET_JIRA_WORKLOG_TOOL",
