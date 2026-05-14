@@ -91,6 +91,114 @@ Formatted Jira/Atlassian Response
 
 ---
 
+## Atlassian Jira Credential Setup
+
+Use these steps to create OAuth client credentials for Jira Cloud and obtain the Jira Cloud ID required by this project.
+
+### 1. Open Atlassian Admin
+
+1. Sign in to Atlassian Admin:
+   - `https://admin.atlassian.com`
+2. Select the organization and Jira site you want this integration to access.
+
+### 2. Create a Service Account
+
+1. In Atlassian Admin, open **Directory** from the left navigation.
+2. Create a dedicated service account for this integration.
+3. Assign appropriate product access to Jira for that service account.
+
+### 3. Create OAuth 2.0 Client Credentials
+
+1. In Atlassian developer/admin app settings, create a new **OAuth 2.0 (Client Credentials)** app.
+2. Select product as **Jira**.
+3. Configure scopes.
+
+### 4. Configure Jira Scopes
+
+1. Use **Classic scopes**.
+2. Select Jira actions your agent needs (for example: read, write, create, delete as required by your use case).
+3. If prompted for roles/permissions, select the required classic roles according to least-privilege policy.
+
+### 5. Capture Client Credentials
+
+Copy and save:
+- `client_id`
+- `client_secret`
+
+You will use these values to generate a bearer token.
+
+### 6. Generate an Access Token
+
+Run:
+
+```bash
+curl --request POST \
+  --url https://auth.atlassian.com/oauth/token \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "grant_type": "client_credentials",
+    "client_id": "<client_id>",
+    "client_secret": "<client_secret>",
+    "audience": "api.atlassian.com"
+  }'
+```
+
+Copy the `access_token` from the response.
+
+### 7. Fetch Accessible Jira Resources (Cloud ID)
+
+Run:
+
+```bash
+curl --request GET \
+  --url https://api.atlassian.com/oauth/token/accessible-resources \
+  --header "Authorization: Bearer <access_token>"
+```
+
+From the response:
+- Use the Jira resource `id` as your Jira **id** value.
+- Keep the associated resource URL/name for validation.
+
+### 8. Create DBMS_CLOUD Credential in Oracle Database
+
+Run as `ADMIN` (or privileged user), replacing placeholders:
+
+```sql
+BEGIN
+  DBMS_CLOUD.CREATE_CREDENTIAL(
+    credential_name => 'ATLASSIAN_CRED',
+    username        => '<client_id>',
+    password        => '<client_secret>'
+  );
+END;
+/
+```
+
+### 9. Provide Config During Tool Installation
+
+When `insight_jira_tools.sql` prompts for `CONFIG_JSON`, provide:
+
+```json
+{
+  "credential_name": "ATLASSIAN_CRED",
+  "cloud_id": "<id>"
+}
+```
+
+### 10. Validate Before Running the Agent
+
+Confirm:
+- Credential exists in DB.
+- `SELECTAI_AGENT_CONFIG` contains:
+  - `CREDENTIAL_NAME` for `AGENT='JIRA'`
+  - `CLOUD_ID` for `AGENT='JIRA'`
+- Network ACL allows outbound HTTPS to:
+  - `auth.atlassian.com`
+  - `api.atlassian.com`
+  - `atlassian.com`
+
+---
+
 ## Installation – Tools
 
 Before running installation commands:
@@ -113,7 +221,7 @@ sqlplus admin@<adb_connect_string> @insight_jira_tools.sql
 ```json
 {
   "credential_name": "ATLASSIAN_CRED",
-  "cloud_id": "your-jira-cloud-id"
+  "id": "your-jira-id"
 }
 ```
 
