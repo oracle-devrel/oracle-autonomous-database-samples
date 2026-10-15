@@ -1,3 +1,11 @@
+26.9.3.2 - 18 Sep 2026 - ZDM_RC
+ + Support backup on standby and final backup on snapshot standby
+
+26.8.2.2 - 14 Aug 2026 - ZDM_RC
+ + Support INCLUDE_STATISTICS instead of EXCLUDE_STATISTICS
+ + --cleanup is added to cleanup project directory across rac inst
+ + Improve display message to use bundle url
+
 26.7.5.1 - 28 JUL 2026 - ZDM_RC
  + Alter transport_set_check.full_check to false
  + Add owner filter during col data type owner validation

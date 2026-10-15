@@ -271,13 +271,21 @@ validate_tablespaces:
     
     if length(l_msg) > 0 then
       l_msg := 
-        'ERROR : Validation failed for tablespace "${tablespace}": Some columns reference data types owned by schemas that are not in the allowed transport list. ' || 
+        'Validation failed for tablespace "${tablespace}": Some columns reference data types owned by schemas that are not in the allowed transport list. ' || 
         'Ensure all referenced data types belong to the transported schemas. ' ||
         'Failing columns:' || l_msg;
-      if ('${dry_run}' = 'TRUE') then
-        dbms_output.put_line(l_msg);
+      if ('${ignore_non_fatal_errors}' = 'TRUE') then
+        dbms_output.put_line('WARNING : ' || l_msg);
+        dbms_output.put_line(
+          'WARNING : IGNORE_NON_FATAL_ERRORS is set to TRUE. ' ||
+          'This validation error is being ignored. The referenced data type owner/schema ' ||
+          'is outside the transported schema list. Restore/import at ADBS may report ' ||
+          'errors if the referenced type or owner is unavailable at the target; existing ' ||
+          'compatible objects at ADBS may allow the import to succeed.');
+      elsif ('${dry_run}' = 'TRUE') then
+        dbms_output.put_line('ERROR : ' || l_msg);
       else
-        raise_application_error(-20001, l_msg);
+        raise_application_error(-20001, 'ERROR : ' || l_msg);
       end if;
     end if;
 
@@ -555,7 +563,15 @@ tts_src_create_directory:
 
 tts_src_drop_directory:
   set feedback off
-    drop directory ${tts_dir_name};
+  begin
+    execute immediate 'drop directory ${tts_dir_name}';
+  exception
+    when others then
+      if sqlcode != -4043 then
+        raise;
+      end if;
+  end;
+  /
 
 tts_src_export_tde_keys:
   set feedback off
@@ -597,6 +613,7 @@ tts_src_gather_data:
     l_sched_cred_list clob := empty_clob();
     l_src_compatible  varchar2(160);
     l_server_type     varchar2(9);
+    l_read_only_host_list varchar2(4000) := '';
   begin
     select ${l_pdb_type} into l_pdb_guid from v$$${l_pdb_table};
     select property_value into l_dst_version from database_properties where property_name = 'DST_PRIMARY_TT_VERSION';
@@ -628,6 +645,8 @@ tts_src_gather_data:
     df.tablespace_name in (${ts_list}) and dt.bigfile = 'YES' 
     group by df.tablespace_name;
     
+    -- Collect RAC instances where the source database/PDB is open READ WRITE.
+    -- Used for RMAN channels on a primary database or snapshot standby.
     FOR rec IN (SELECT host_name, instance_name FROM gv$$${l_pdb_table} pdb, gv$instance inst
                   WHERE pdb.name = UPPER('${database_name}') 
                   AND pdb.open_mode = 'READ WRITE' 
@@ -635,6 +654,17 @@ tts_src_gather_data:
           l_host_list := l_host_list || ';' || rec.host_name || ':' || rec.instance_name;
     END LOOP;
     l_host_list := SUBSTR(l_host_list, 2);
+
+    -- Collect RAC instances where the source database/PDB is open READ ONLY.
+    -- Used for RMAN channels when the source is a physical standby.
+    FOR rec IN (SELECT host_name, instance_name FROM gv$$${l_pdb_table} pdb, gv$instance inst
+                  WHERE pdb.name = UPPER('${database_name}') 
+                  AND pdb.open_mode = 'READ ONLY' 
+                  AND pdb.inst_id = inst.inst_id) LOOP
+          l_read_only_host_list := l_read_only_host_list || ';' || rec.host_name || ':' || rec.instance_name;
+    END LOOP;
+    l_read_only_host_list := SUBSTR(l_read_only_host_list, 2);
+
     select decode(count(*), 0, 'true', 'false') into l_tbs_read_only from dba_tablespaces where status != 'READ ONLY' and tablespace_name in (${ts_list});
 
     FOR rec IN (SELECT tablespace_name, bigfile, encrypted FROM dba_tablespaces where tablespace_name IN (${ts_list})) LOOP
@@ -715,7 +745,8 @@ tts_src_gather_data:
                           l_mview_schemas || ',' ||
                           l_sched_cred_list || ',' ||
                           l_src_compatible || ',' ||
-                          l_server_type);
+                          l_server_type || ',' ||
+                          l_read_only_host_list);
   end;
   /
 
@@ -734,10 +765,11 @@ tts_src_export_xml_tables:
   USERID="${db_user}/${db_password}@${l_conn_str}"
   TABLES=${xml_export_tables}
   DIRECTORY=${tts_dir_name} 
-  DUMPFILE=xml_tables.dmp 
+  ${xml_dump_file_clause}
+  ${xml_estimate_clause}
   CLUSTER=NO
   ${job_name_str}
-  LOGFILE=export_xml.log
+  LOGFILE=${xml_expdp_log_file}
   ${exclude_clause}
 
 tts_src_export_tablespaces:
@@ -863,3 +895,14 @@ get_dv_protected_schemas:
     dbms_output.put_line(l_datapump_user);
   end;
   /
+
+tts_src_get_rac_hosts:
+  set feedback off
+  set heading off
+  set pagesize 0
+  select host_name from gv$instance order by inst_id;
+  
+tts_src_get_database_role:
+  set heading off feedback off verify off echo off pages 0
+  select upper(database_role) || '|' || upper(open_mode)
+    from v$database;
