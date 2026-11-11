@@ -116,17 +116,3 @@ To detach this standalone example after verifying the change:
 ## Scope and limitations
 
 The sample requests a maintenance-window change for an imported database. It does not provision a database, change patch level, or demonstrate an explicit future execution date. Provider documentation still contains legacy cloning wording; the live result below is the evidence for this workflow.
-
-## References
-
-- [Repository design reference](https://github.com/davcarde/oracle-autonomous-database-samples/tree/main/terraform/adb_ocpu_to_ecpu_update)
-- [ADB-S maintenance schedule and restrictions](https://docs.oracle.com/en-us/iaas/autonomous-database-serverless/doc/maintenance-windows-patching.html)
-- [Terraform ADB resource](https://docs.oracle.com/en-us/iaas/tools/terraform-provider-oci/latest/docs/r/database_autonomous_database.html)
-- [OCI Python DatabaseClient](https://docs.oracle.com/en-us/iaas/tools/python/latest/api/database/client/oci.database.DatabaseClient.html)
-
-## Validation evidence
-
-- Local checks on 2026-11-11: Terraform 1.15.2, OCI provider 9.12.1; `terraform fmt -check`, `terraform validate`, and Python syntax parsing passed. The supplied version pin/lock remains 9.12.1.
-- User-run live test on 2026-11-11: the initial error reported OCI provider 9.12.0. After switching to `scheduled_maintenance_window`, apply succeeded with `0 added, 1 changed, 0 destroyed`. The successful apply output did not independently report the provider version.
-- The console confirmed a target of Sunday 01:00–03:00 UTC in AD-1, scheduled for 2026-11-11 19:40 UTC. The database was still reporting its old AD-3 active window at that point.
-- Confirmed: authentication, discovery, import, update acceptance and scheduled change visibility. Still pending: confirmation of the final active window and post-completion Terraform reconciliation. No database deletion was tested.
