@@ -29,8 +29,10 @@ Changing the window can involve movement to another availability domain. Oracle 
 1. Discover available windows. The helper uses your OCI SDK configuration (independent of Terraform credentials), and handles pagination:
 
    ```bash
-   python3 -m pip install oci
-   python3 list_windows.py --adb-id '<ADB_OCID>' --region '<OCI_REGION>'
+   python3 -m venv .venv
+   source .venv/bin/activate
+   python -m pip install oci
+   python list_windows.py --adb-id '<ADB_OCID>' --region '<OCI_REGION>'
    ```
 
    Optional arguments: `--config-file ~/.oci/config --profile DEFAULT`.
@@ -69,11 +71,51 @@ If another Terraform project already owns this database, integrate the maintenan
 
 The example deliberately omits passwords and compute/storage settings. It manages an imported database, not provisioning. Review the imported plan because provider defaults and the existing resource configuration can still affect the diff. Keep real variable values, state and plan files out of public repositories; state/plan files may contain sensitive information.
 
+## Authentication and window selection
+
+Python is an optional discovery helper, not a Terraform dependency. Terraform does not execute it. You may instead view available windows in the OCI console without submitting a change there.
+
+- Python reads `~/.oci/config`, profile `DEFAULT` unless `--profile` is supplied.
+- Terraform uses the credential variables in `terraform.tfvars` through `provider.tf`.
+- The configured fingerprint must match the public key registered for the configured OCI user, and the private key file must belong to that pair. Generating a new API key requires updating both configurations.
+- `401 NotAuthenticated` occurs before window discovery; check the profile, user/tenancy, matching key pair and system clock. Never upload or share the private key.
+- Copy the complete `availability_domain` identifier returned by OCI (including any prefix), not just the console label `AD-1`. Select the day, UTC start/end times and AD from the same returned option.
+
+## Scheduling and completion
+
+The writable target in this tested workflow is `scheduled_maintenance_window`. Updating `autonomous_database_maintenance_window` directly was rejected with `400 InvalidParameter: Active Maintenance Window cannot be scheduled`.
+
+This sample omits `time_scheduled_maintenance_window_update`. In the observed run, OCI automatically assigned an execution time and the console displayed the pending change. This is consistent with the console's earliest-available behavior; it is an observation from this run, not a verified guarantee for every configuration. Explicit future scheduling, cancellation and rescheduling are outside this sample's tested scope.
+
+The weekly window and the execution timestamp are different: a target such as Sunday 01:00–03:00 UTC describes recurring maintenance, while the assigned timestamp describes when OCI will move the database to that schedule.
+
+`Still modifying` means Terraform is waiting on the operation. `Apply complete` can mean the request was accepted and scheduled, even if the database is `AVAILABLE` and its active window is unchanged. Do not run another apply merely because the active window has not changed yet.
+
+Check the console's Maintenance schedule and Work requests. The observed outputs retained the old active window and showed the new scheduled window; the execution-time output was absent, and the boolean flags were false/null despite a scheduled change in the console. Do not interpret those flags alone as definitive status.
+
+After the assigned execution time, verify that the target is now the active window, then refresh Terraform's state and review a new plan. Do not blindly reapply a target that OCI has cleared after completion; post-completion reconciliation has not yet been tested.
+
+## Stop managing the database without deleting it
+
+Importing adopts the whole database as a Terraform-managed resource. `terraform destroy` attempts to delete that database, not cancel the maintenance-window request. `prevent_destroy = true` blocks destruction while the resource configuration containing it remains present; it is not a service-side deletion lock.
+
+To detach this standalone example after verifying the change:
+
+1. Ensure no Terraform run is active and retain a protected state backup.
+2. Remove the `import` block and the `oci_database_autonomous_database.adb` resource block from this configuration. Remove outputs referencing that resource as well. Do not run plan/apply between these edits and the next step.
+3. In this same Terraform working directory and workspace, run:
+
+   ```bash
+   terraform state rm oci_database_autonomous_database.adb
+   ```
+
+4. Run `terraform plan` and verify it proposes no database creation or deletion.
+
+`state rm` only removes Terraform's association; it does not delete the OCI database or cancel a scheduled OCI operation. Keeping the resource/import blocks could cause a later plan to recreate or re-import the association. Do not use this detachment procedure in an existing shared project without coordinating its ownership.
+
 ## Scope and limitations
 
-This revised example sends `scheduled_maintenance_window` to `UpdateAutonomousDatabase`. The original active-window block was rejected by OCI with `400 InvalidParameter: Active Maintenance Window cannot be scheduled`. This revision is a proposed correction based on the distinct scheduled-window API field; live service acceptance remains unverified. It does not set a custom execution date, change Early/Regular patch level, or implement cancellation/rescheduling. The provider also exposes scheduled-window fields, but their end-to-end scheduling semantics are not demonstrated here.
-
-The provider documentation still contains legacy wording about cloning to change a window, although the field is marked Updatable and the provider's update implementation sends it to OCI. Local format/schema validation does not establish service acceptance. A successful live plan/apply against an eligible test database remains necessary before treating this as an end-to-end tested sample.
+The sample requests a maintenance-window change for an imported database. It does not provision a database, change patch level, or demonstrate an explicit future execution date. Provider documentation still contains legacy cloning wording; the live result below is the evidence for this workflow.
 
 ## References
 
@@ -82,6 +124,9 @@ The provider documentation still contains legacy wording about cloning to change
 - [Terraform ADB resource](https://docs.oracle.com/en-us/iaas/tools/terraform-provider-oci/latest/docs/r/database_autonomous_database.html)
 - [OCI Python DatabaseClient](https://docs.oracle.com/en-us/iaas/tools/python/latest/api/database/client/oci.database.DatabaseClient.html)
 
-## Local validation
+## Validation evidence
 
-Validated on 2026-11-11 with Terraform 1.15.2 and OCI provider 9.12.1: `terraform fmt -check`, `terraform validate`, and Python syntax parsing passed. No live OCI plan or apply was run.
+- Local checks on 2026-11-11: Terraform 1.15.2, OCI provider 9.12.1; `terraform fmt -check`, `terraform validate`, and Python syntax parsing passed. The supplied version pin/lock remains 9.12.1.
+- User-run live test on 2026-11-11: the initial error reported OCI provider 9.12.0. After switching to `scheduled_maintenance_window`, apply succeeded with `0 added, 1 changed, 0 destroyed`. The successful apply output did not independently report the provider version.
+- The console confirmed a target of Sunday 01:00–03:00 UTC in AD-1, scheduled for 2026-11-11 19:40 UTC. The database was still reporting its old AD-3 active window at that point.
+- Confirmed: authentication, discovery, import, update acceptance and scheduled change visibility. Still pending: confirmation of the final active window and post-completion Terraform reconciliation. No database deletion was tested.
