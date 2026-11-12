@@ -34,7 +34,7 @@ Use these samples to deploy Autonomous Database on cloud providers using APIs. T
 You may be interested in other Oracle Database examples:
 * [Examples of applications and tool usage for Oracle Database](https://github.com/oracle-samples/oracle-db-examples/)
 * Oracle .NET [Autonomous Database code examples](https://github.com/oracle/dotnet-db-samples/tree/master/samples/autonomous-db) and [general code examples](https://github.com/oracle/dotnet-db-samples/tree/master/samples)
-* Python [python-oracledb examples](https://github.com/oracle/python-oracledb/tree/main/samples)
+* Python [python-oracledb examples](https://github.com/oracle/python-oracledb/tree/main/samples), plus [oracle-vecdb](https://github.com/oracle/vecdb-python-sdk) for building vector search, RAG, and AI applications with [sample apps](https://github.com/oracle-devrel/oracle-ai-developer-hub/tree/main/apps/vecdb) and [notebooks](https://github.com/oracle-devrel/oracle-ai-developer-hub/tree/main/notebooks/vecdb)
 * Node.js [node-oracledb examples](https://github.com/oracle/node-oracledb/tree/main/examples)
 
 <!--

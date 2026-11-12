@@ -113,7 +113,7 @@ Leave these a blank unless really needed.
 
 ***EXCLUDE_TABLES*** : (OPTIONAL INPUT) List of comma separated tables to exclude. Validation checks are skipped for these tables and tables along with their dependent objects are excluded during Data Pump export of metadata. Leave empty to not exclude any tables. Note that table names are case-sensitive.
 
-***EXCLUDE_STATISTICS*** : (OPTIONAL INPUT) Accepted values TRUE/true or FALSE/false. When set to TRUE, statistics (table, index, and related statistics) are excluded during tablespace metadata export. If the input parameter is not provided, value defaults to FALSE.
+***INCLUDE_STATISTICS*** : (OPTIONAL INPUT) Accepted values TRUE/true or FALSE/false. When set to TRUE, statistics (table, index, and related statistics) are included during tablespace metadata export. If the input parameter is not provided, value defaults to FALSE.
 
 ***TRANSPORT_TABLES_PROTECTED_BY_REDACTION_POLICIES*** - (OPTIONAL INPUT) Accepted values TRUE/true or FALSE/false. Explicit consent to transport tables protected by redaction policies. If redaction protected tables are detected in the source database and this parameter is set to TRUE/true, the backup process will proceed with the understanding that the corresponding redaction policies will be created user in the target Autonomous AI Database. Redacted data will be unprotected after migration if the policies are not created in the target database. If the input parameter is not provided or set to FALSE/false, backup validations will fail when redaction protected tables are found in the source database.
 
@@ -186,7 +186,7 @@ Leave these a blank unless really needed.
   ###                     Miscellaneous inputs                                 ###
   ################################################################################
   EXCLUDE_TABLES=
-  EXCLUDE_STATISTICS=TRUE/FALSE
+  INCLUDE_STATISTICS=TRUE/FALSE
   TRANSPORT_TABLES_PROTECTED_BY_REDACTION_POLICIES=FALSE
   TRANSPORT_TABLES_PROTECTED_BY_OLS_POLICIES=FALSE
   TRANSPORT_DB_PROTECTED_BY_DATABASE_VAULT=FALSE
@@ -198,6 +198,13 @@ Leave these a blank unless really needed.
   IGNORE_NON_FATAL_ERRORS=FALSE
   JDK8_PATH=
 ```
+
+##### Cleanup Project State
+Use the following command only after confirming that no TTS backup is running for this project or using the shared `TTS_DUMP_DIR` directory object:
+```
+  $ python3 tts-backup.py --cleanup
+```
+Cleanup removes the local project directory from the current host and all active RAC hosts, including local manifests, logs, parfiles, wallet files and failed-level directories. It also drops TTS_DUMP_DIR when it exists. Cleanup does not remove object storage objects or FSS backup artifacts under `TTS_FSS_MOUNT_DIR`.
 
 Run the TTS Backup Tool from the project directory as below. User will be prompted for database password and optional TDE wallet store password.
 
@@ -335,7 +342,7 @@ Open tts-backup-env.txt file downloaded to the project directory and provide the
 
 ***EXCLUDE_TABLES*** : (OPTIONAL INPUT) List of comma separated tables to exclude. Validation checks are skipped for these tables and tables along with their dependent objects are excluded during Data Pump export of metadata. Leave empty to not exclude any tables. Note that table names are case-sensitive.
 
-***EXCLUDE_STATISTICS*** : (OPTIONAL INPUT) Accepted values TRUE/true or FALSE/false. When set to TRUE, statistics (table, index, and related statistics) are excluded during tablespace metadata export. If the input parameter is not provided, value defaults to FALSE.
+***INCLUDE_STATISTICS*** : (OPTIONAL INPUT) Accepted values TRUE/true or FALSE/false. When set to TRUE, statistics (table, index, and related statistics) are included during tablespace metadata export. If the input parameter is not provided, value defaults to FALSE.
 
 ***TRANSPORT_TABLES_PROTECTED_BY_REDACTION_POLICIES*** - (OPTIONAL INPUT) Accepted values TRUE/true or FALSE/false. Explicit consent to transport tables protected by redaction policies. If redaction protected tables are detected in the source database and this parameter is set to TRUE/true, the backup process will proceed with the understanding that the corresponding redaction policies will be created user in the target Autonomous AI Database. Redacted data will be unprotected after migration if the policies are not created in the target database. If the input parameter is not provided or set to FALSE/false, backup validations will fail when redaction protected tables are found in the source database.
 
@@ -403,7 +410,7 @@ Open tts-backup-env.txt file downloaded to the project directory and provide the
   ###                     Miscellaneous inputs                                 ###
   ################################################################################
   EXCLUDE_TABLES=
-  EXCLUDE_STATISTICS=TRUE/FALSE
+  INCLUDE_STATISTICS=TRUE/FALSE
   TRANSPORT_TABLES_PROTECTED_BY_REDACTION_POLICIES=FALSE
   TRANSPORT_TABLES_PROTECTED_BY_OLS_POLICIES=FALSE
   TRANSPORT_DB_PROTECTED_BY_DATABASE_VAULT=FALSE

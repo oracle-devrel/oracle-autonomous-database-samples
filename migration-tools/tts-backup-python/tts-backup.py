@@ -22,7 +22,7 @@ import re
 import base64
 import hashlib
 import tempfile
-
+import shlex
 
 
 print = functools.partial(print, flush=True)
@@ -428,8 +428,9 @@ class Environment:
   A class to load environment variables from a config file (tts-backup-env.txt) and expose them as attributes.
   """
 
-  def __init__(self, env_file: str):
+  def __init__(self, env_file: str, cleanup_only=False):
     self.env_file = env_file
+    self._cleanup_only = cleanup_only
     self._env = ConfigParser()
     self._defaults = {}
 
@@ -489,7 +490,13 @@ class Environment:
     # Define and load required variables
     value_fss = self._defaults.get('TTS_FSS_CONFIG', '').strip()
     value_objs = self._defaults.get('TTS_BACKUP_URL', '').strip()
-    if value_fss:
+    if self._cleanup_only:
+      required_vars = [
+        'PROJECT_NAME', 'DATABASE_NAME', 
+        'HOSTNAME', 'LSNR_PORT', 'DB_SVC_NAME', 'ORAHOME',
+        'DBUSER', 'DB_VERSION'
+      ]
+    elif value_fss:
       required_vars = [
         'PROJECT_NAME', 'DATABASE_NAME', 
         'HOSTNAME', 'LSNR_PORT', 'DB_SVC_NAME', 'ORAHOME',
@@ -517,6 +524,13 @@ class Environment:
     if len(self.PROJECT_NAME) > 128:
       print_stderr("PROJECT_NAME exceeds the 128-character limit.")
       exit(1)
+      
+    if (self.PROJECT_NAME in ('.', '..')
+      or os.path.isabs(self.PROJECT_NAME)
+      or '/' in self.PROJECT_NAME
+      or '\\' in self.PROJECT_NAME):
+      print_stderr("PROJECT_NAME must be a single project directory name.")
+      exit(1)
 
     # Set one varable which defines customer choosen storage type disk ot objs
     if value_fss:
@@ -524,7 +538,7 @@ class Environment:
     elif value_objs:
       setattr(self, 'STORAGE_TYPE', 'OBJECT_STORAGE')
 
-    if value_objs:
+    if value_objs and not self._cleanup_only:
       if not os.path.isfile(self.CONFIG_FILE):
         raise FileNotFoundError(f"CONFIG_FILE path '{self.CONFIG_FILE}' does not exist or is not a file.")
 
@@ -545,7 +559,7 @@ class Environment:
     # Load optional variables; set to empty if not found
     optional_vars = ['SCHEMAS', 'TABLESPACES', 'EXCLUDE_TABLESPACES', 'EXCLUDE_SCHEMAS',
                      'OCI_INSTALLER_PATH', 'OCI_PROXY_HOST', 'OCI_PROXY_PORT', 'CLUSTER_MODE',
-                     'DRCC_REGION', 'DRY_RUN', 'EXCLUDE_TABLES', 'EXCLUDE_STATISTICS', 
+                     'DRCC_REGION', 'DRY_RUN', 'EXCLUDE_TABLES', 'INCLUDE_STATISTICS', 
                      'TRANSPORT_TABLES_PROTECTED_BY_REDACTION_POLICIES', 'TRANSPORT_TABLES_PROTECTED_BY_OLS_POLICIES',
                      'TRANSPORT_DB_PROTECTED_BY_DATABASE_VAULT','DVREALM_USER',
                      'ZDM_BASED_TRANSPORT', 'IGNORE_NON_FATAL_ERRORS', 'JDK8_PATH']
@@ -557,6 +571,22 @@ class Environment:
         # value = escape_dollar(value)
       setattr(self, var, value)
     
+    # Cleanup needs database authentication only. Do not request TDE or
+    # Database Vault credentials because it does not access protected data.
+    if self._cleanup_only:
+      if getattr(self, 'ZDM_BASED_TRANSPORT').strip():
+        stdin_line = sys.stdin.readline().strip()
+        parsed = parse_stdin_kv(stdin_line) if stdin_line else {}
+        dbpassword = parsed.get("DBPASSWORD", "")
+      else:
+        dbpassword = secure_input("Enter database password: ").strip()
+      
+      if not dbpassword:
+        print("Missing required variable: DBPASSWORD")
+        self.usage()
+      setattr(self, 'DBPASSWORD', dbpassword)
+      return
+
     self.SCHEMAS, self.COMMON_USER_REMAP = _normalize_schema_input(self.SCHEMAS)
 
     if self.TABLESPACES and self.EXCLUDE_TABLESPACES:
@@ -627,6 +657,9 @@ class Environment:
     project_dir = getattr(self, 'PROJECT_NAME')
     project_dir_path = os.path.join(scriptpath(), project_dir)
     setattr(self, 'PROJECT_DIR_PATH', project_dir_path)
+    setattr(self, 'TTS_DIR_NAME', 'TTS_DUMP_DIR')
+    if self._cleanup_only:
+      return
 
     # Set default values
     setattr(self, 'BACKUP_LEVEL', 0)
@@ -678,7 +711,7 @@ class Environment:
       raise ValueError(f"CLUSTER_MODE value should be one of ['TRUE' , 'FALSE' , 'true' , 'false'] but value is {cluser_mode}.")
 
     # Set optional var's 
-    opt_vars = ['DRCC_REGION', 'DRY_RUN', 'EXCLUDE_STATISTICS']
+    opt_vars = ['DRCC_REGION', 'DRY_RUN', 'INCLUDE_STATISTICS']
     for var in opt_vars:
       setattr(self, var, getattr(self, var, 'FALSE') or 'FALSE')
       value = getattr(self, var).strip().upper()
@@ -688,7 +721,6 @@ class Environment:
     # Other default settings
     setattr(self, 'OCI_INSTALLER_PATH', getattr(self, 'OCI_INSTALLER_PATH', '') or scriptpath())
     setattr(self, 'TTS_WALLET_CRED_ALIAS', '')
-    setattr(self, 'TTS_DIR_NAME', 'TTS_DUMP_DIR')
     setattr(self, 'TDE_KEYS_FILE', "tde_keys.exp")
     setattr(self, 'NEXT_SCN', 0)
     setattr(self, 'MAX_CHANNELS', 200)
@@ -1389,6 +1421,7 @@ class TTS_SRC_RUN_VALIDATIONS:
         'dry_run': self._env.DRY_RUN.strip().upper(),
         'exc_tbl_filter_xml': exc_tbl_filter_xml,
         'exc_tbl_filter_xml_cont': exc_tbl_filter_xml_cont,
+        'ignore_non_fatal_errors': self._env.IGNORE_NON_FATAL_ERRORS.strip().upper(), 
       }
     
     if not self._sqlplus.run_sql(template.get('validate_tablespaces'), self.log_file, append_log=append_log):
@@ -1819,45 +1852,70 @@ class TTS_SRC_GATHER_DATA:
 
 class TTS_SRC_DIRECTORY_MANAGER:
   """
-  Class to create or drop a directory object in the database.
-  """
-  def __init__(self, env, template):
-    self._env = env
-    self.tts_src_create_directory(template)
+  Manage the source TTS directory object and validate database-role
+  restrictions for directory DDL and Data Pump operations.
 
-  def tts_src_create_directory(self, template):
+  Primary and snapshot standby allow directory DDL.
+  Physical standby skips directory DDL and Data Pump.
+  Logical standby is not supported.
+  """  
+  def __init__(self, env, template, create_directory=True):
+    self._env = env
+    self._database_role = None
+    self._database_open_mode = None
+    if create_directory:
+      self.tts_src_create_directory(template)
+
+  def tts_src_create_directory(self, template, dir_name=None, dir_path=None):
     """Function to create directory object in the database"""
+    # Directory DDL is allowed only when the database role 
+    # is PRIMARY or SNAPSHOT STANDBY
+    if not self._directory_operation_allowed(template, 'create'):
+      return False
+
     sqlplus = SqlPlus(self._env.DBUSER, self._env.DBPASSWORD,
                       self._env.HOSTNAME, self._env.LSNR_PORT,
                       self._env.DB_SVC_NAME, self._env.ORAHOME)
 
+    dir_name = dir_name or self._env.TTS_DIR_NAME
+    dir_path = dir_path or self._env.TTS_DIR_PATH
+
     Configuration.substitutions = {
-        'tts_dir_name': self._env.TTS_DIR_NAME,
-        'tts_dir_path': self._env.TTS_DIR_PATH,
+        'tts_dir_name': dir_name,
+        'tts_dir_path': dir_path,
         'db_user': self._env.DBUSER,
       }
     
-    log_file = os.path.join(self._env.TTS_DIR_PATH, 'create_dir.log')
+    log_file = os.path.join(self._env.TTS_DIR_PATH, f'{dir_name.lower()}.log')
     if not sqlplus.run_sql(template.get('tts_src_create_directory'), log_file):
-      print(f"Failed to create directory {self._env.TTS_DIR_NAME} \n")
+      print(f"Failed to create directory {dir_name} \n")
       self._log_error(log_file)
-      raise RuntimeError(f"Directory creation failed: {self._env.TTS_DIR_NAME}\n")
+      raise RuntimeError(f"Directory creation failed: {dir_name}\n")
       
-    print(f"Directory {self._env.TTS_DIR_NAME} created successfully.")
+    print(f"Directory {dir_name} created successfully.")
+    return True
   
-  def tts_src_drop_directory(self, template):
+  def tts_src_drop_directory(self, template, dir_name=None):
     """Function to drop directory object in the database"""
+    # Directory DDL is allowed only when the database role 
+    # is PRIMARY or SNAPSHOT STANDBY
+    if not self._directory_operation_allowed(template, 'drop'):
+      return False
+
     sqlplus = SqlPlus(self._env.DBUSER, self._env.DBPASSWORD,
                       self._env.HOSTNAME, self._env.LSNR_PORT,
                       self._env.DB_SVC_NAME, self._env.ORAHOME)
 
+    dir_name = dir_name or self._env.TTS_DIR_NAME
+
     Configuration.substitutions = {
-        'tts_dir_name': self._env.TTS_DIR_NAME,
+        'tts_dir_name': dir_name,
       }
     if not sqlplus.run_sql(template.get('tts_src_drop_directory')):
-      print(f"Failed to drop directory {self._env.TTS_DIR_NAME} \n")
-      raise RuntimeError(f"Directory drop failed: {self._env.TTS_DIR_NAME}\n")
-    print(f"Directory {self._env.TTS_DIR_NAME} dropped successfully.")
+      print(f"Failed to drop directory {dir_name} \n")
+      raise RuntimeError(f"Directory drop failed: {dir_name}\n")
+    print(f"Directory {dir_name} dropped successfully.")
+    return True
   
   def _log_error(self, log_file):
     """Helper function to log the error details from the log file."""
@@ -1867,6 +1925,103 @@ class TTS_SRC_DIRECTORY_MANAGER:
         print(f"Error details:\n{error_details} \n")
     else:
       print(f"Log file {log_file} does not exist. \n")
+
+  def _get_database_role(self, template):
+    """
+    Return the source database role and open mode from v$database.
+
+    The result is cached for the current backup run and shared through _env
+    by wallet-copy and RMAN channel allocation.
+    """
+    if self._database_role is not None:
+      self._env.DATABASE_ROLE = self._database_role
+      self._env.DATABASE_OPEN_MODE = self._database_open_mode
+      return self._database_role, self._database_open_mode
+
+    sqlplus = SqlPlus(self._env.DBUSER, self._env.DBPASSWORD,
+                    self._env.HOSTNAME, self._env.LSNR_PORT,
+                    self._env.DB_SVC_NAME, self._env.ORAHOME)
+
+    log_dir = getattr(self._env, 'TTS_DIR_PATH', None) or '/tmp'
+    log_file = os.path.join(log_dir, f'{self._env.PROJECT_NAME}_tts_database_role.log')
+
+    Configuration.substitutions = {}
+    if not sqlplus.run_sql(template.get('tts_src_get_database_role'), log_file):
+        self._log_error(log_file)
+        raise RuntimeError('Unable to determine database role.')
+
+    try:
+        with open(log_file, 'r') as log:
+            role_lines = [line.strip() for line in log if '|' in line]
+
+        database_role, open_mode = role_lines[-1].split('|', 1)
+        self._database_role = database_role.strip().upper()
+        self._database_open_mode = open_mode.strip().upper()
+
+        self._env.DATABASE_ROLE = self._database_role
+        self._env.DATABASE_OPEN_MODE = self._database_open_mode
+
+        return self._database_role, self._database_open_mode
+    except (OSError, IndexError, ValueError) as err:
+        raise RuntimeError(f'Unable to parse database role information: {err}') from err
+
+  def _directory_operation_allowed(self, template, operation):
+    """
+    Check whether CREATE/DROP DIRECTORY is allowed for the current role.
+
+    A physical standby must not run directory DDL. A logical standby is not
+    supported. Primary and snapshot standby may create or drop the object.
+    """
+    database_role, _ = self._get_database_role(template)
+
+    if database_role in ('PRIMARY', 'SNAPSHOT STANDBY'):
+        return True
+
+    if database_role == 'PHYSICAL STANDBY':
+        print('\nINFO: Source database is a PHYSICAL STANDBY. Incremental TTS '
+            'backup uses only PDB instances open READ ONLY. '
+            'To run FINAL_BACKUP=TRUE, convert this standby to a SNAPSHOT '
+            'STANDBY before triggering the final backup.\n')
+        print(f'Skipping directory {operation}: database role is '
+            'PHYSICAL STANDBY.')
+        return False
+
+    if database_role == 'LOGICAL STANDBY':
+        raise RuntimeError(f'Directory {operation} is not supported on a logical standby. '
+            'Contact Oracle Support.')
+
+    raise RuntimeError(f'Directory {operation} is supported only on a primary or snapshot '
+        f'standby. Current database role is {database_role}.')
+
+  def tts_src_can_run_expdp(self, template, operation):
+    """
+    Check whether the requested Data Pump operation can run.
+
+    expdp, including ESTIMATE_ONLY, needs a writable database. Therefore it
+    is allowed only on primary or snapshot standby, never physical standby.
+    """
+    database_role, open_mode = self._get_database_role(template)
+
+    if database_role in ('PRIMARY', 'SNAPSHOT STANDBY'):
+        if open_mode != 'READ WRITE':
+            raise RuntimeError(f'{operation} requires READ WRITE mode. Current role/open mode: '
+                f'{database_role}/{open_mode}.')
+        return True
+
+    if database_role == 'PHYSICAL STANDBY':
+        # Do not run expdp on physical standby. 
+        # Customers must convert to snapshot standby 
+        # for expdp validation or before triggering FINAL_BACKUP=TRUE.
+        print(f'Skipping {operation}: expdp is not supported on a physical '
+            'standby. Convert the standby to a snapshot standby and retry.')
+        return False
+
+    if database_role == 'LOGICAL STANDBY':
+        raise RuntimeError(f'{operation} is not supported on a logical standby. '
+            'Contact Oracle Support.')
+
+    raise RuntimeError(f'{operation} is supported only on a primary or snapshot standby. '
+        f'Current database role is {database_role}.')
 
 
 class TTS_SRC_TDE_KEY_EXPORTER:
@@ -1944,7 +2099,18 @@ class TTS_SRC_WALLET_COPIER:
   """
   def __init__(self, env):
     self._env = env
+
+    # Use READ ONLY PDB instances for a physical standby.
+    # primay and snapshot continue to use READ WRITE PDB instances.
+    database_role = str(getattr(self._env, 'DATABASE_ROLE', '')).upper()
+    
+    # Read Write host list
     self.hosts = self.parse_hosts(self._env.DB_PROPS_ARRAY[13])
+    
+    if database_role == 'PHYSICAL STANDBY':
+      # Read Only host list
+      self.hosts = self.parse_hosts(self._env.DB_PROPS_ARRAY[26])
+
     self.tts_src_copy_wallet()
 
   def parse_hosts(self, host_string):
@@ -2053,6 +2219,153 @@ class TTS_SRC_RMAN_BACKUP:
     expdp_bin = os.path.join(self._env.ORAHOME, "bin", "expdp")
     return self._execute_command_args([expdp_bin, f"parfile={parfile_path}"], "EXPDP")
 
+  def _format_bytes(self, size_bytes):
+    units = ['B', 'KB', 'MB', 'GB', 'TB']
+    size = float(size_bytes)
+    for unit in units:
+      if size < 1024 or unit == units[-1]:
+        if unit == 'B':
+          return f"{int(size)} {unit}"
+        return f"{size:.1f} {unit}"
+      size /= 1024
+
+  def _parse_expdp_estimate_bytes(self, log_file):
+    estimate_pattern = re.compile(
+      r'Total estimation using .* method: ([0-9]+(?:\.[0-9]+)?)\s*([KMGT]?B)',
+      re.IGNORECASE
+    )
+    unit_map = {
+      'B': 1,
+      'KB': 1024,
+      'MB': 1024 ** 2,
+      'GB': 1024 ** 3,
+      'TB': 1024 ** 4,
+    }
+
+    with open(log_file, 'r') as log:
+      for line in log:
+        match = estimate_pattern.search(line)
+        if match:
+          size = float(match.group(1))
+          unit = match.group(2).upper()
+          return int(size * unit_map[unit])
+    return None
+
+  def tts_src_estimate_xml_dump_space(self, template):
+    if self._env.table_with_xml_type.upper() != 'TRUE':
+      return
+
+    l_conn_str = (
+      f"{self._env.HOSTNAME}:{self._env.LSNR_PORT}/"
+      f"{self._env.DB_SVC_NAME} AS SYSDBA"
+    )
+    job_name_str = ""
+    if self._env.ZDM_BASED_TRANSPORT.upper() == "TRUE":
+      job_name_str = f'JOB_NAME={self._env.PROJECT_NAME}_ZDM_XML_ESTIMATE'
+
+    exclude_clauses = [
+      'EXCLUDE=INDEX:"IN (SELECT index_name FROM dba_xml_indexes '
+      f'WHERE upper(index_type) <> \'STRUCTURED\' '
+      f'AND table_owner IN ({split_into_lines(self._env.SCHEMAS).upper()}))"'
+    ]
+
+    if self._env.INCLUDE_STATISTICS.strip().upper() != "TRUE":
+      exclude_clauses.append(
+        "EXCLUDE=STATISTICS,INDEX_STATISTICS,TABLE_STATISTICS")
+    
+    exclude_clause = "\n".join(exclude_clauses)
+
+    Configuration.substitutions = {
+        'oracle_home': self._env.ORAHOME,
+        'db_user': self._env.DBUSER,
+        'db_password': self._env.DBPASSWORD,
+        'xml_export_tables': self._env.xml_export_tables,
+        'l_conn_str': l_conn_str,
+        'tts_dir_name': self._env.TTS_DIR_NAME,
+        'xml_dump_file_clause': '',
+        'exclude_clause': exclude_clause,
+        'xml_estimate_clause': 'ESTIMATE_ONLY=YES\nESTIMATE=BLOCKS',
+        'xml_expdp_log_file': 'estimate_xml.log',
+        'job_name_str': job_name_str.upper(),
+      }
+
+    parfile_path = self._write_expdp_parfile(
+        'expdp_xml_estimate.par',
+        template.get('tts_src_export_xml_tables')
+    )
+    log_file = os.path.join(self._env.TTS_DIR_PATH, 'estimate_xml.log')
+    try:
+      return_val = self._execute_expdp_parfile(parfile_path)
+      if return_val == 1:
+        err_msg = (
+          'Failed to estimate xml_tables.dmp size ' +
+          'for local staging validation.'
+        )
+        self._env.add_dry_run_error(err_msg)
+        if not self._env.is_dry_run():
+          print(err_msg)
+        return 1
+    finally:
+      if os.path.exists(parfile_path):
+        os.remove(parfile_path)
+
+    estimate_bytes = self._parse_expdp_estimate_bytes(log_file)
+    if estimate_bytes is None:
+      err_msg = (
+        'Unable to parse XML dump estimate from ' +
+        f"estimate_xml.log. Review: {log_file}"
+      )
+      self._env.add_dry_run_error(err_msg)
+      if not self._env.is_dry_run():
+        print(err_msg)
+      return 1
+
+    required_bytes = estimate_bytes + (2 * 1024 * 1024 * 1024)
+    free_bytes = shutil.disk_usage(self._env.TTS_DIR_PATH).free
+
+    print(
+      'XML dump estimate using ESTIMATE=BLOCKS: ' +
+      f"{self._format_bytes(estimate_bytes)}; " +
+      'extra safety buffer: 2.0 GB; ' +
+      'required free space for local staging validation: ' +
+      f"{self._format_bytes(required_bytes)}; " +
+      f"available: {self._format_bytes(free_bytes)}"
+    )
+
+    if free_bytes < required_bytes:
+      err_msg = (
+        'Insufficient local space for xml_tables.dmp staging ' +
+        'on this source when ' +
+        'using OBJECT_STORAGE. ' +
+        f"Estimated dump size={self._format_bytes(estimate_bytes)}, " +
+        f"required free space={self._format_bytes(required_bytes)}, " +
+        f"available={self._format_bytes(free_bytes)}."
+      )
+      self._env.add_dry_run_error(err_msg)
+      if not self._env.is_dry_run():
+        print(err_msg)
+      return 1
+
+    return 0
+
+  def _get_object_storage_xml_dump_url(self):
+    object_name = f"{os.path.splitext(self._env.BUNDLE_FILE_NAME)[0]}_xml_tables.dmp"
+    return OCI_CURL_SIGNER(self._env).build_object_url(
+        self._env.TTS_BACKUP_URL,
+        object_name
+    )
+
+  def _upload_xml_dump_to_object_storage(self, xml_dump_path):
+    url = self._get_object_storage_xml_dump_url()
+    OCI_CURL_SIGNER(self._env).request(
+        method="PUT",
+        url=url,
+        body_file=xml_dump_path,
+        content_type="application/octet-stream",
+        expected_status=(200,)
+    )
+    print(f"XML dump uploaded successfully to {url}.")
+
   def _execute_rman_script(self, rman_script, log_file, command_type):
     """Run RMAN with script supplied through stdin."""
     rman_bin = os.path.join(self._env.ORAHOME, "bin", "rman")
@@ -2143,11 +2456,30 @@ class TTS_SRC_RMAN_BACKUP:
 
   def tts_src_get_channel(self):
     """Construct the Channel string"""
-    self.host_array = self._env.DB_PROPS_ARRAY[13].split(';')
+    # Physical standby RMAN channels must use only instances where the PDB is
+    # open READ ONLY. Primary and snapshot standby use READ WRITE instances.
+    database_role = str(getattr(self._env, 'DATABASE_ROLE', '')).upper()
+
+    if database_role == 'PHYSICAL STANDBY':
+      self.host_array = self._env.DB_PROPS_ARRAY[26].split(';')
+      expected_open_mode = 'READ ONLY'
+    else:
+      self.host_array = self._env.DB_PROPS_ARRAY[13].split(';')  
+      expected_open_mode = 'READ WRITE'
+
     self._env.CPU_COUNT = self.calculate_cpu_count()
 
-    if not self._env.DB_PROPS_ARRAY[13]:
-      print("Invalid DATABASE_NAME {0} or the PDB is not open in READ WRITE mode in any instance. Exiting...".format(self._env.DATABASE_NAME))
+    if not self.host_array:
+      if database_role == 'PHYSICAL STANDBY':
+        print(f'ERROR: No PDB instance open {expected_open_mode} was found for '
+            f'{self._env.DATABASE_NAME} on the physical standby. '
+            'Open the PDB READ ONLY on at least one standby RAC instance '
+            'before running an incremental TTS backup. '
+            'FINAL_BACKUP=TRUE requires conversion to a snapshot standby.')
+      else:
+        print(f'ERROR: No PDB instance open {expected_open_mode} was found for '
+            f'{self._env.DATABASE_NAME}. Ensure the PDB is open READ WRITE '
+            'on at least one RAC instance before running TTS backup.')
       sys.exit(1)
 
     if not self.host_array or self._env.CPU_COUNT <= 0:
@@ -2173,9 +2505,11 @@ class TTS_SRC_RMAN_BACKUP:
       _OPC_TAG_METERING=FALSE)';
       """
 
-    libopc_path = self._env.get_libopc_path()
-    if not os.path.isfile(libopc_path):
-      raise FileNotFoundError(f"libopc.so not found at {libopc_path}")
+    if self._env.STORAGE_TYPE == "OBJECT_STORAGE":
+      libopc_path = self._env.get_libopc_path()
+      if not os.path.isfile(libopc_path):
+        raise FileNotFoundError(
+          f"libopc.so not found at {libopc_path}")
       
     count = 0
     current_host = socket.gethostname()
@@ -2239,7 +2573,7 @@ class TTS_SRC_RMAN_BACKUP:
             rman_backup_started = True
           if "Finished backup at" in line:
             rman_backup_finished = True
-          if "RMAN-" in line and "WARNING" not in line:
+          if "RMAN-" in line.upper() and "WARNING" not in line.upper():
             print(f"RMAN errors found. {line}")
             print(f"Please check logs at {log_file}.")
             return False
@@ -2473,11 +2807,43 @@ class TTS_SRC_RMAN_BACKUP:
 
   def tts_src_export_xml_tables(self, template):
     """Export XML Tables"""
-    xml_dump_path = os.path.join(self._env.TTS_DIR_PATH, 'xml_tables.dmp')
-    if os.path.exists(xml_dump_path):
-      os.remove(xml_dump_path)
+    xml_dir_name = self._env.TTS_DIR_NAME
+    xml_dump_file = 'xml_tables.dmp'
+
+    xml_expdp_log_file = 'export_xml.log'
+    cleanup_dir_name = None
+    local_xml_dump_path = None
+
+    if self._env.STORAGE_TYPE == "FSS":
+      xml_dir_name = "TTS_XML_DUMP_DIR"
+      # Keep export_xml.log in TTS_DUMP_DIR while xml_tables.dmp goes to FSS.
+      xml_expdp_log_file = f"{self._env.TTS_DIR_NAME}:export_xml.log"
+      cleanup_dir_name = xml_dir_name
+      local_xml_dump_path = os.path.join(
+          self._env.TTS_FSS_MOUNT_DIR,
+          self._env.PROJECT_NAME,
+          'datafile',
+          xml_dump_file
+      )
+      if os.path.exists(local_xml_dump_path):
+        os.remove(local_xml_dump_path)
+      directory_manager = TTS_SRC_DIRECTORY_MANAGER(
+        self._env, template, create_directory=False
+      )
+      directory_manager.tts_src_create_directory(
+          template,
+          dir_name=xml_dir_name,
+          dir_path=os.path.dirname(local_xml_dump_path)
+      )
+    else:
+      local_xml_dump_path = os.path.join(self._env.TTS_DIR_PATH, xml_dump_file)
+      if os.path.exists(local_xml_dump_path):
+        os.remove(local_xml_dump_path)
     
-    l_conn_str = f"{self._env.HOSTNAME}:{self._env.LSNR_PORT}/{self._env.DB_SVC_NAME} AS SYSDBA"
+    l_conn_str = (
+      f"{self._env.HOSTNAME}:{self._env.LSNR_PORT}/"
+      f"{self._env.DB_SVC_NAME} AS SYSDBA"
+    )
 
     job_name_str = ""
     if self._env.ZDM_BASED_TRANSPORT.upper() == "TRUE":
@@ -2489,8 +2855,9 @@ class TTS_SRC_RMAN_BACKUP:
       f'AND table_owner IN ({split_into_lines(self._env.SCHEMAS).upper()}))"'
     ]
 
-    if self._env.EXCLUDE_STATISTICS.strip().upper() == "TRUE":
-      exclude_clauses.append("EXCLUDE=STATISTICS,INDEX_STATISTICS,TABLE_STATISTICS")
+    if self._env.INCLUDE_STATISTICS.strip().upper() != "TRUE":
+      exclude_clauses.append(
+        "EXCLUDE=STATISTICS,INDEX_STATISTICS,TABLE_STATISTICS")
     
     exclude_clause = "\n".join(exclude_clauses)
 
@@ -2500,12 +2867,18 @@ class TTS_SRC_RMAN_BACKUP:
         'db_password': self._env.DBPASSWORD,
         'xml_export_tables': self._env.xml_export_tables,
         'l_conn_str': l_conn_str,
-        'tts_dir_name': self._env.TTS_DIR_NAME,
+        'tts_dir_name': xml_dir_name,
+        'xml_dump_file_clause': f'DUMPFILE={xml_dump_file}',
+        'xml_estimate_clause': '',
+        'xml_expdp_log_file': xml_expdp_log_file,
         'exclude_clause': exclude_clause,
         'job_name_str': job_name_str.upper(),
       }
 
-    parfile_path = self._write_expdp_parfile("expdp_xml.par", template.get("tts_src_export_xml_tables"))
+    parfile_path = self._write_expdp_parfile(
+      "expdp_xml.par",
+      template.get("tts_src_export_xml_tables")
+    )
     try:
       return_val = self._execute_expdp_parfile(parfile_path)
       if return_val:
@@ -2521,6 +2894,11 @@ class TTS_SRC_RMAN_BACKUP:
     finally:
       if os.path.exists(parfile_path):
         os.remove(parfile_path)
+      if cleanup_dir_name:
+        directory_manager.tts_src_drop_directory(
+            template,
+            dir_name=cleanup_dir_name
+        )
     expdp_log_file = "export_xml.log"
     
     # Append logs to expdp log file
@@ -2533,8 +2911,16 @@ class TTS_SRC_RMAN_BACKUP:
     log_file = f"{self._env.TTS_DIR_PATH}/{expdp_log_file}"
 
     if not self.check_log_for_errors(log_file):
-      print(f"Error found in EXPDP log file: {log_file}. Export of XML tables Metadata failed.")
+      print(
+        f"Error found in EXPDP log file: {log_file}. "
+        "Export of XML tables Metadata failed."
+      )
       return 1
+    
+    if return_val == 0 and self._env.STORAGE_TYPE == "OBJECT_STORAGE":
+      self._upload_xml_dump_to_object_storage(local_xml_dump_path)
+      if os.path.exists(local_xml_dump_path):
+        os.remove(local_xml_dump_path)
     return return_val
   
   def _build_exclude_table_clauses(self, table_names, max_clause_len=3900):
@@ -2614,7 +3000,7 @@ class TTS_SRC_RMAN_BACKUP:
 
     exclude_clauses = self._build_exclude_table_clauses(tables_to_exclude)
 
-    if self._env.EXCLUDE_STATISTICS.strip().upper() == "TRUE":
+    if self._env.INCLUDE_STATISTICS.strip().upper() != "TRUE":
         exclude_clauses.append(
             "EXCLUDE=STATISTICS,INDEX_STATISTICS,TABLE_STATISTICS"
         )
@@ -2692,7 +3078,9 @@ class TTS_SRC_RMAN_BACKUP:
 
     new_backup_level = next_backup_level(self._env.BACKUP_LEVEL)
     
-    if self._env.TBS_READ_ONLY == "true":
+    database_role = str(getattr(self._env, 'DATABASE_ROLE', '')).strip().upper()
+
+    if self._env.TBS_READ_ONLY == "true" or database_role == 'PHYSICAL STANDBY':
       next_scn = self.SCNS_ARRAY[1]
     else:
       next_scn = self.SCNS_ARRAY[0]
@@ -2769,6 +3157,76 @@ class TTS_SRC_RMAN_BACKUP:
     print(f"Updated {self._env.TTS_PROJECT_FILE} Successful.")
 
 
+class TTS_SRC_CLEANUP_MANAGER:
+  def __init__(self, env):
+    self._env = env
+  
+  def _get_rac_hosts(self, template):
+    fd, host_file = tempfile.mkstemp(prefix="tts_cleanup_hosts_", suffix=".log")
+    os.close(fd)
+    try:
+      sqlplus = SqlPlus(
+          self._env.DBUSER,
+          self._env.DBPASSWORD,
+          self._env.HOSTNAME,
+          self._env.LSNR_PORT,
+          self._env.DB_SVC_NAME,
+          self._env.ORAHOME
+      )
+      if not sqlplus.run_sql(template.get('tts_src_get_rac_hosts'), host_file):
+        raise RuntimeError("Unable to discover RAC hosts for --cleanup.")
+
+      with open(host_file, 'r') as file_handle:
+        hosts = [line.strip() for line in file_handle if line.strip()]
+    finally:
+      try:
+        os.remove(host_file)
+      except OSError:
+        pass
+      
+    hosts.append(socket.gethostname())
+    unique_hosts = []
+    for host in hosts:
+      host = host.lower()
+      if host not in unique_hosts:
+        unique_hosts.append(host)
+    
+    return unique_hosts
+
+  def tts_src_cleanup(self, template):
+    project_dir_path = os.path.join(scriptpath(), self._env.PROJECT_NAME)
+    rac_hosts = self._get_rac_hosts(template)
+
+    # Drop first so no database directory object points at deleted storage.
+    directory_manager = TTS_SRC_DIRECTORY_MANAGER(self._env, template, create_directory=False)
+    directory_manager.tts_src_drop_directory(template)
+
+    failures = []
+    try:
+      if os.path.exists(project_dir_path):
+        shutil.rmtree(project_dir_path)
+        print(f"Removed local project directory: {project_dir_path}")
+    except Exception as err:
+      failures.append(f"local host: {err}")
+
+    current_host = socket.gethostname().lower()
+    for host in rac_hosts:
+      if host == current_host:
+        continue
+      try:
+        remote_command = f"rm -rf -- {shlex.quote(project_dir_path)}"
+        subprocess.run(["ssh", "-oBatchMode=yes", "-oConnectTimeout=15", "-oConnectionAttempts=1", host, remote_command], check=True, timeout=300)
+        print(f"Removed project directory on {host}: {project_dir_path}")
+      except subprocess.TimeoutExpired:
+        failures.append(f"{host}: remote cleanup timed out after 300 seconds")
+      except subprocess.CalledProcessError as err:
+        failures.append(f"{host}: {err}")
+    
+    if failures:
+      raise RuntimeError("Cleanup completed with failures:\n" + "\n".join(failures))
+    
+    print("TTS project cleanup completed successfully.")
+
 
 class TTS_SRC_BUNDLE_MANAGER:
   """
@@ -2790,14 +3248,10 @@ class TTS_SRC_BUNDLE_MANAGER:
     
     schema_dump = ""
     tablespace_dump = ""
-    xml_dump = ""
-    
     # Determine if final backup is requested
     if self._env.FINAL_BACKUP.upper() == "TRUE":
       tablespace_dump = os.path.join(bundle_dir, "tablespace.dmp")
       schema_dump = os.path.join(bundle_dir, "schema.dmp")
-      if self._env.table_with_xml_type.upper() == "TRUE":
-        xml_dump = os.path.join(bundle_dir, "xml_tables.dmp")
 
     tde_path = ""
     
@@ -2816,8 +3270,6 @@ class TTS_SRC_BUNDLE_MANAGER:
           tar.add(os.path.join(bundle_dir, "cwallet.sso"), arcname=f"{os.path.basename(bundle_dir)}/cwallet.sso")
         if schema_dump:
           tar.add(schema_dump, arcname=f"{os.path.basename(bundle_dir)}/schema.dmp")
-        if xml_dump:
-          tar.add(xml_dump, arcname=f"{os.path.basename(bundle_dir)}/xml_tables.dmp")
         if tablespace_dump:
           tar.add(tablespace_dump, arcname=f"{os.path.basename(bundle_dir)}/tablespace.dmp")
         if tde_path:
@@ -2830,7 +3282,7 @@ class TTS_SRC_BUNDLE_MANAGER:
 
     # Clean up the bundle directory
     try:
-      os.system(f"rm -rf {bundle_dir}")
+      shutil.rmtree(bundle_dir)
       print(f"Cleaned up the bundle directory: {bundle_dir}.")
     except Exception as e:
       print(f"Failed to clean up the bundle directory: {e} \n")
@@ -2841,19 +3293,6 @@ class TTS_SRC_BUNDLE_MANAGER:
     # Cleanup libopc.so downloaded by OCI Installer
     if self._env.STORAGE_TYPE == "OBJECT_STORAGE" and not self._env.use_orahome_libopc():
       os.remove(self._env.get_libopc_path())
-
-      # Remove remote directory created on other rac instances
-      self.hosts = [host.strip() for host in self._env.DB_PROPS_ARRAY[13].split(';') if host.strip()]
-      current_host = socket.gethostname()
-
-      for host in self.hosts:
-        host_name = host.split(':')[0]
-        if current_host == host_name:
-          continue
-        if self._env.CLUSTER_MODE.upper() == 'TRUE':
-          rm_tts_dir = f"ssh -oStrictHostKeyChecking=no {host_name} 'rm -rf {self._env.PROJECT_DIR_PATH}'"
-          print(f"Removing remote directory on {host_name}...")
-          subprocess.run(rm_tts_dir, shell=True, check=True)
   
   def tts_src_upload_bundle(self):
     """
@@ -2877,10 +3316,11 @@ class TTS_SRC_BUNDLE_MANAGER:
         print(f"Bundle uploaded successfully to {url}.")
         self.display_success_message(url)
       elif self._env.STORAGE_TYPE == "FSS":
-        url = f"{self._env.TTS_FSS_MOUNT_DIR}/{self._env.PROJECT_NAME}/metadata/"
-        os.system(f"cp {self._env.TTS_BUNDLE_FILE} {url}")
-        print(f"Bundle copied successfully to {url}.")
-        self.display_success_message(url)
+        fss_mount_path = f"{self._env.TTS_FSS_MOUNT_DIR}/{self._env.PROJECT_NAME}/metadata/"
+        fss_bundle_uri = f"{self._env.TTS_FSS_CONFIG}/{self._env.BUNDLE_FILE_NAME}"
+        os.system(f"cp {self._env.TTS_BUNDLE_FILE} {fss_mount_path}")
+        print(f"Bundle copied successfully to {fss_mount_path}.")
+        self.display_success_message(fss_bundle_uri)
     except Exception as e:
       print(f"Error occurred during the upload_bundle: {e} \n")
       sys.exit(1) 
@@ -2890,11 +3330,10 @@ class TTS_SRC_BUNDLE_MANAGER:
       print("---------")
       min_storage_size = float(self._env.DB_PROPS_ARRAY[12]) + max(float(self._env.DB_PROPS_ARRAY[19]),
                                                                    float(self._env.DB_PROPS_ARRAY[20]))
-      print(f"Create a database in ADB-S cloud with minimum storage size of {min_storage_size}GB")
-      print("Specify tag name/value as")
-      if self._env.STORAGE_TYPE == "OBJECT_STORAGE":
-        print(f"ADB$TTS_BUNDLE_URL: {url}")
-        print("---------")    
+      print(f"Create or Update a database in ADB-S cloud with minimum storage size of {min_storage_size}GB")
+      print("Under Migration, enable Import Transportable Tablespaces and provide this transportable tablespace bundle URI:")
+      print(url)
+      print("---------")
 
 class Template(object):
   def __init__(self, filename):
@@ -2932,8 +3371,9 @@ def main(args):
       print(f"TTS backup utility version: {tts_version}\n")
       sys.exit(0)
 
-    if args:
-      print_stderr("Command line options are not supported. Configure IGNORE_NON_FATAL_ERRORS and JDK8_PATH in tts-backup-env.txt.")
+    cleanup_only = args == ["--cleanup"]
+    if args and not cleanup_only:
+      print_stderr("Unsupported command line option. Use --version or --cleanup.")
       sys.exit(1)
 
     # Check if python version is >= 3
@@ -2946,7 +3386,11 @@ def main(args):
     template = Template(os.path.join(scriptpath(), 'ttsTemplate.txt'))
 
     # Configure or Load the environment
-    _env = Environment(os.path.join(scriptpath(), 'tts-backup-env.txt'))
+    _env = Environment(os.path.join(scriptpath(), 'tts-backup-env.txt'), cleanup_only=cleanup_only)
+
+    if cleanup_only:
+      TTS_SRC_CLEANUP_MANAGER(_env).tts_src_cleanup(template)
+      return 0
  
     ### STEP 1: RUN tablespace validations ###
     print("\n* Run tablespace validations...\n")
@@ -3021,6 +3465,31 @@ def main(args):
     start_time = log_start_time()
     directory_manager = TTS_SRC_DIRECTORY_MANAGER(_env, template)
     log_end_time(start_time)
+
+    is_dry_run = _env.DRY_RUN.strip().upper() == 'TRUE'
+    is_final_backup = _env.FINAL_BACKUP.strip().upper() == 'TRUE'
+
+    # A real final backup must not run on physical standby.
+    if not is_dry_run and is_final_backup:
+      if not directory_manager.tts_src_can_run_expdp(template, 'Final TTS backup'):
+        print('ERROR: FINAL_BACKUP=TRUE cannot run on a physical standby. '
+            'Convert the standby to a SNAPSHOT STANDBY before triggering '
+            'the final backup.')
+        exit(1)
+
+    ### Step 5a-1: Estimate xml dump size if xml tables exist and
+    ###             fail early
+    if (_env.STORAGE_TYPE == 'OBJECT_STORAGE' and
+        _env.table_with_xml_type.upper() == 'TRUE'):
+      if directory_manager.tts_src_can_run_expdp(template, 'XML dump size estimate'):
+        print("\n* Estimate local xml dump staging space for object storage.\n")
+        start_time = log_start_time()
+        xml_estimator = TTS_SRC_RMAN_BACKUP(_env)
+        if xml_estimator.tts_src_estimate_xml_dump_space(template) == 1:
+          print("Estimate local xml dump staging space Failed.\n")
+          if not _env.is_dry_run():
+            exit(1)
+        log_end_time(start_time)
 
     if _env.DRY_RUN.strip().upper() != "TRUE":
       ### STEP 5b: Export TDE keys ###
@@ -3108,7 +3577,10 @@ def main(args):
         log_end_time(start_time)
         
         if _env.table_with_xml_type.upper() == "TRUE":
-          print(f"\n* Export {_env.TABLESPACES.upper()} tablespaces XML tables using data pump...\n")
+          print(
+            f"\n* Export {_env.TABLESPACES.upper()} tablespaces XML "
+            "tables using data pump...\n"
+          )
           start_time = log_start_time()
           if rman_backup.tts_src_export_xml_tables(template) == 1:
             print("Export XML Tables Failed.\n")
@@ -3141,19 +3613,19 @@ def main(args):
       start_time = log_start_time()
       bundle_manager.tts_src_upload_bundle()
       log_end_time(start_time)
-
-      if _env.STORAGE_TYPE == "FSS":
-        print(f"ADB$TTS_BUNDLE_URL: {_env.TTS_FSS_CONFIG}/{_env.BUNDLE_FILE_NAME}")
-        print("---------")  
     else:
       if _env.DB_VERSION != '11g':
-        rman_backup = TTS_SRC_RMAN_BACKUP(_env)
-        print(f"\n* Validation export for tablespaces metadata using datapump..\n")
-        start_time = log_start_time()
-        if rman_backup.tts_src_export_tablespaces(template, True) == 1:
-          print("Export Tablespace metadata Failed.\n")
-          _env.add_dry_run_error("Validation export for tablespaces metadata using datapump failed.")
-        log_end_time(start_time)
+        if directory_manager.tts_src_can_run_expdp(template, 'Dry-run Data Pump validation'):
+          rman_backup = TTS_SRC_RMAN_BACKUP(_env)
+          print(f"\n* Validation export for tablespaces metadata using datapump..\n")
+          start_time = log_start_time()
+          if rman_backup.tts_src_export_tablespaces(template, True) == 1:
+            print("Export Tablespace metadata Failed.\n")
+            _env.add_dry_run_error("Validation export for tablespaces metadata using datapump failed.")
+          log_end_time(start_time)
+        else:
+          print('Data Pump validation is not supported on a physical standby. '
+            'Convert the standby to a snapshot standby for data pump validations.')
 
       print("\n* Dry run cleanup: dropping the TTS directory object...\n")
       start_time = log_start_time()
@@ -3166,19 +3638,33 @@ def main(args):
 
   except FileNotFoundError as err_msg:
     print(f"File Not Found Error: {err_msg}")
+    if cleanup_only:
+      return 1
   except EnvironmentError as err_msg:
     print(f"Environment Error: {err_msg}")
+    if cleanup_only:
+      return 1
   except ValueError as err_msg:
     print(f"Value Error: {err_msg}")
+    if cleanup_only:
+      return 1
   except AttributeError as err_msg:
     print(f"Attribute Error: {err_msg}")
+    if cleanup_only:
+      return 1
   except RuntimeError as err_msg:
     print(f"Runtime Error: {err_msg}")
+    if cleanup_only:
+      return 1
   except Exception as err_msg:
     print(f"Error: {err_msg}")
+    if cleanup_only:
+      return 1
 
 if __name__ == '__main__':
   """
   Run the main function for direct invocation of script
   """
-  main(sys.argv[1:])
+  exit_code = main(sys.argv[1:])
+  if exit_code is not None:
+    sys.exit(exit_code)
