@@ -1,0 +1,6 @@
+{
+  "dayOfWeek": { "name": "SUNDAY" },
+  "maintenanceStartTime": "01:00",
+  "maintenanceEndTime": "03:00",
+  "availabilityDomain": ""
+}
