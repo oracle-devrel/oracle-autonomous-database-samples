@@ -1,0 +1,6 @@
+{
+  "dayOfWeek": { "name": "SUNDAY" },
+  "maintenanceStartTime": "02:00",
+  "maintenanceEndTime": "04:00",
+  "availabilityDomain": "gTef:US-ASHBURN-AD-1"
+}
