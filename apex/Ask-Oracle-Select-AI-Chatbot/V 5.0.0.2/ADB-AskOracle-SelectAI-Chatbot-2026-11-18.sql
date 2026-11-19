@@ -114,7 +114,7 @@ wwv_imp_workspace.create_flow(
 ,p_public_user=>'APEX_PUBLIC_USER'
 ,p_proxy_server=>nvl(wwv_flow_application_install.get_proxy,'')
 ,p_no_proxy_domains=>nvl(wwv_flow_application_install.get_no_proxy_domains,'')
-,p_flow_version=>'Release 5.0.0.1'
+,p_flow_version=>'Release 5.0.0.2'
 ,p_flow_status=>'AVAILABLE_W_EDIT_LINK'
 ,p_browser_cache=>'N'
 ,p_browser_frame=>'D'
@@ -332245,7 +332245,7 @@ wwv_flow_imp_page.create_page_plug(
 '    <span style="color:#3498db;">ADB-AskOracle-SelectAI-Chatbot-2026-11-18.sql</span><br>',
 '',
 '    <b>Compatibility:</b>',
-'    <span style="color:#3498db;">Compatible with Apex 24 & Apex 26 version</span>',
+'    <span style="color:#3498db;">Requires Oracle APEX 26.1.6 or later; not compatible with APEX 24</span>',
 '  </p>',
 '',
 '  <h3>Major New Features in V5</h3>',

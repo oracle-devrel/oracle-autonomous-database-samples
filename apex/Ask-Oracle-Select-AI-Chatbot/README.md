@@ -1,21 +1,25 @@
-# Ask Oracle Select AI 5.0.0.1
+# Ask Oracle Select AI 5.0.0.2
+
+See the [Release 5.0.0.2 guide](V%205.0.0.2/README.md) for the version-specific installation notes. Older release exports remain available in the table below.
 
 Ask Oracle Select AI is an Oracle APEX application that provides a low-code interface to Oracle Select AI on Oracle AI Database and Autonomous AI Database. It brings conversational AI, natural-language-to-SQL (NL2SQL), Retrieval-Augmented Generation (RAG), and agent experiences into one application that you can inspect, customize, and extend.
 
 Release 5.0 evolves the original conversational interface into a low-code application platform for configuring, governing, and deploying Select AI-powered experiences.
-This app is compatible with Apex 24 and Apex 26 versions.
+The 5.0.0.2 application export was generated with Oracle APEX **26.1.6**. It requires APEX 26.1.6 or later; it cannot be imported into APEX 24.
 
-## What's new in Release 5.0.0.1
+## What's new in Release 5.0.0.2
 
-- Visual Agent Builder for Oracle Select AI Agent Framework agents and teams
-- Agent Team Map for inspecting agent, task, and tool relationships
-- Prebuilt Oracle Select AI agents that can be installed and configured in the application
-- AI Profile lifecycle management for NL2SQL, RAG, and agents
-- Centralized governance, defaults, branding, and button-level access controls
+Release 5.0.0.2 builds on the Release 5.0 agent and governance features with:
 
-## Why use Release 5.0.0.1?
+- **Supervisor Agent support** for coordinating agent workflows.
+- **Profile and agent configuration import/export** to move these configurations between environments.
+- **Chat history tags** to organize and separate conversations.
+- **Chat-only end-user access**; end users no longer have access to the Settings page.
+- **Chart generation and rendering improvements** for visualization prompts.
 
-Release 5.0 helps teams move from asking questions to building governed AI applications. Use it to configure NL2SQL and RAG profiles, build and validate agent teams visually, and control the capabilities available to different users.
+## Why use Release 5.0.0.2?
+
+Release 5.0.0.2 helps teams run governed Select AI conversations and agent workflows. Coordinate agents with a Supervisor Agent, move profile and agent configurations between environments, organize chats with tags, and give end users a focused chat experience.
 
 ## Key capabilities
 
@@ -26,11 +30,13 @@ Release 5.0 helps teams move from asking questions to building governed AI appli
 - **Visual Agent Builder** — generate an initial team from natural language, then refine its teams, agents, tasks, and tools in one visual workflow before validating it.
 - **Agent Team Map** — view routing and relationships among teams, agents, tasks, and tools.
 - **Prebuilt agents** — install a provided agent through the application, then configure its required credentials, parameters, tools, and target resources, plus data access.
-- **Profiles and governance** — create, edit, validate, and reuse AI Profiles; configure application defaults, branding, and feature access.
+- **Profiles and governance** — create, edit, validate, import, export, and reuse AI Profiles and agent configurations; configure application defaults, branding, and feature access.
+- **Conversation organization** — tag chat history to keep conversations organized.
+- **Charts** — generate and render charts from visualization prompts.
 
 ## User Interface
 
-![Agent Builder showing an agent team with its agents, tasks, and assigned tools](../../images/agent_builder.png)
+![Agent Builder showing an agent team with its agents, tasks, and assigned tools](../images/agent_builder.png)
 
 **Figure 1:** Visual Agent Builder for creating and refining an agent team, including its agents, tasks, and assigned tools.
 
@@ -39,30 +45,32 @@ Release 5.0 helps teams move from asking questions to building governed AI appli
 <br>
 <br>
 
-![Agent Team Map showing relationships among teams, agents, tasks, and tools](../../images/agent_team_map.png)
+![Agent Team Map showing relationships among teams, agents, tasks, and tools](../images/agent_team_map.png)
 
 **Figure 2:** Agent Team Map for reviewing the relationships among teams, agents, tasks, and tools.
 
 <br>
 <br>
 
-![AI Profile management screen for configuring an NL2SQL profile](../../images/nl2sql_profile.png)
+![AI Profile management screen for configuring an NL2SQL profile](../images/nl2sql_profile.png)
 
 **Figure 3:** AI Profile management for configuring and validating an NL2SQL profile.
 
 ## Repository contents
 
-| Path | Purpose |
-| --- | --- |
-| [`ADB-AskOracle-Chatbot-2026-07-23.sql`](ADB-AskOracle-Chatbot-2026-08-06.sql) | Oracle APEX application export for Ask Oracle Select AI Release 5.0.0.1 It includes supporting objects. |
-| [Ask Oracle App Installation Steps.pdf](https://github.com/sandeepkhot/oracle-autonomous-database-samples/blob/main/apex/Ask-Oracle-Select-AI-Chatbot/Ask%20Oracle%20App%20Installation%20Steps.pdf) | Installation guide. |
-| `README.md` | This overview, setup guidance, and troubleshooting notes. |
+| Version | Application export | Release guide |
+| --- | --- | --- |
+| 5.0.0.2 | [`ADB-AskOracle-SelectAI-Chatbot-2026-11-18.sql`](V%205.0.0.2/ADB-AskOracle-SelectAI-Chatbot-2026-11-18.sql) | [Release README](V%205.0.0.2/README.md) |
+| 5.0.0.1 | [`ADB-AskOracle-Chatbot-2026-08-06.sql`](V%205.0.0.1/ADB-AskOracle-Chatbot-2026-08-06.sql) | [Release README](V%205.0.0.1/README.md) |
+| 5.0.0.0 | [`ADB-AskOracle-Chatbot-2026-07-23.sql`](V%205.0.0.0/ADB-AskOracle-Chatbot-2026-07-23.sql) | [Release README](V%205.0.0.0/README.md) |
+
+The [installation guide](https://github.com/oracle-devrel/oracle-autonomous-database-samples/blob/main/apex/Ask-Oracle-Select-AI-Chatbot/Ask%20Oracle%20App%20Installation%20Steps.pdf) and [installation video](https://github.com/oracle-devrel/oracle-autonomous-database-samples/blob/main/apex/images/Ask%20Oracle%20App%20Installation%20video.mp4) are also available in the repository.
 
 Prebuilt agent definitions are included with the application export and become available in the **Prebuilt Agents** interface after import. Installing an agent is only the first step: configure its credentials, parameters, tools, and target resources, plus least-privilege data access, before using it. This version does not include standalone prebuilt-agent definition files outside the application export.
 
 ## Prerequisites and compatibility
 
-Use a supported Oracle AI Database or Autonomous AI Database deployment where Oracle APEX and Oracle Select AI are available. The export was generated with Oracle APEX **24.2.17**; import it into a compatible APEX environment. Agent capabilities additionally require a deployment that supports the Oracle Select AI Agent Framework. Confirm feature availability, supported providers, and version requirements for your target database service before deployment.
+Use a supported Oracle AI Database or Autonomous AI Database deployment where Oracle APEX and Oracle Select AI are available. This export was generated with Oracle APEX **26.1.6** and requires APEX 26.1.6 or later. Oracle documents that an application created in a specific APEX release cannot be imported into an earlier version, so this export is not compatible with APEX 24. Agent capabilities additionally require a deployment that supports the Oracle Select AI Agent Framework. Confirm feature availability, supported providers, and version requirements for your target database service before deployment. See Oracle's [APEX import guidance](https://docs.oracle.com/en/database/oracle/apex/24.2/htmdb/importing-export-files.html).
 
 ### App installation prerequisites
 
@@ -118,14 +126,14 @@ alter user <APP_INSTALL_SCHEMA> quota <QUOTA> on <TABLESPACE>;
 
 ## Installation
 
-1. Download or clone this repository and locate [`ADB-AskOracle-Chatbot-2026-07-23.sql`](ADB-AskOracle-Chatbot-2026-07-23.sql).
+1. Download or clone this repository and locate the [5.0.0.2 application export](V%205.0.0.2/ADB-AskOracle-SelectAI-Chatbot-2026-11-18.sql).
 2. Sign in to the target Oracle APEX workspace as a workspace administrator or developer with permission to import applications.
 3. Open **App Builder**, select **Import**, choose the SQL export, and complete the import wizard. Choose the target parsing schema when prompted.
 4. Review the supporting-object installation during the import. The application export includes supporting objects; allow the import to install them when appropriate for your environment.
 5. Open the imported application and configure its Select AI Profiles, conversation defaults, and access controls. Configure RAG profiles and vector indexes only if you plan to use RAG; configure an agent team only if you plan to use agents.
 6. Run the application and complete the validation checks below.
 
-For an illustrated import procedure, see the [installation guide](https://github.com/sandeepkhot/oracle-autonomous-database-samples/blob/main/apex/Ask-Oracle-Select-AI-Chatbot/Ask%20Oracle%20App%20Installation%20Steps.pdf) or [watch the installation video on YouTube](https://youtu.be/kjeQ2AC3TFo). The local [MP4 copy](https://github.com/sandeepkhot/oracle-autonomous-database-samples/blob/main/apex/images/Ask%20Oracle%20App%20Installation%20video.mp4) is provided for download; GitHub does not reliably provide in-page MP4 playback for repository README content.
+For an illustrated import procedure, see the [installation guide](https://github.com/oracle-devrel/oracle-autonomous-database-samples/blob/main/apex/Ask-Oracle-Select-AI-Chatbot/Ask%20Oracle%20App%20Installation%20Steps.pdf), [watch the installation video on YouTube](https://youtu.be/kjeQ2AC3TFo), or [download the MP4 from this repository](https://github.com/oracle-devrel/oracle-autonomous-database-samples/blob/main/apex/images/Ask%20Oracle%20App%20Installation%20video.mp4). GitHub does not reliably provide in-page MP4 playback for repository README content.
 
 ## Configuration
 
@@ -135,7 +143,8 @@ Configure the application before making it available to end users:
 - **Conversation defaults:** Choose the default conversation mode and the default NL2SQL Profile, RAG Profile, and optional Agent Team.
 - **RAG:** Select the RAG AI Profile, Oracle AI Vector Search vector index, and retrieval settings. Use the provider default embedding model where applicable, then load and index trusted content before testing retrieval.
 - **Agents:** Use Agent Builder to create or refine teams, agents, tasks, and tools; validate the team before assigning it as a default. For a prebuilt agent, complete its required environment-specific configuration before validation.
-- **Governance:** Set application name, logo, branding, navigation, and permissions for actions such as SQL Editor, exports, deletion, conversation timer, and agent reasoning.
+- **Import and export:** Import or export AI Profile and agent configurations as needed for your environment.
+- **Governance:** Set application name, logo, branding, navigation, and permissions for actions such as SQL Editor, exports, deletion, conversation timer, and agent reasoning. End users are limited to the chat experience and do not have Settings page access.
 
 ## Quick start and validation
 
