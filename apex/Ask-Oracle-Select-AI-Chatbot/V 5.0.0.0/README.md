@@ -54,7 +54,7 @@ Release 5.0 helps teams move from asking questions to building governed AI appli
 | Path | Purpose |
 | --- | --- |
 | [`ADB-AskOracle-Chatbot-2026-07-23.sql`](ADB-AskOracle-Chatbot-2026-07-23.sql) | Oracle APEX application export for Ask Oracle Select AI Release 5.0. It includes supporting objects. |
-| [Ask Oracle App Installation Steps.pdf](https://github.com/sandeepkhot/oracle-autonomous-database-samples/blob/main/apex/Ask-Oracle-Select-AI-Chatbot/Ask%20Oracle%20App%20Installation%20Steps.pdf) | Installation guide. |
+| [Ask Oracle App Installation Steps.pdf](https://github.com/oracle-devrel/oracle-autonomous-database-samples/blob/main/apex/Ask-Oracle-Select-AI-Chatbot/Ask%20Oracle%20App%20Installation%20Steps.pdf) | Installation guide. |
 | `README.md` | This overview, setup guidance, and troubleshooting notes. |
 
 Prebuilt agent definitions are included with the application export and become available in the **Prebuilt Agents** interface after import. Installing an agent is only the first step: configure its credentials, parameters, tools, and target resources, plus least-privilege data access, before using it. This version does not include standalone prebuilt-agent definition files outside the application export.
@@ -124,7 +124,7 @@ alter user <APP_INSTALL_SCHEMA> quota <QUOTA> on <TABLESPACE>;
 5. Open the imported application and configure its Select AI Profiles, conversation defaults, and access controls. Configure RAG profiles and vector indexes only if you plan to use RAG; configure an agent team only if you plan to use agents.
 6. Run the application and complete the validation checks below.
 
-For an illustrated import procedure, see the [installation guide](https://github.com/sandeepkhot/oracle-autonomous-database-samples/blob/main/apex/Ask-Oracle-Select-AI-Chatbot/Ask%20Oracle%20App%20Installation%20Steps.pdf) or [watch the installation video on YouTube](https://youtu.be/kjeQ2AC3TFo). The local [MP4 copy](https://github.com/sandeepkhot/oracle-autonomous-database-samples/blob/main/apex/images/Ask%20Oracle%20App%20Installation%20video.mp4) is provided for download; GitHub does not reliably provide in-page MP4 playback for repository README content.
+For an illustrated import procedure, see the [installation guide](https://github.com/oracle-devrel/oracle-autonomous-database-samples/blob/main/apex/Ask-Oracle-Select-AI-Chatbot/Ask%20Oracle%20App%20Installation%20Steps.pdf), [watch the installation video on YouTube](https://youtu.be/kjeQ2AC3TFo), or [download the MP4 from this repository](https://github.com/oracle-devrel/oracle-autonomous-database-samples/blob/main/apex/images/Ask%20Oracle%20App%20Installation%20video.mp4). GitHub does not reliably provide in-page MP4 playback for repository README content.
 
 ## Configuration
 
